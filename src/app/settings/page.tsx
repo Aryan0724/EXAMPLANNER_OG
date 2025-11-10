@@ -38,24 +38,32 @@ const SubjectStudentList = ({ courseName, departmentName, subjectCode }: { cours
     }, [students, courseName, departmentName]);
 
     const handleToggleEligibility = (studentId: string) => {
+        let studentName = '';
+        let isNowEligible = false;
+
         setStudents(prevStudents => {
             return prevStudents.map(student => {
                 if (student.id === studentId) {
-                    const isEligible = student.eligibleSubjects.includes(subjectCode);
-                    const newEligibleSubjects = isEligible
-                        ? student.eligibleSubjects.filter(code => code !== subjectCode)
-                        : [...student.eligibleSubjects, subjectCode];
+                    studentName = student.name;
+                    const wasEligible = student.eligibleSubjects.includes(subjectCode);
+                    isNowEligible = !wasEligible;
                     
-                    toast({
-                        title: `Eligibility Updated for ${student.name}`,
-                        description: `${student.name} is now ${!isEligible ? 'eligible' : 'ineligible'} for ${subjectCode}.`,
-                    });
+                    const newEligibleSubjects = isNowEligible
+                        ? [...student.eligibleSubjects, subjectCode]
+                        : student.eligibleSubjects.filter(code => code !== subjectCode);
                     
                     return { ...student, eligibleSubjects: newEligibleSubjects };
                 }
                 return student;
             });
         });
+
+        if (studentName) {
+            toast({
+                title: `Eligibility Updated for ${studentName}`,
+                description: `${studentName} is now ${isNowEligible ? 'eligible' : 'ineligible'} for ${subjectCode}.`,
+            });
+        }
     };
 
     return (
