@@ -72,7 +72,7 @@ export const INVIGILATORS: Invigilator[] = Array.from({ length: 100 }, (_, i) =>
   id: `I${String(i + 1).padStart(3, '0')}`,
   name: `Professor ${i + 1}`,
   department: DEPARTMENTS[i % DEPARTMENTS.length],
-  isAvailable: Math.random() > 0.1, // 90% available
+  isAvailable: (i + 1) % 10 !== 0, // Deterministic: 90% available
   unavailableSlots: [],
   assignedSessionIds: [],
 }));
