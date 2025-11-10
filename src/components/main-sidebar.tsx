@@ -20,11 +20,13 @@ import {
   Telescope,
   CircleHelp,
   ShieldBan,
+  Printer,
 } from 'lucide-react';
 import Link from 'next/link';
 
 const menuItems = [
     { id: 'dashboard', href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'allotment', href: '/allotment', icon: Printer, label: 'Allotment' },
     { id: 'students', href: '/students', icon: Users, label: 'Students' },
     { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
     { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
@@ -86,5 +88,3 @@ export function MainSidebar() {
     </Sidebar>
   );
 }
-
-    
