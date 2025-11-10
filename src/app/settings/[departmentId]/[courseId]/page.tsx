@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
@@ -11,22 +10,14 @@ import { COURSES, DEPARTMENTS, EXAM_SCHEDULE } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
 export default function CourseSubjectsPage({ params }: { params: { departmentId: string, courseId: string } }) {
-  const departmentName = useMemo(() => {
-    return DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
-  }, [params.departmentId]);
+  const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
   
-  const courseName = useMemo(() => {
-      const coursesInDept = COURSES[departmentName as keyof typeof COURSES] || [];
-      return coursesInDept.find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === params.courseId) || 'Unknown Course';
-  }, [departmentName, params.courseId]);
+  const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === params.courseId) || 'Unknown Course';
 
-  const subjects = useMemo(() => {
-    const subjectsForCourse = EXAM_SCHEDULE.filter(
-      exam => exam.department === departmentName && exam.course === courseName
-    );
-    const uniqueSubjects = [...new Map(subjectsForCourse.map(s => [s.subjectCode, { code: s.subjectCode, name: s.subjectName }])).values()];
-    return uniqueSubjects;
-  }, [departmentName, courseName]);
+  const subjectsForCourse = EXAM_SCHEDULE.filter(
+    exam => exam.department === departmentName && exam.course === courseName
+  );
+  const subjects = [...new Map(subjectsForCourse.map(s => [s.subjectCode, { code: s.subjectCode, name: s.subjectName }])).values()];
 
   return (
     <SidebarProvider>

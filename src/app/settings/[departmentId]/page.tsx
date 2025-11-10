@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
@@ -11,17 +10,12 @@ import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
 export default function DepartmentCoursesPage({ params }: { params: { departmentId: string } }) {
-  const departmentName = useMemo(() => {
-    return DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
-  }, [params.departmentId]);
+  const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
 
-  const courses = useMemo(() => {
-    const coursesInDept = COURSES[departmentName as keyof typeof COURSES] || [];
-    return coursesInDept.map(course => ({
-      name: course,
-      id: encodeURIComponent(course.toLowerCase().replace(/ /g, '-')),
-    }));
-  }, [departmentName]);
+  const courses = (COURSES[departmentName as keyof typeof COURSES] || []).map(course => ({
+    name: course,
+    id: encodeURIComponent(course.toLowerCase().replace(/ /g, '-')),
+  }));
 
   return (
     <SidebarProvider>

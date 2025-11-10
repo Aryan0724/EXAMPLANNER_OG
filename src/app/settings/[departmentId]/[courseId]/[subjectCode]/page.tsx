@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -74,23 +74,13 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
     const [students, setStudents] = useState<Student[]>(initialStudents);
     const [dialogState, setDialogState] = useState<{isOpen: boolean; studentId: string | null; studentName: string | null}>({ isOpen: false, studentId: null, studentName: null });
 
-    const departmentName = useMemo(() => {
-        return DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === departmentId) || 'Unknown Department';
-    }, [departmentId]);
+    const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === departmentId) || 'Unknown Department';
     
-    const courseName = useMemo(() => {
-        const coursesInDept = COURSES[departmentName as keyof typeof COURSES] || [];
-        return coursesInDept.find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === courseId) || 'Unknown Course';
-    }, [departmentName, courseId]);
+    const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === courseId) || 'Unknown Course';
 
-    const subjectName = useMemo(() => {
-        const exam = EXAM_SCHEDULE.find(e => e.subjectCode === subjectCode);
-        return exam?.subjectName || 'Unknown Subject';
-    }, [subjectCode]);
+    const subjectName = EXAM_SCHEDULE.find(e => e.subjectCode === subjectCode)?.subjectName || 'Unknown Subject';
 
-    const relevantStudents = useMemo(() => {
-        return students.filter(s => s.course === courseName && s.department === departmentName);
-    }, [students, courseName, departmentName]);
+    const relevantStudents = students.filter(s => s.course === courseName && s.department === departmentName);
 
     const handleToggleEligibility = (studentId: string) => {
         const student = students.find(s => s.id === studentId);
