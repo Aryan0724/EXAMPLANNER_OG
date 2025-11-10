@@ -21,6 +21,7 @@ export interface Student {
   eligibleSubjects: string[]; // Array of subject codes
   unavailableSlots: AvailabilitySlot[];
   seatAssignment: SeatAssignment | null; // Persisted seat
+  isDebarred?: boolean;
 }
 
 export interface Classroom {

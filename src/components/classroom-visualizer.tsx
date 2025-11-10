@@ -23,6 +23,7 @@ const StudentTooltip = ({ student, seatNumber }: { student: Student | null, seat
         <p>Seat: {seatNumber}</p>
         {student && <p>ID: {student.id}</p>}
         {student && <p>Course: {student.course}</p>}
+        {student?.isDebarred && <p className="text-destructive font-bold">Status: Debarred</p>}
       </div>
     </TooltipContent>
   );
@@ -58,11 +59,11 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
                     className={cn(
                       "flex flex-col items-center justify-center w-24 h-16 rounded-md border-2 text-center p-1",
                       seat.student ? 'border-primary bg-primary/10' : 'border-dashed border-muted-foreground/50',
-                      (seat.student as any)?.isDebarred && 'border-destructive bg-destructive/10'
+                      seat.student?.isDebarred && 'border-destructive bg-destructive/10'
                     )}
                   >
                     {seat.student ? (
-                        (seat.student as any)?.isDebarred ? (
+                        seat.student.isDebarred ? (
                             <Ban className="w-5 h-5 text-destructive" />
                         ) : (
                             <User className="w-5 h-5 text-primary" />
@@ -71,10 +72,10 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
                       <div className="w-5 h-5" />
                     )}
                     <span className="text-xs text-foreground font-medium truncate w-full">
-                      {seat.student ? seat.student.name : 'Empty'}
+                      {seat.student ? (seat.student.isDebarred ? 'Debarred' : seat.student.name) : 'Empty'}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
-                        {seat.student ? seat.student.rollNo : `Seat ${seat.seatNumber}`}
+                        {seat.student && !seat.student.isDebarred ? seat.student.rollNo : `Seat ${seat.seatNumber}`}
                     </span>
                   </div>
                 </TooltipTrigger>

@@ -45,7 +45,7 @@ export default function StudentsPage() {
                           <TableCell>{student.department}</TableCell>
                           <TableCell>{student.course}</TableCell>
                           <TableCell>
-                             {(student as any).isDebarred && <Badge variant="destructive">Debarred</Badge>}
+                             {student.isDebarred && <Badge variant="destructive">Debarred</Badge>}
                           </TableCell>
                         </TableRow>
                       ))}
