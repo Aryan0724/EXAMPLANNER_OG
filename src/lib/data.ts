@@ -1,4 +1,5 @@
 
+
 import { Student, Classroom, createClassroom, Invigilator, ExamSlot } from './types';
 
 export const DEPARTMENTS = [
@@ -33,6 +34,7 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
       semester: semester,
       section: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][i % 8],
       eligibleSubjects: [], // Initially eligible for all subjects in their course
+      ineligibilityRecords: [],
       unavailableSlots: [],
       seatAssignment: null,
       isDebarred: isDebarred,

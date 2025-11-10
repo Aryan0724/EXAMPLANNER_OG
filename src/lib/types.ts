@@ -1,4 +1,5 @@
 
+
 export interface SeatAssignment {
   classroomId: string;
   roomNo: string;
@@ -11,6 +12,11 @@ export interface AvailabilitySlot {
   reason: string; // e.g., "Medical", "Maintenance"
 }
 
+export interface IneligibilityRecord {
+  subjectCode: string;
+  reason: string;
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -20,6 +26,7 @@ export interface Student {
   semester: number;
   section: string;
   eligibleSubjects: string[]; // Array of subject codes
+  ineligibilityRecords: IneligibilityRecord[];
   unavailableSlots: AvailabilitySlot[];
   seatAssignment: SeatAssignment | null; // Persisted seat
   isDebarred?: boolean;

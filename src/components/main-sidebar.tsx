@@ -19,6 +19,7 @@ import {
   FileText,
   Telescope,
   CircleHelp,
+  ShieldBan,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -28,7 +29,8 @@ const menuItems = [
     { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
     { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
     { id: 'reports', href: '/reports', icon: FileText, label: 'Reports' },
-    { id: 'explorer', href: '/explorer', icon: Telescope, label: 'Explorer' },
+    { id: 'explorer', href: '/settings', icon: Telescope, label: 'Explorer' },
+    { id: 'debarred', href: '/debarred', icon: ShieldBan, label: 'Debarred/Ineligible' },
 ];
 
 const helpMenuItems = [
@@ -37,7 +39,7 @@ const helpMenuItems = [
 
 export function MainSidebar() {
   const pathname = usePathname();
-  const activeItem = pathname.substring(1) || 'dashboard';
+  const activeItem = pathname.split('/')[1] || 'dashboard';
 
   return (
     <Sidebar>
