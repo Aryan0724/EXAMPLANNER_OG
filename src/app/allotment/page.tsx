@@ -83,109 +83,113 @@ export default function AllotmentPage() {
   const representativeExam = seatPlan ? examSlotsByTime[selectedSlotKey!]?.[0] : null;
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen">
-        <MainSidebar />
-        <SidebarInset>
-          <div className="flex flex-col h-full">
-            <MainHeader />
-            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-              <div className="space-y-8 no-print">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Seat Plan Generation & Allotment</CardTitle>
-                    <CardDescription>Select an exam session and generate the seat allotment and invigilator duties.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className="w-full sm:w-auto flex-grow">
-                      <Select onValueChange={setSelectedSlotKey} defaultValue={selectedSlotKey}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an exam session..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {slotOptions.map(slot => (
-                            <SelectItem key={slot.id} value={slot.id}>{slot.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button onClick={handleGeneration} disabled={isGenerating || !selectedSlotKey} className="w-full sm:w-auto">
-                      {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                      Generate Plan
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {seatPlan && (
+    <>
+      <SidebarProvider>
+        <div className="flex min-h-screen no-print">
+          <MainSidebar />
+          <SidebarInset>
+            <div className="flex flex-col h-full">
+              <MainHeader />
+              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+                <div className="space-y-8">
                   <Card>
                     <CardHeader>
-                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                              <CardTitle>Allotment Viewer</CardTitle>
-                              <CardDescription>
-                                 Viewing plan for session: {representativeExam?.date} @ {representativeExam?.time}
-                              </CardDescription>
-                          </div>
-                          <div className="flex items-center gap-2 mt-4 sm:mt-0">
-                               <Select onValueChange={setSelectedClassroomId} value={selectedClassroomId || ''}>
-                                  <SelectTrigger className="w-full sm:w-[280px]">
-                                      <SelectValue placeholder="Select a classroom to view" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                      {classroomsInPlan.map(c => (
-                                          <SelectItem key={c.id} value={c.id}>{c.id} - {c.roomNo} ({c.building})</SelectItem>
-                                      ))}
-                                  </SelectContent>
-                              </Select>
-                              <Button onClick={handlePrint} variant="outline" disabled={!selectedClassroom}>
-                                <Printer className="mr-2 h-4 w-4" />
-                                Print Allotment
-                              </Button>
-                          </div>
-                      </div>
+                      <CardTitle>Seat Plan Generation & Allotment</CardTitle>
+                      <CardDescription>Select an exam session and generate the seat allotment and invigilator duties.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      {selectedClassroom && (
-                          <div key={selectedClassroom.id}>
-                              <h3 className="flex items-center gap-2 text-xl font-semibold mb-4 text-center justify-center">
-                                  <Building className="w-6 h-6" />
-                                  Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
-                              </h3>
-                               <p className="text-center mb-1 text-muted-foreground">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
-                               <p className="text-center mb-4 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
-                              <ClassroomVisualizer
-                                  classroom={selectedClassroom}
-                                  assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
-                              />
-                          </div>
-                      )}
-                      {!selectedClassroom && (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <p>Select a classroom to view its seating arrangement.</p>
-                        </div>
-                      )}
+                    <CardContent className="flex flex-col sm:flex-row items-center gap-4">
+                      <div className="w-full sm:w-auto flex-grow">
+                        <Select onValueChange={setSelectedSlotKey} defaultValue={selectedSlotKey}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an exam session..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {slotOptions.map(slot => (
+                              <SelectItem key={slot.id} value={slot.id}>{slot.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button onClick={handleGeneration} disabled={isGenerating || !selectedSlotKey} className="w-full sm:w-auto">
+                        {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                        Generate Plan
+                      </Button>
                     </CardContent>
                   </Card>
-                )}
-              </div>
-               {selectedClassroom && (
-                  <div className="printable-area">
-                      <h3 className="flex items-center gap-2 text-xl font-semibold mb-4 text-center justify-center">
-                          <Building className="w-6 h-6" />
-                          Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
-                      </h3>
-                       <p className="text-center mb-1 text-muted-foreground">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
-                       <p className="text-center mb-4 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
-                      <ClassroomVisualizer
-                          classroom={selectedClassroom}
-                          assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
-                      />
-                  </div>
-              )}
-            </main>
-          </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+
+                  {seatPlan && (
+                    <Card>
+                      <CardHeader>
+                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <CardTitle>Allotment Viewer</CardTitle>
+                                <CardDescription>
+                                   Viewing plan for session: {representativeExam?.date} @ {representativeExam?.time}
+                                </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                                 <Select onValueChange={setSelectedClassroomId} value={selectedClassroomId || ''}>
+                                    <SelectTrigger className="w-full sm:w-[280px]">
+                                        <SelectValue placeholder="Select a classroom to view" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {classroomsInPlan.map(c => (
+                                            <SelectItem key={c.id} value={c.id}>{c.id} - {c.roomNo} ({c.building})</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button onClick={handlePrint} variant="outline" disabled={!selectedClassroom}>
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  Print Allotment
+                                </Button>
+                            </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {selectedClassroom && (
+                            <div key={selectedClassroom.id}>
+                                <h3 className="flex items-center gap-2 text-xl font-semibold mb-4 text-center justify-center">
+                                    <Building className="w-6 h-6" />
+                                    Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
+                                </h3>
+                                 <p className="text-center mb-1 text-muted-foreground">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
+                                 <p className="text-center mb-4 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
+                                <ClassroomVisualizer
+                                    classroom={selectedClassroom}
+                                    assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
+                                />
+                            </div>
+                        )}
+                        {!selectedClassroom && (
+                          <div className="text-center py-12 text-muted-foreground">
+                            <p>Select a classroom to view its seating arrangement.</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </main>
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+      {selectedClassroom && (
+        <div className="printable-area hidden">
+             <div className="p-4 border rounded-lg">
+                <h3 className="flex items-center gap-2 text-2xl font-bold mb-4 text-center justify-center">
+                    <Building className="w-8 h-8" />
+                    Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
+                </h3>
+                 <p className="text-center text-lg mb-1">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
+                 <p className="text-center text-lg mb-6">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
+                <ClassroomVisualizer
+                    classroom={selectedClassroom}
+                    assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
+                />
+            </div>
+        </div>
+      )}
+    </>
   );
 }
