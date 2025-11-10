@@ -28,11 +28,11 @@ const menuItems = [
     { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
     { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
     { id: 'reports', href: '/reports', icon: FileText, label: 'Reports' },
+    { id: 'settings', href: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 const helpMenuItems = [
     { id: 'help', href: '#', icon: CircleHelp, label: 'Help & Support' },
-    { id: 'settings', href: '#', icon: Settings, label: 'Settings' },
 ]
 
 export function MainSidebar() {
