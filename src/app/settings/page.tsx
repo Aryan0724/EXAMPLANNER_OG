@@ -108,18 +108,23 @@ const SubjectStudentList = ({ courseName, departmentName, subjectCode }: { cours
 
         if (isCurrentlyIneligible) {
             // Make them eligible again (remove the record)
+            let studentName = '';
             setStudents(prevStudents => {
-                return prevStudents.map(s => {
+                const newStudents = prevStudents.map(s => {
                     if (s.id === studentId) {
+                        studentName = s.name;
                         return { ...s, ineligibilityRecords: s.ineligibilityRecords.filter(r => r.subjectCode !== subjectCode) };
                     }
                     return s;
                 });
+                return newStudents;
             });
-            toast({
-                title: `Eligibility Updated for ${student.name}`,
-                description: `${student.name} is now ELIGIBLE for ${subjectCode}.`,
-            });
+             if (studentName) {
+                toast({
+                    title: `Eligibility Updated for ${studentName}`,
+                    description: `${studentName} is now ELIGIBLE for ${subjectCode}.`,
+                });
+            }
         } else {
             // Open dialog to get reason for ineligibility
             setDialogState({ isOpen: true, studentId, studentName: student.name });
