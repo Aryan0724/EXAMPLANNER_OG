@@ -29,7 +29,7 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
     // TODO: Implement seat retention logic here.
     // For now, we assign all students.
     const studentsToAssign = allEligibleStudents.filter(s => !s.seatAssignment);
-    const studentsWithPersistedSeats = allEligibleStudents.filter(s => s.seatAssignment);
+    // const studentsWithPersistedSeats = allEligibleStudents.filter(s => s.seatAssignment);
 
     let studentIndex = 0;
 
@@ -40,7 +40,7 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
             continue; // Skip classroom if unavailable for any of the current exams
         }
 
-        const roomSeats: { student: (Student & { exam: ExamSlot; }) | null; classroom: Classroom; seatNumber: number; }[] = [];
+        const roomSeats: Seat[] = [];
 
         // Pre-fill all seats as empty
         for (let seatNum = 1; seatNum <= room.capacity; seatNum++) {
@@ -48,7 +48,7 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
         }
 
         // --- Start of New Bench-Aware and Course-Mixing Logic ---
-        const benches: { seats: { student: (Student & { exam: ExamSlot; }) | null; classroom: Classroom; seatNumber: number; }[] }[] = [];
+        const benches: { seats: Seat[] }[] = [];
         for (let i = 0; i < room.rows * room.columns; i++) {
             const benchSeats = roomSeats.slice(i * room.benchCapacity, (i + 1) * room.benchCapacity);
             if (benchSeats.length > 0) {
@@ -58,26 +58,30 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
         
         for (const bench of benches) {
             for (let i = 0; i < bench.seats.length; i++) {
-                if (studentIndex < studentsToAssign.length) {
-                    const studentToPlace = studentsToAssign[studentIndex];
-                    const otherStudentsOnBench = bench.seats.map(s => s.student).filter(Boolean);
+                if (studentIndex >= studentsToAssign.length) break;
 
-                    // **RULE: Students on the same bench must be from different courses**
-                    const canPlace = otherStudentsOnBench.every(
-                        other => other.course !== studentToPlace.course
-                    );
-                    
-                    if (canPlace) {
-                        bench.seats[i].student = studentToPlace;
+                const studentToPlace = studentsToAssign[studentIndex];
+                const otherStudentsOnBench = bench.seats.map(s => s.student).filter(Boolean);
+
+                // **RULE: Students on the same bench must be from different courses**
+                const canPlace = otherStudentsOnBench.every(
+                    // The "exam" property is added dynamically, so we need to cast to any
+                    other => (other as any).exam.course !== (studentToPlace as any).exam.course
+                );
+                
+                if (canPlace) {
+                    // Find the first empty seat on the bench
+                    const emptySeatIndex = bench.seats.findIndex(s => s.student === null);
+                    if (emptySeatIndex !== -1) {
+                        bench.seats[emptySeatIndex].student = studentToPlace;
                         studentIndex++;
                     }
-                    // If we can't place this student, we'll try to place the next one, leaving a gap.
-                    // This is a simple greedy approach. A more complex algorithm would backtrack.
                 }
             }
         }
         
         assignments.push(...benches.flatMap(b => b.seats));
+        if (studentIndex >= studentsToAssign.length) break; // All students seated
     }
 
 
