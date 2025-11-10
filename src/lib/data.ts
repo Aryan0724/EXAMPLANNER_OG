@@ -21,7 +21,7 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
     const deptCourses = COURSES[dept as keyof typeof COURSES];
     const course = deptCourses[0]; // All students in the first course of their dept
     const semester = 1; // All are 1st year students
-    const isDebarred = Math.random() < 0.02; // 2% of students are debarred
+    const isDebarred = (i + 1) % 50 === 0; // ~2% of students are debarred, but deterministically
     
     return {
       id: `S${String(i + 1).padStart(4, '0')}`,
