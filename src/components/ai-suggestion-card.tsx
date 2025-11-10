@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState, useEffect } from 'react';
+import { useFormStatus } from 'react-dom';
 import { suggestAvailability, type SuggestAvailabilityInput, type SuggestAvailabilityOutput } from '@/ai/flows/suggest-availability';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -8,9 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bot, Loader2, Lightbulb, CheckCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Bot, Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect } from 'react';
 
 const initialState: {
   output: SuggestAvailabilityOutput | null;
@@ -54,7 +55,7 @@ function SubmitButton() {
 }
 
 export function AiSuggestionCard() {
-  const [state, formAction] = useFormState(suggestAvailabilityAction, initialState);
+  const [state, formAction] = useActionState(suggestAvailabilityAction, initialState);
   const { toast } = useToast();
 
   useEffect(() => {
