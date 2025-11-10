@@ -1,54 +1,91 @@
-import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment } from './types';
+import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat } from './types';
 
 // This is a simplified logic for demonstration purposes.
 // It will be expanded upon based on the detailed algorithm provided.
 
-export function generateSeatPlan(students: Student[], classrooms: Classroom[], exam: ExamSlot): SeatPlan {
-  const assignments = [];
+function getEligibleStudentsForExam(students: Student[], exam: ExamSlot): Student[] {
+    return students.filter(s => {
+        const isDebarred = (s as any).isDebarred;
+        // A student is eligible if their course and semester match the exam
+        const isTakingExam = s.course === exam.course && s.semester === exam.semester;
+        // Or if the specific exam subject code is in their list of eligible subjects
+        const isEligibleForSubject = s.eligibleSubjects.includes(exam.subjectCode);
 
-  // Filter students who are eligible for this exam (based on course, semester, and not debarred/unavailable)
-  const eligibleStudents = students.filter(s => {
-    const isDebarred = (s as any).isDebarred; // Temporary check for old data structure
-    const isTakingExam = s.course === exam.course && s.semester === exam.semester;
-    const isUnavailable = s.unavailableSlots.some(slot => slot.slotId === exam.id);
-    return isTakingExam && !isDebarred && !isUnavailable;
-  });
+        const isUnavailable = s.unavailableSlots.some(slot => slot.slotId === exam.id);
+        
+        return (isTakingExam || isEligibleForSubject) && !isDebarred && !isUnavailable;
+    });
+}
 
-  // Prioritize students who already have a seat assignment
-  const studentsWithPersistedSeats = eligibleStudents.filter(s => s.seatAssignment);
-  const studentsToAssign = eligibleStudents.filter(s => !s.seatAssignment);
 
-  let studentIndex = 0;
+export function generateSeatPlan(students: Student[], classrooms: Classroom[], exams: ExamSlot[]): SeatPlan {
+    const assignments: Seat[] = [];
+    
+    // This function now handles multiple exams happening at the same time.
+    const allEligibleStudents = exams.flatMap(exam =>
+        getEligibleStudentsForExam(students, exam).map(student => ({ ...student, exam: exam }))
+    );
 
-  // Simplified sorting of classrooms by capacity
-  const sortedClassrooms = [...classrooms].sort((a, b) => b.capacity - a.capacity);
+    // TODO: Implement seat retention logic here.
+    // For now, we assign all students.
+    const studentsToAssign = allEligibleStudents.filter(s => !s.seatAssignment);
+    const studentsWithPersistedSeats = allEligibleStudents.filter(s => s.seatAssignment);
 
-  for (const room of sortedClassrooms) {
-    // Check if classroom is available
-    if (room.unavailableSlots.some(slot => slot.slotId === exam.id)) {
-      continue;
+    let studentIndex = 0;
+
+    const sortedClassrooms = [...classrooms].sort((a, b) => a.capacity - b.capacity);
+
+    for (const room of sortedClassrooms) {
+        if (exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id))) {
+            continue; // Skip classroom if unavailable for any of the current exams
+        }
+
+        const roomSeats: { student: (Student & { exam: ExamSlot; }) | null; classroom: Classroom; seatNumber: number; }[] = [];
+
+        // Pre-fill all seats as empty
+        for (let seatNum = 1; seatNum <= room.capacity; seatNum++) {
+            roomSeats.push({ student: null, classroom: room, seatNumber: seatNum });
+        }
+
+        // --- Start of New Bench-Aware and Course-Mixing Logic ---
+        const benches: { seats: { student: (Student & { exam: ExamSlot; }) | null; classroom: Classroom; seatNumber: number; }[] }[] = [];
+        for (let i = 0; i < room.rows * room.columns; i++) {
+            const benchSeats = roomSeats.slice(i * room.benchCapacity, (i + 1) * room.benchCapacity);
+            if (benchSeats.length > 0) {
+                 benches.push({ seats: benchSeats });
+            }
+        }
+        
+        for (const bench of benches) {
+            for (let i = 0; i < bench.seats.length; i++) {
+                if (studentIndex < studentsToAssign.length) {
+                    const studentToPlace = studentsToAssign[studentIndex];
+                    const otherStudentsOnBench = bench.seats.map(s => s.student).filter(Boolean);
+
+                    // **RULE: Students on the same bench must be from different courses**
+                    const canPlace = otherStudentsOnBench.every(
+                        other => other.course !== studentToPlace.course
+                    );
+                    
+                    if (canPlace) {
+                        bench.seats[i].student = studentToPlace;
+                        studentIndex++;
+                    }
+                    // If we can't place this student, we'll try to place the next one, leaving a gap.
+                    // This is a simple greedy approach. A more complex algorithm would backtrack.
+                }
+            }
+        }
+        
+        assignments.push(...benches.flatMap(b => b.seats));
     }
 
-    for (let seatNum = 1; seatNum <= room.capacity; seatNum++) {
-      if (studentIndex < studentsToAssign.length) {
-        const student = studentsToAssign[studentIndex];
 
-        // This is where the complex adjacency logic will go.
-        // For now, it's a simple sequential assignment.
-
-        assignments.push({ student, classroom: room, seatNumber: seatNum });
-        studentIndex++;
-      } else {
-        // Fill remaining seats as empty
-        assignments.push({ student: null, classroom: room, seatNumber: seatNum });
-      }
-    }
-  }
-
-  // TODO: Handle students with persisted seats.
-  // TODO: Handle unassigned students if capacity is exceeded.
-
-  return { exam, assignments };
+    return {
+        // Since this plan is for a single time slot, we can use the first exam as representative
+        exam: exams[0],
+        assignments,
+    };
 }
 
 
@@ -57,18 +94,24 @@ export function assignInvigilators(invigilators: Invigilator[], classroomsInUse:
   const assignments: InvigilatorAssignment[] = [];
   let invigilatorIndex = 0;
 
-  // This is where invigilator assignment rules (count, non-consecutive) will be implemented.
-
   for (const room of classroomsInUse) {
-    if (availableInvigilators.length > 0) {
-      // Simplified rotation
-      const invigilator = availableInvigilators[invigilatorIndex % availableInvigilators.length];
-      assignments.push({
-        exam,
-        classroom: room,
-        invigilator,
-      });
-      invigilatorIndex++;
+      // Basic invigilator count rule
+      const studentCount = room.capacity; // This should be actual student count
+      let requiredInvigilators = 1;
+      if (studentCount > 90) requiredInvigilators = 4;
+      else if (studentCount > 60) requiredInvigilators = 3;
+      else if (studentCount > 19) requiredInvigilators = 2;
+
+    for(let i=0; i < requiredInvigilators; i++) {
+         if (availableInvigilators.length > 0) {
+            const invigilator = availableInvigilators[invigilatorIndex % availableInvigilators.length];
+            assignments.push({
+                exam,
+                classroom: room,
+                invigilator,
+            });
+            invigilatorIndex++;
+         }
     }
   }
   return assignments;

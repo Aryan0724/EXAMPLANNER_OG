@@ -39,6 +39,26 @@ import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AiSuggestionCard } from '@/components/ai-suggestion-card';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 
+// Group exams by date and time to handle concurrent exams
+const examSlotsByTime = EXAM_SCHEDULE.reduce((acc, exam) => {
+  const key = `${exam.date} ${exam.time}`;
+  if (!acc[key]) {
+    acc[key] = [];
+  }
+  acc[key].push(exam);
+  return acc;
+}, {} as Record<string, ExamSlot[]>);
+
+const slotOptions = Object.entries(examSlotsByTime).map(([key, exams]) => {
+    const representativeExam = exams[0];
+    const examNames = exams.map(e => e.subjectCode).join(', ');
+    return {
+        id: key,
+        label: `${representativeExam.date} @ ${representativeExam.time} (${examNames})`
+    }
+});
+
+
 export function DashboardClient() {
   const { toast } = useToast();
 
@@ -62,7 +82,7 @@ export function DashboardClient() {
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedExamId, setSelectedExamId] = useState<string | undefined>(EXAM_SCHEDULE[0]?.id);
+  const [selectedSlotKey, setSelectedSlotKey] = useState<string | undefined>(slotOptions[0]?.id);
   const [seatPlan, setSeatPlan] = useState<SeatPlan | null>(null);
   const [invigilatorAssignments, setInvigilatorAssignments] = useState<InvigilatorAssignment[] | null>(null);
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
@@ -87,7 +107,7 @@ export function DashboardClient() {
                 break;
             case 'schedule':
                 loadedData = { schedule: EXAM_SCHEDULE };
-                toastMessage = `Exam schedule with ${EXAM_SCHEDULE.length} exams loaded.`;
+                toastMessage = `Exam schedule with ${EXAM_SCHEDULE.length} slots loaded.`;
                 break;
         }
       setData(prev => ({...prev, ...loadedData}));
@@ -100,32 +120,32 @@ export function DashboardClient() {
   };
 
   const handleGeneration = () => {
-    if (!selectedExamId || data.students.length === 0 || data.classrooms.length === 0) {
+    if (!selectedSlotKey || data.students.length === 0 || data.classrooms.length === 0) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Please load student and classroom data, and select an exam before generating.',
+        description: 'Please load student and classroom data, and select an exam slot before generating.',
       });
       return;
     }
     
     setIsGenerating(true);
     setTimeout(() => {
-      const selectedExam = data.schedule.find(e => e.id === selectedExamId);
-      if (!selectedExam) return;
+      const selectedExams = examSlotsByTime[selectedSlotKey];
+      if (!selectedExams || selectedExams.length === 0) return;
 
-      const newSeatPlan = generateSeatPlan(data.students, data.classrooms, selectedExam);
+      const newSeatPlan = generateSeatPlan(data.students, data.classrooms, selectedExams);
       setSeatPlan(newSeatPlan);
       
-      const classroomsInUse = Array.from(new Set(newSeatPlan.assignments.map(a => a.classroom)));
+      const classroomsInUse = [...new Map(newSeatPlan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
 
-      const newInvigilatorAssignments = assignInvigilators(data.invigilators, classroomsInUse, selectedExam);
+      const newInvigilatorAssignments = assignInvigilators(data.invigilators, classroomsInUse, selectedExams[0]);
       setInvigilatorAssignments(newInvigilatorAssignments);
 
       setIsGenerating(false);
       toast({
         title: 'Generation Complete',
-        description: 'Seat plan and invigilator assignments have been generated.',
+        description: `Seat plan generated for ${selectedExams.length} concurrent exam(s).`,
       });
     }, 2000);
   };
@@ -135,6 +155,8 @@ export function DashboardClient() {
   const classroomsInPlan = seatPlan ? [...new Map(seatPlan.assignments.map(item => [item.classroom.id, item.classroom])).values()] : [];
 
   const filteredClassrooms = departmentFilter === 'all' ? classroomsInPlan : classroomsInPlan.filter(c => c.departmentBlock === CLASSROOMS.find(cl => cl.id.startsWith(departmentFilter.substring(0,2)))?.departmentBlock);
+
+  const representativeExam = seatPlan ? examSlotsByTime[selectedSlotKey!]?.[0] : null;
 
 
   return (
@@ -170,22 +192,22 @@ export function DashboardClient() {
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Control Panel & Generation</CardTitle>
-            <CardDescription>Select an exam and generate the seat allotment and invigilator duties.</CardDescription>
+            <CardDescription>Select an exam session and generate the seat allotment and invigilator duties.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col sm:flex-row items-center gap-4">
             <div className="w-full sm:w-auto flex-grow">
-              <Select onValueChange={setSelectedExamId} defaultValue={selectedExamId} disabled={data.schedule.length === 0}>
+              <Select onValueChange={setSelectedSlotKey} defaultValue={selectedSlotKey} disabled={data.schedule.length === 0}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an exam..." />
+                  <SelectValue placeholder="Select an exam session..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {data.schedule.map(exam => (
-                    <SelectItem key={exam.id} value={exam.id}>{exam.subjectName} ({exam.course}) - {exam.date} @ {exam.time}</SelectItem>
+                  {slotOptions.map(slot => (
+                    <SelectItem key={slot.id} value={slot.id}>{slot.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleGeneration} disabled={isGenerating || !selectedExamId} className="w-full sm:w-auto">
+            <Button onClick={handleGeneration} disabled={isGenerating || !selectedSlotKey} className="w-full sm:w-auto">
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Generate Plan
             </Button>
@@ -200,7 +222,7 @@ export function DashboardClient() {
                 <div>
                     <CardTitle>Allotment & Schedule</CardTitle>
                     <CardDescription>
-                        Generated plan for: {seatPlan?.exam.subjectName}
+                       Generated plan for session: {representativeExam?.date} @ {representativeExam?.time}
                     </CardDescription>
                 </div>
                 <div className="flex items-center gap-2 mt-4 sm:mt-0">
@@ -268,7 +290,6 @@ export function DashboardClient() {
         </Card>
       )}
 
-      {/* Report Generation Card removed for brevity for now */}
     </div>
   );
 }
