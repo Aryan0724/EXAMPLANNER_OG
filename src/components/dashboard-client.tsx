@@ -31,9 +31,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileUp, FileDown, Bot, Loader2, Sparkles, Filter } from 'lucide-react';
+import { FileUp, FileDown, Sparkles, Loader2, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Student, Classroom, Invigilator, Exam, SeatPlan, InvigilatorAssignment } from '@/lib/types';
+import type { Student, Classroom, Invigilator, ExamSlot, SeatPlan, InvigilatorAssignment } from '@/lib/types';
 import { STUDENTS, CLASSROOMS, INVIGILATORS, EXAM_SCHEDULE, DEPARTMENTS } from '@/lib/data';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AiSuggestionCard } from '@/components/ai-suggestion-card';
@@ -52,7 +52,7 @@ export function DashboardClient() {
     students: Student[];
     classrooms: Classroom[];
     invigilators: Invigilator[];
-    schedule: Exam[];
+    schedule: ExamSlot[];
   }>({
     students: [],
     classrooms: [],
@@ -73,7 +73,7 @@ export function DashboardClient() {
         let toastMessage;
         switch(type) {
             case 'students':
-                loadedData = { students: STUDENTS };
+                loadedData = { students: STUDENTS as Student[] }; // Casting for temp compat
                 toastMessage = `${STUDENTS.length} student records loaded.`;
                 break;
             case 'classrooms':
@@ -139,7 +139,8 @@ export function DashboardClient() {
   };
 
   const filteredSeatPlan = seatPlan?.assignments.filter(a => departmentFilter === 'all' || a.student?.department === departmentFilter);
-  const filteredInvigilators = invigilatorAssignments?.filter(a => departmentFilter === 'all' || a.classroom.departmentBlock === CLASSROOMS.find(c => c.departmentBlock === departmentFilter)?.departmentBlock)
+  const filteredInvigilators = invigilatorAssignments?.filter(a => departmentFilter === 'all' || a.classroom.departmentBlock === CLASSROOMS.find(c => c.id.startsWith(departmentFilter.substring(0,2)))?.departmentBlock);
+
 
   return (
     <div className="space-y-8">
@@ -184,7 +185,7 @@ export function DashboardClient() {
                 </SelectTrigger>
                 <SelectContent>
                   {data.schedule.map(exam => (
-                    <SelectItem key={exam.id} value={exam.id}>{exam.subject} ({exam.department}) - {exam.date} @ {exam.time}</SelectItem>
+                    <SelectItem key={exam.id} value={exam.id}>{exam.subjectName} ({exam.course}) - {exam.date} @ {exam.time}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -204,7 +205,7 @@ export function DashboardClient() {
                 <div>
                     <CardTitle>Allotment & Schedule</CardTitle>
                     <CardDescription>
-                        Generated plan for: {seatPlan?.exam.subject}
+                        Generated plan for: {seatPlan?.exam.subjectName}
                     </CardDescription>
                 </div>
                 <div className="flex items-center gap-2 mt-4 sm:mt-0">
@@ -238,7 +239,7 @@ export function DashboardClient() {
                         <TableHead>Seat No.</TableHead>
                         <TableHead>Student ID</TableHead>
                         <TableHead>Student Name</TableHead>
-                        <TableHead>Department</TableHead>
+                        <TableHead>Course</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -249,9 +250,9 @@ export function DashboardClient() {
                           <TableCell>{seat.seatNumber}</TableCell>
                           <TableCell className="font-code">{seat.student?.id ?? '---'}</TableCell>
                           <TableCell>{seat.student?.name ?? '---'}</TableCell>
-                          <TableCell>{seat.student?.department ?? '---'}</TableCell>
+                          <TableCell>{seat.student?.course ?? '---'}</TableCell>
                           <TableCell>
-                            {seat.student?.isDebarred ? <Badge variant="destructive">Debarred</Badge> : seat.student ? <Badge variant="secondary">Allotted</Badge> : <Badge variant="outline">Empty</Badge>}
+                            {(seat.student as any)?.isDebarred ? <Badge variant="destructive">Debarred</Badge> : seat.student ? <Badge variant="secondary">Allotted</Badge> : <Badge variant="outline">Empty</Badge>}
                           </TableCell>
                         </TableRow>
                       ))}
