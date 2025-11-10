@@ -30,7 +30,6 @@ const menuItems = [
     { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
     { id: 'reports', href: '/reports', icon: FileText, label: 'Reports' },
     { id: 'explorer', href: '/settings', icon: Telescope, label: 'Explorer' },
-    { id: 'debarred', href: '/debarred', icon: ShieldBan, label: 'Debarred/Ineligible' },
 ];
 
 const helpMenuItems = [
