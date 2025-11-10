@@ -7,7 +7,7 @@ import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sparkles, Loader2, Printer, Building } from 'lucide-react';
+import { Sparkles, Loader2, Printer, Building, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom } from '@/lib/types';
 import { STUDENTS, CLASSROOMS, INVIGILATORS, EXAM_SCHEDULE } from '@/lib/data';
@@ -80,6 +80,10 @@ export default function AllotmentPage() {
 
   const selectedClassroom = selectedClassroomId ? classroomsInPlan.find(c => c.id === selectedClassroomId) : null;
 
+  const invigilatorsForClassroom = selectedClassroom && invigilatorAssignments
+    ? invigilatorAssignments.filter(a => a.classroom.id === selectedClassroom?.id).map(a => a.invigilator)
+    : [];
+
   const representativeExam = seatPlan ? examSlotsByTime[selectedSlotKey!]?.[0] : null;
 
   return (
@@ -148,12 +152,17 @@ export default function AllotmentPage() {
                       <CardContent>
                         {selectedClassroom && (
                             <div key={selectedClassroom.id}>
-                                <h3 className="flex items-center gap-2 text-xl font-semibold mb-4 text-center justify-center">
+                                <h3 className="flex items-center gap-2 text-xl font-semibold mb-2 text-center justify-center">
                                     <Building className="w-6 h-6" />
                                     Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
                                 </h3>
-                                 <p className="text-center mb-1 text-muted-foreground">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
-                                 <p className="text-center mb-4 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
+                                <p className="text-center mb-1 text-muted-foreground">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
+                                <p className="text-center mb-2 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
+                                <div className="text-center mb-4">
+                                  <p className="text-sm font-medium text-muted-foreground inline-flex items-center gap-2">
+                                    <UserCheck className="w-4 h-4" /> Invigilator(s): <span className="font-semibold text-foreground">{invigilatorsForClassroom.map(i => i.name).join(', ')}</span>
+                                  </p>
+                                </div>
                                 <ClassroomVisualizer
                                     classroom={selectedClassroom}
                                     assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
@@ -177,12 +186,17 @@ export default function AllotmentPage() {
       {selectedClassroom && (
         <div className="printable-area hidden">
              <div className="p-4 border rounded-lg">
-                <h3 className="flex items-center gap-2 text-2xl font-bold mb-4 text-center justify-center">
+                <h3 className="flex items-center gap-2 text-2xl font-bold mb-2 text-center justify-center">
                     <Building className="w-8 h-8" />
                     Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
                 </h3>
                  <p className="text-center text-lg mb-1">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
-                 <p className="text-center text-lg mb-6">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
+                 <p className="text-center text-lg mb-2">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
+                 <div className="text-center mb-6">
+                    <p className="text-md font-medium inline-flex items-center gap-2">
+                        <UserCheck className="w-5 h-5" /> Invigilator(s): <span className="font-semibold">{invigilatorsForClassroom.map(i => i.name).join(', ')}</span>
+                    </p>
+                 </div>
                 <ClassroomVisualizer
                     classroom={selectedClassroom}
                     assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
