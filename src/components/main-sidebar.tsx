@@ -17,7 +17,7 @@ import {
   Building,
   UserCheck,
   FileText,
-  Settings,
+  Telescope,
   CircleHelp,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -28,7 +28,7 @@ const menuItems = [
     { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
     { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
     { id: 'reports', href: '/reports', icon: FileText, label: 'Reports' },
-    { id: 'settings', href: '/settings', icon: Settings, label: 'Settings' },
+    { id: 'explorer', href: '/explorer', icon: Telescope, label: 'Explorer' },
 ];
 
 const helpMenuItems = [
