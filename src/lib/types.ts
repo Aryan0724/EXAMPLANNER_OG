@@ -1,3 +1,4 @@
+
 export interface SeatAssignment {
   classroomId: string;
   roomNo: string;

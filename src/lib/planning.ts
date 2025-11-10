@@ -1,3 +1,4 @@
+
 import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat } from './types';
 
 // This is a simplified logic for demonstration purposes.

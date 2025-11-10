@@ -1,3 +1,4 @@
+
 import { Student, Classroom, createClassroom, Invigilator, ExamSlot } from './types';
 
 export const DEPARTMENTS = [
@@ -19,9 +20,16 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
     const deptIndex = i % DEPARTMENTS.length;
     const dept = DEPARTMENTS[deptIndex];
     const deptCourses = COURSES[dept as keyof typeof COURSES];
-    const course = deptCourses[0]; // All students in the first course of their dept
+    const course = deptCourses[0];
     const semester = 1; // All are 1st year students
-    const isDebarred = (i + 1) % 50 === 0; // ~2% of students are debarred, but deterministically
+    const isDebarred = (i + 1) % 50 === 0;
+
+    // Make some students ineligible for a specific subject
+    let eligibleSubjects: string[] = [];
+    if ((i + 1) % 20 === 0) { // Approx 5% of students
+      // Let's assume they are not eligible for '...102' subjects
+      eligibleSubjects = ['CS101', 'ME101', 'CE101', 'EE101', 'CS103', 'ME103', 'CE103', 'EE103'];
+    }
     
     return {
       id: `S${String(i + 1).padStart(4, '0')}`,
@@ -31,11 +39,11 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
       course: course,
       semester: semester,
       section: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][i % 8],
-      eligibleSubjects: [], // Simplified for now
+      eligibleSubjects: eligibleSubjects,
       unavailableSlots: [],
       seatAssignment: null,
-      ...(isDebarred && { isDebarred: true })
-    } as Student & { isDebarred?: boolean };
+      isDebarred: isDebarred,
+    };
 });
 
 // --- Generate Classrooms with bench capacity of 2 ---
