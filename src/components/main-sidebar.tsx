@@ -51,27 +51,35 @@ export function MainSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Students">
-              <Users />
-              <span>Students</span>
+            <SidebarMenuButton asChild tooltip="Students">
+              <Link href="#">
+                <Users />
+                <span>Students</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Classrooms">
-              <Building />
-              <span>Classrooms</span>
+            <SidebarMenuButton asChild tooltip="Classrooms">
+              <Link href="#">
+                <Building />
+                <span>Classrooms</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Invigilators">
-              <UserCheck />
-              <span>Invigilators</span>
+            <SidebarMenuButton asChild tooltip="Invigilators">
+              <Link href="#">
+                <UserCheck />
+                <span>Invigilators</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Reports">
-              <FileText />
-              <span>Reports</span>
+            <SidebarMenuButton asChild tooltip="Reports">
+              <Link href="#">
+                <FileText />
+                <span>Reports</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -79,15 +87,19 @@ export function MainSidebar() {
       <SidebarFooter className="p-2">
         <SidebarMenu>
            <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Help">
-              <CircleHelp />
-              <span>Help & Support</span>
+            <SidebarMenuButton asChild tooltip="Help">
+              <Link href="#">
+                <CircleHelp />
+                <span>Help & Support</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Settings">
-              <Settings />
-              <span>Settings</span>
+            <SidebarMenuButton asChild tooltip="Settings">
+              <Link href="#">
+                <Settings />
+                <span>Settings</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
