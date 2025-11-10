@@ -70,15 +70,14 @@ const IneligibilityDialog = ({ isOpen, onClose, onSubmit, studentName, subjectCo
 };
 
 export default function SubjectStudentsPage({ params }: { params: { departmentId: string, courseId: string, subjectCode: string } }) {
-    const { departmentId, courseId, subjectCode } = params;
     const [students, setStudents] = useState<Student[]>(initialStudents);
     const [dialogState, setDialogState] = useState<{isOpen: boolean; studentId: string | null; studentName: string | null}>({ isOpen: false, studentId: null, studentName: null });
 
-    const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === departmentId) || 'Unknown Department';
+    const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
     
-    const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === courseId) || 'Unknown Course';
+    const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === params.courseId) || 'Unknown Course';
 
-    const subjectName = EXAM_SCHEDULE.find(e => e.subjectCode === subjectCode)?.subjectName || 'Unknown Subject';
+    const subjectName = EXAM_SCHEDULE.find(e => e.subjectCode === params.subjectCode)?.subjectName || 'Unknown Subject';
 
     const relevantStudents = students.filter(s => s.course === courseName && s.department === departmentName);
 
@@ -86,7 +85,7 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
         const student = students.find(s => s.id === studentId);
         if (!student) return;
 
-        const isCurrentlyIneligible = student.ineligibilityRecords.some(r => r.subjectCode === subjectCode);
+        const isCurrentlyIneligible = student.ineligibilityRecords.some(r => r.subjectCode === params.subjectCode);
 
         if (isCurrentlyIneligible) {
             let studentName = '';
@@ -94,7 +93,7 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
                 const newStudents = prevStudents.map(s => {
                     if (s.id === studentId) {
                         studentName = s.name;
-                        return { ...s, ineligibilityRecords: s.ineligibilityRecords.filter(r => r.subjectCode !== subjectCode) };
+                        return { ...s, ineligibilityRecords: s.ineligibilityRecords.filter(r => r.subjectCode !== params.subjectCode) };
                     }
                     return s;
                 });
@@ -103,7 +102,7 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
              if (studentName) {
                 toast({
                     title: `Eligibility Updated for ${studentName}`,
-                    description: `${studentName} is now ELIGIBLE for ${subjectCode}.`,
+                    description: `${studentName} is now ELIGIBLE for ${params.subjectCode}.`,
                 });
             }
         } else {
@@ -118,7 +117,7 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
             return prevStudents.map(student => {
                 if (student.id === dialogState.studentId) {
                     studentName = student.name;
-                    const newRecord = { subjectCode, reason };
+                    const newRecord = { subjectCode: params.subjectCode, reason };
                     return { ...student, ineligibilityRecords: [...student.ineligibilityRecords, newRecord] };
                 }
                 return student;
@@ -128,7 +127,7 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
         if (studentName) {
             toast({
                 title: `Eligibility Updated for ${studentName}`,
-                description: `${studentName} is now INELIGIBLE for ${subjectCode}. Reason: ${reason}`,
+                description: `${studentName} is now INELIGIBLE for ${params.subjectCode}. Reason: ${reason}`,
             });
         }
         
@@ -142,7 +141,7 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
                 onClose={() => setDialogState({ isOpen: false, studentId: null, studentName: null })}
                 onSubmit={handleConfirmIneligibility}
                 studentName={dialogState.studentName || ''}
-                subjectCode={subjectCode}
+                subjectCode={params.subjectCode}
             />
             <div className="flex min-h-screen">
                 <MainSidebar />
@@ -158,22 +157,22 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
                                     </BreadcrumbItem>
                                     <BreadcrumbSeparator />
                                     <BreadcrumbItem>
-                                      <BreadcrumbLink href={`/settings/${departmentId}`}>{departmentName}</BreadcrumbLink>
+                                      <BreadcrumbLink href={`/settings/${params.departmentId}`}>{departmentName}</BreadcrumbLink>
                                     </BreadcrumbItem>
                                      <BreadcrumbSeparator />
                                     <BreadcrumbItem>
-                                       <BreadcrumbLink href={`/settings/${departmentId}/${courseId}`}>{courseName}</BreadcrumbLink>
+                                       <BreadcrumbLink href={`/settings/${params.departmentId}/${params.courseId}`}>{courseName}</BreadcrumbLink>
                                     </BreadcrumbItem>
                                     <BreadcrumbSeparator />
                                     <BreadcrumbItem>
-                                      <BreadcrumbPage>{subjectName} ({subjectCode})</BreadcrumbPage>
+                                      <BreadcrumbPage>{subjectName} ({params.subjectCode})</BreadcrumbPage>
                                     </BreadcrumbItem>
                                   </BreadcrumbList>
                                 </Breadcrumb>
                               </div>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Student Eligibility for {subjectName} ({subjectCode})</CardTitle>
+                                    <CardTitle>Student Eligibility for {subjectName} ({params.subjectCode})</CardTitle>
                                     <CardDescription>Manage which students are eligible to write the exam for this subject.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
@@ -189,7 +188,7 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
                                             </TableHeader>
                                             <TableBody>
                                                 {relevantStudents.map(student => {
-                                                    const ineligibilityRecord = student.ineligibilityRecords.find(r => r.subjectCode === subjectCode);
+                                                    const ineligibilityRecord = student.ineligibilityRecords.find(r => r.subjectCode === params.subjectCode);
                                                     const isIneligible = !!ineligibilityRecord;
                                                     return (
                                                         <TableRow key={student.id}>
