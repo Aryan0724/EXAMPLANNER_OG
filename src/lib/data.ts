@@ -6,68 +6,116 @@ export const DEPARTMENTS = [
   'Civil Engineering',
   'Electrical Engineering',
   'Biotechnology',
+  'Aerospace Engineering',
+  'Chemical Engineering',
+  'Information Technology',
+  'Electronics & Comm.',
+  'Architecture'
 ];
 
 export const COURSES = {
-  'Computer Science': ['CS101', 'CS201', 'CS301'],
-  'Mechanical Engineering': ['ME101', 'ME201', 'ME301'],
-  'Civil Engineering': ['CE101', 'CE201', 'CE301'],
-  'Electrical Engineering': ['EE101', 'EE201', 'EE301'],
-  'Biotechnology': ['BT101', 'BT201', 'BT301'],
+  'Computer Science': ['CS101', 'CS202', 'CS303', 'CS404'],
+  'Mechanical Engineering': ['ME101', 'ME202', 'ME303', 'ME404'],
+  'Civil Engineering': ['CE101', 'CE202', 'CE303', 'CE404'],
+  'Electrical Engineering': ['EE101', 'EE202', 'EE303', 'EE404'],
+  'Biotechnology': ['BT101', 'BT202', 'BT303', 'BT404'],
+  'Aerospace Engineering': ['AE101', 'AE202', 'AE303', 'AE404'],
+  'Chemical Engineering': ['CH101', 'CH202', 'CH303', 'CH404'],
+  'Information Technology': ['IT101', 'IT202', 'IT303', 'IT404'],
+  'Electronics & Comm.': ['EC101', 'EC202', 'EC303', 'EC404'],
+  'Architecture': ['AR101', 'AR202', 'AR303', 'AR404'],
 };
 
-export const STUDENTS: Student[] = [
-  { id: 'S001', name: 'Aarav Sharma', rollNo: 'CS-001', department: 'Computer Science', course: 'CS101', semester: 1, section: 'A', eligibleSubjects: ['DS101', 'ALGO202'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S002', name: 'Diya Patel', rollNo: 'CS-002', department: 'Computer Science', course: 'CS101', semester: 1, section: 'A', eligibleSubjects: ['DS101', 'ALGO202'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S003', name: 'Vivaan Singh', rollNo: 'CS-003', department: 'Computer Science', course: 'CS101', semester: 1, section: 'A', eligibleSubjects: ['DS101'], unavailableSlots: [{ slotId: 'E02', reason: 'Medical' }], seatAssignment: null, isDebarred: true } as Student & { isDebarred: boolean}, // Temp compat
-  { id: 'S004', name: 'Ishaan Kumar', rollNo: 'ME-001', department: 'Mechanical Engineering', course: 'ME101', semester: 1, section: 'A', eligibleSubjects: ['TD101'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S005', name: 'Ananya Gupta', rollNo: 'ME-002', department: 'Mechanical Engineering', course: 'ME101', semester: 1, section: 'A', eligibleSubjects: ['TD101'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S006', name: 'Rohan Mehra', rollNo: 'CE-001', department: 'Civil Engineering', course: 'CE101', semester: 1, section: 'A', eligibleSubjects: ['SA201'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S007', name: 'Saanvi Joshi', rollNo: 'CE-002', department: 'Civil Engineering', course: 'CE101', semester: 1, section: 'A', eligibleSubjects: ['SA201'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S008', name: 'Advik Reddy', rollNo: 'EE-001', department: 'Electrical Engineering', course: 'EE101', semester: 1, section: 'A', eligibleSubjects: ['CT201'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S009', name: 'Kiara Verma', rollNo: 'EE-002', department: 'Electrical Engineering', course: 'EE101', semester: 1, section: 'A', eligibleSubjects: ['CT201'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S010', name: 'Arjun Nair', rollNo: 'BT-001', department: 'Biotechnology', course: 'BT101', semester: 1, section: 'A', eligibleSubjects: ['MB301'], unavailableSlots: [], seatAssignment: null },
-  { id: 'S011', name: 'Zara Khan', rollNo: 'BT-002', department: 'Biotechnology', course: 'BT101', semester: 1, section: 'A', eligibleSubjects: ['MB301'], unavailableSlots: [], seatAssignment: null, isDebarred: true } as Student & { isDebarred: boolean}, // Temp compat
-  ...Array.from({ length: 40 }, (_, i) => {
+// --- Generate 5000 Students ---
+export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
     const dept = DEPARTMENTS[i % DEPARTMENTS.length];
+    const deptCourses = COURSES[dept as keyof typeof COURSES];
+    const course = deptCourses[i % deptCourses.length];
+    const semester = (i % 8) + 1;
+    const isDebarred = Math.random() < 0.02; // 2% of students are debarred
+    
     return {
-      id: `S${String(12 + i).padStart(3, '0')}`,
-      name: `Student ${12 + i}`,
-      rollNo: `${dept.substring(0,2).toUpperCase()}-${String(3 + i).padStart(3,'0')}`,
+      id: `S${String(i + 1).padStart(4, '0')}`,
+      name: `Student ${i + 1}`,
+      rollNo: `${dept.substring(0,2).toUpperCase()}-${String(i + 1).padStart(4,'0')}`,
       department: dept,
-      course: COURSES[dept as keyof typeof COURSES][0],
-      semester: 1,
-      section: 'B',
-      eligibleSubjects: [],
+      course: course,
+      semester: semester,
+      section: ['A', 'B', 'C', 'D'][i % 4],
+      eligibleSubjects: [], // Simplified for now
       unavailableSlots: [],
       seatAssignment: null,
-      isDebarred: false
-    } as Student & { isDebarred: boolean}
-  }),
-];
+      ...(isDebarred && { isDebarred: true })
+    } as Student & { isDebarred?: boolean };
+});
 
+// --- Generate more Classrooms to seat ~5000 students ---
+// Total capacity will be sum of all rooms, need enough for largest exam session.
 export const CLASSROOMS: Classroom[] = [
-  createClassroom({ id: 'CR101', roomNo: '101', building: 'A', rows: 5, columns: 2, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'A' }),
-  createClassroom({ id: 'CR102', roomNo: '102', building: 'A', rows: 5, columns: 3, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'A' }),
-  createClassroom({ id: 'CR201', roomNo: '201', building: 'B', rows: 6, columns: 3, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'B' }),
-  createClassroom({ id: 'CR202', roomNo: '202', building: 'B', rows: 4, columns: 2, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'B' }),
-  createClassroom({ id: 'CR301', roomNo: '301', building: 'C', rows: 8, columns: 3, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'C' }),
+  // Block A (CS/IT)
+  createClassroom({ id: 'CRA101', roomNo: 'A-101', building: 'Academic Block A', rows: 8, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'CS/IT' }), // 80
+  createClassroom({ id: 'CRA102', roomNo: 'A-102', building: 'Academic Block A', rows: 10, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'CS/IT' }), // 100
+  createClassroom({ id: 'CRA201', roomNo: 'A-201', building: 'Academic Block A', rows: 10, columns: 6, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'CS/IT' }), // 120
+  createClassroom({ id: 'CRA202', roomNo: 'A-202', building: 'Academic Block A', rows: 12, columns: 6, benchCapacity: 3, unavailableSlots: [], departmentBlock: 'CS/IT' }), // 216
+
+  // Block B (ME/CE/AE)
+  createClassroom({ id: 'CRB101', roomNo: 'B-101', building: 'Academic Block B', rows: 10, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'ME/CE/AE' }), // 100
+  createClassroom({ id: 'CRB102', roomNo: 'B-102', building: 'Academic Block B', rows: 10, columns: 5, benchCapacity: 3, unavailableSlots: [], departmentBlock: 'ME/CE/AE' }), // 150
+  createClassroom({ id: 'CRB201', roomNo: 'B-201', building: 'Academic Block B', rows: 15, columns: 5, benchCapacity: 3, unavailableSlots: [], departmentBlock: 'ME/CE/AE' }), // 225
+  createClassroom({ id: 'CRB202', roomNo: 'B-202', building: 'Academic Block B', rows: 20, columns: 5, benchCapacity: 3, unavailableSlots: [], departmentBlock: 'ME/CE/AE' }), // 300
+  
+  // Block C (EE/EC/BT/CH)
+  createClassroom({ id: 'CRC101', roomNo: 'C-101', building: 'Academic Block C', rows: 7, columns: 4, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'EE/EC/BT' }), // 56
+  createClassroom({ id: 'CRC102', roomNo: 'C-102', building: 'Academic Block C', rows: 8, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'EE/EC/BT' }), // 80
+  createClassroom({ id: 'CRC201', roomNo: 'C-201', building: 'Academic Block C', rows: 10, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'EE/EC/BT' }), // 100
+  createClassroom({ id: 'CRC202', roomNo: 'C-202', building: 'Academic Block C', rows: 10, columns: 6, benchCapacity: 3, unavailableSlots: [], departmentBlock: 'EE/EC/BT' }), // 180
+
+  // Block D (Arch)
+  createClassroom({ id: 'CRD101', roomNo: 'D-101', building: 'Architecture Block D', rows: 10, columns: 4, benchCapacity: 1, unavailableSlots: [], departmentBlock: 'Arch' }), // 40
+  createClassroom({ id: 'CRD102', roomNo: 'D-102', building: 'Architecture Block D', rows: 12, columns: 5, benchCapacity: 1, unavailableSlots: [], departmentBlock: 'Arch' }), // 60
 ];
 
-export const INVIGILATORS: Invigilator[] = [
-  { id: 'I01', name: 'Prof. Anjali Rao', department: 'Computer Science', isAvailable: true, unavailableSlots: [], assignedSessionIds: [] },
-  { id: 'I02', name: 'Prof. Vikram Singh', department: 'Mechanical Engineering', isAvailable: true, unavailableSlots: [], assignedSessionIds: [] },
-  { id: 'I03', name: 'Prof. Priya Desai', department: 'Civil Engineering', isAvailable: true, unavailableSlots: [], assignedSessionIds: [] },
-  { id: 'I04', name: 'Prof. Rahul Menon', department: 'Electrical Engineering', isAvailable: false, unavailableSlots: [{ slotId: 'E04', reason: 'Duty Conflict' }], assignedSessionIds: [] },
-  { id: 'I05', name: 'Prof. Sunita Pillai', department: 'Biotechnology', isAvailable: true, unavailableSlots: [], assignedSessionIds: [] },
-  { id: 'I06', name: 'Dr. Sameer Ahmed', department: 'Computer Science', isAvailable: true, unavailableSlots: [], assignedSessionIds: [] },
-  { id: 'I07', name: 'Dr. Neha Choudhary', department: 'Mechanical Engineering', isAvailable: true, unavailableSlots: [], assignedSessionIds: [] },
-];
 
-export const EXAM_SCHEDULE: ExamSlot[] = [
-  { id: 'E01', subjectName: 'Data Structures', subjectCode: 'DS101', department: 'Computer Science', course: 'CS101', semester: 1, date: '2024-09-10', time: '09:00', duration: 180 },
-  { id: 'E02', subjectName: 'Thermodynamics', subjectCode: 'TD101', department: 'Mechanical Engineering', course: 'ME101', semester: 1, date: '2024-09-10', time: '09:00', duration: 180 },
-  { id: 'E03', subjectName: 'Structural Analysis', subjectCode: 'SA201', department: 'Civil Engineering', course: 'CE101', semester: 1, date: '2024-09-11', time: '14:00', duration: 180 },
-  { id: 'E04', subjectName: 'Circuit Theory', subjectCode: 'CT201', department: 'Electrical Engineering', course: 'EE101', semester: 1, date: '2024-09-11', time: '14:00', duration: 180 },
-  { id: 'E05', subjectName: 'Molecular Biology', subjectCode: 'MB301', department: 'Biotechnology', course: 'BT101', semester: 1, date: '2024-09-12', time: '09:00', duration: 180 },
-];
+// --- Generate more Invigilators ---
+export const INVIGILATORS: Invigilator[] = Array.from({ length: 100 }, (_, i) => ({
+  id: `I${String(i + 1).padStart(3, '0')}`,
+  name: `Professor ${i + 1}`,
+  department: DEPARTMENTS[i % DEPARTMENTS.length],
+  isAvailable: Math.random() > 0.1, // 90% available
+  unavailableSlots: [],
+  assignedSessionIds: [],
+}));
+
+
+// --- Generate ~50 Exam Slots ---
+export const EXAM_SCHEDULE: ExamSlot[] = [];
+const examDates = ['2024-09-10', '2024-09-11', '2024-09-12', '2024-09-13', '2024-09-14'];
+const examTimes = ['09:00', '14:00'];
+let examCounter = 1;
+
+for (const date of examDates) {
+  for (const time of examTimes) {
+    // Create 5 concurrent exams for each slot
+    for (let i = 0; i < 5; i++) {
+        if(examCounter > 50) break;
+        const deptIndex = (examCounter - 1 + i) % DEPARTMENTS.length;
+        const dept = DEPARTMENTS[deptIndex];
+        const deptCourses = COURSES[dept as keyof typeof COURSES];
+        const course = deptCourses[(examCounter-1) % deptCourses.length];
+        const semester = ((examCounter-1) % 4) * 2 + 1; // Semesters 1, 3, 5, 7
+        
+        EXAM_SCHEDULE.push({
+            id: `E${String(examCounter).padStart(3, '0')}`,
+            subjectName: `${dept} Subject ${examCounter}`,
+            subjectCode: `${dept.substring(0,2).toUpperCase()}${semester}0${(examCounter % 3) + 1}`,
+            department: dept,
+            course: course,
+            semester: semester,
+            date: date,
+            time: time,
+            duration: 180,
+        });
+        examCounter++;
+    }
+  }
+}
