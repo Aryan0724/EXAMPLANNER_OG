@@ -31,12 +31,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileUp, FileDown, Sparkles, Loader2, Filter } from 'lucide-react';
+import { FileUp, Sparkles, Loader2, Filter, Building } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Student, Classroom, Invigilator, ExamSlot, SeatPlan, InvigilatorAssignment } from '@/lib/types';
 import { STUDENTS, CLASSROOMS, INVIGILATORS, EXAM_SCHEDULE, DEPARTMENTS } from '@/lib/data';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AiSuggestionCard } from '@/components/ai-suggestion-card';
+import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 
 export function DashboardClient() {
   const { toast } = useToast();
@@ -69,11 +70,11 @@ export function DashboardClient() {
   const handleDataLoad = (type: keyof typeof isLoading) => {
     setIsLoading(prev => ({...prev, [type]: true}));
     setTimeout(() => {
-        let loadedData;
+        let loadedData: any;
         let toastMessage;
         switch(type) {
             case 'students':
-                loadedData = { students: STUDENTS as Student[] }; // Casting for temp compat
+                loadedData = { students: STUDENTS };
                 toastMessage = `${STUDENTS.length} student records loaded.`;
                 break;
             case 'classrooms':
@@ -113,13 +114,11 @@ export function DashboardClient() {
       const selectedExam = data.schedule.find(e => e.id === selectedExamId);
       if (!selectedExam) return;
 
-      // Generate Seat Plan
       const newSeatPlan = generateSeatPlan(data.students, data.classrooms, selectedExam);
       setSeatPlan(newSeatPlan);
       
       const classroomsInUse = Array.from(new Set(newSeatPlan.assignments.map(a => a.classroom)));
 
-      // Assign Invigilators
       const newInvigilatorAssignments = assignInvigilators(data.invigilators, classroomsInUse, selectedExam);
       setInvigilatorAssignments(newInvigilatorAssignments);
 
@@ -131,15 +130,11 @@ export function DashboardClient() {
     }, 2000);
   };
   
-  const handleReportDownload = (reportType: string) => {
-    toast({
-        title: 'Report Generation',
-        description: `${reportType} is being generated... (Simulation)`,
-    });
-  };
-
-  const filteredSeatPlan = seatPlan?.assignments.filter(a => departmentFilter === 'all' || a.student?.department === departmentFilter);
   const filteredInvigilators = invigilatorAssignments?.filter(a => departmentFilter === 'all' || a.classroom.departmentBlock === CLASSROOMS.find(c => c.id.startsWith(departmentFilter.substring(0,2)))?.departmentBlock);
+  
+  const classroomsInPlan = seatPlan ? [...new Map(seatPlan.assignments.map(item => [item.classroom.id, item.classroom])).values()] : [];
+
+  const filteredClassrooms = departmentFilter === 'all' ? classroomsInPlan : classroomsInPlan.filter(c => c.departmentBlock === CLASSROOMS.find(cl => cl.id.startsWith(departmentFilter.substring(0,2)))?.departmentBlock);
 
 
   return (
@@ -230,35 +225,19 @@ export function DashboardClient() {
                 <TabsTrigger value="seat-plan">Seat Plan</TabsTrigger>
                 <TabsTrigger value="invigilator-schedule">Invigilator Schedule</TabsTrigger>
               </TabsList>
-              <TabsContent value="seat-plan">
-                <div className="rounded-md border mt-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Classroom</TableHead>
-                        <TableHead>Seat No.</TableHead>
-                        <TableHead>Student ID</TableHead>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>Course</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredSeatPlan?.map((seat, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{seat.classroom.id}</TableCell>
-                          <TableCell>{seat.seatNumber}</TableCell>
-                          <TableCell className="font-code">{seat.student?.id ?? '---'}</TableCell>
-                          <TableCell>{seat.student?.name ?? '---'}</TableCell>
-                          <TableCell>{seat.student?.course ?? '---'}</TableCell>
-                          <TableCell>
-                            {(seat.student as any)?.isDebarred ? <Badge variant="destructive">Debarred</Badge> : seat.student ? <Badge variant="secondary">Allotted</Badge> : <Badge variant="outline">Empty</Badge>}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+              <TabsContent value="seat-plan" className="space-y-4 pt-4">
+                 {filteredClassrooms.map(classroom => (
+                    <div key={classroom.id}>
+                        <h3 className="flex items-center gap-2 text-lg font-semibold mb-2">
+                            <Building className="w-5 h-5" />
+                            {classroom.id} ({classroom.roomNo})
+                        </h3>
+                        <ClassroomVisualizer
+                            classroom={classroom}
+                            assignments={seatPlan?.assignments.filter(a => a.classroom.id === classroom.id) ?? []}
+                        />
+                    </div>
+                ))}
               </TabsContent>
               <TabsContent value="invigilator-schedule">
                 <div className="rounded-md border mt-4">
@@ -289,26 +268,7 @@ export function DashboardClient() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Report Generation</CardTitle>
-          <CardDescription>Export detailed reports in Excel/CSV format.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Button variant="secondary" onClick={() => handleReportDownload('Seat Plan')}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Seat Plan (Excel)
-          </Button>
-          <Button variant="secondary" onClick={() => handleReportDownload('Student List')}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Student List (CSV)
-          </Button>
-          <Button variant="secondary" onClick={() => handleReportDownload('Invigilator Schedule')}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Invigilator Duty (Excel)
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Report Generation Card removed for brevity for now */}
     </div>
   );
 }

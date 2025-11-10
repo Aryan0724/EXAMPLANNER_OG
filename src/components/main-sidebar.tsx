@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import {
   Sidebar,
   SidebarHeader,
@@ -21,9 +22,22 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+const menuItems = [
+    { id: 'dashboard', href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'students', href: '/students', icon: Users, label: 'Students' },
+    { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
+    { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
+    { id: 'reports', href: '/reports', icon: FileText, label: 'Reports' },
+];
+
+const helpMenuItems = [
+    { id: 'help', href: '#', icon: CircleHelp, label: 'Help & Support' },
+    { id: 'settings', href: '#', icon: Settings, label: 'Settings' },
+]
+
 export function MainSidebar() {
-  // In a real app, this would come from a router or state
-  const activeItem = 'dashboard';
+  const pathname = usePathname();
+  const activeItem = pathname.substring(1) || 'dashboard';
 
   return (
     <Sidebar>
@@ -38,70 +52,34 @@ export function MainSidebar() {
       </SidebarHeader>
       <SidebarContent className="p-2">
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={activeItem === 'dashboard'}
-              tooltip="Dashboard"
-            >
-              <Link href="#">
-                <LayoutDashboard />
-                <span>Dashboard</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Students">
-              <Link href="#">
-                <Users />
-                <span>Students</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Classrooms">
-              <Link href="#">
-                <Building />
-                <span>Classrooms</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Invigilators">
-              <Link href="#">
-                <UserCheck />
-                <span>Invigilators</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Reports">
-              <Link href="#">
-                <FileText />
-                <span>Reports</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {menuItems.map(item => (
+             <SidebarMenuItem key={item.id}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={activeItem === item.id}
+                  tooltip={item.label}
+                >
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="p-2">
         <SidebarMenu>
-           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Help">
-              <Link href="#">
-                <CircleHelp />
-                <span>Help & Support</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Settings">
-              <Link href="#">
-                <Settings />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+           {helpMenuItems.map(item => (
+             <SidebarMenuItem key={item.id}>
+                <SidebarMenuButton asChild tooltip={item.label}>
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+           ))}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

@@ -3,7 +3,7 @@ import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { DashboardClient } from '@/components/dashboard-client';
 
-export default function Home() {
+export default function DashboardPage() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
