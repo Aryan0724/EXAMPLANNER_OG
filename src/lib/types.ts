@@ -30,6 +30,7 @@ export interface Student {
   unavailableSlots: AvailabilitySlot[];
   seatAssignment: SeatAssignment | null; // Persisted seat
   isDebarred?: boolean;
+  debarmentReason?: string;
 }
 
 export interface Classroom {
@@ -91,3 +92,5 @@ export interface InvigilatorAssignment {
   classroom: Classroom;
   invigilator: Invigilator;
 }
+
+    
