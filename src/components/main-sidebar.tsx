@@ -29,7 +29,7 @@ const menuItems = [
     { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
     { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
     { id: 'reports', href: '/reports', icon: FileText, label: 'Reports' },
-    { id: 'explorer', href: '/settings', icon: Telescope, label: 'Explorer' },
+    { id: 'settings', href: '/settings', icon: Telescope, label: 'Explorer' },
 ];
 
 const helpMenuItems = [
@@ -57,7 +57,7 @@ export function MainSidebar() {
              <SidebarMenuItem key={item.id}>
                 <SidebarMenuButton
                   asChild
-                  isActive={activeItem === item.id}
+                  isActive={activeItem === item.id || (item.id === 'settings' && activeItem === 'settings')}
                   tooltip={item.label}
                 >
                   <Link href={item.href}>
@@ -86,3 +86,5 @@ export function MainSidebar() {
     </Sidebar>
   );
 }
+
+    

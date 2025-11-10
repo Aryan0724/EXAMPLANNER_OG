@@ -6,17 +6,16 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Users, ChevronLeft, ChevronRight, Ban } from 'lucide-react';
+import { Users, ChevronLeft, ChevronRight, Ban, X } from 'lucide-react';
 import { STUDENTS as initialStudents } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Student, IneligibilityRecord } from '@/lib/types';
+import { Student } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { X } from 'lucide-react';
 
 const STUDENTS_PER_PAGE = 20;
 
@@ -77,7 +76,7 @@ const DebarmentStatusDialog = ({ isOpen, onClose, student, onSubmitDebarred, onR
                                 id="reason" 
                                 placeholder="e.g., Disciplinary action, Fee overdue, etc."
                                 value={reason}
-                                onChange={(e) => setReason(e.targe.value)} 
+                                onChange={(e) => setReason(e.target.value)} 
                             />
                         </CardContent>
                         <CardFooter>
@@ -162,46 +161,46 @@ export default function StudentsPage() {
     if (!dialogState.student) return;
     
     let studentName = '';
-    setStudents(prevStudents => {
-        const newStudents = prevStudents.map(student => {
-            if (student.id === dialogState.student?.id) {
-                studentName = student.name;
-                return { ...student, isDebarred: isDebarred, debarmentReason: isDebarred ? reason : undefined };
-            }
-            return student;
-        });
-        return newStudents;
+    const updatedStudents = students.map(student => {
+        if (student.id === dialogState.student?.id) {
+            studentName = student.name;
+            return { ...student, isDebarred: isDebarred, debarmentReason: isDebarred ? reason : undefined };
+        }
+        return student;
     });
+    setStudents(updatedStudents);
 
     toast({
         title: `Status Updated for ${studentName}`,
         description: `${studentName} is now ${isDebarred ? 'debarred' : 'eligible'}. Reason: ${reason}`,
     });
-    closeStatusDialog();
+    
+    // Also update the student in the dialog state
+    const updatedStudent = updatedStudents.find(s => s.id === dialogState.student?.id) || null;
+    setDialogState({ isOpen: true, student: updatedStudent });
   };
 
   const handleRemoveIneligibility = (subjectCode: string) => {
     if (!dialogState.student) return;
 
     let studentName = '';
-    setStudents(prevStudents => {
-        const newStudents = prevStudents.map(student => {
-            if (student.id === dialogState.student?.id) {
-                 studentName = student.name;
-                const newRecords = student.ineligibilityRecords.filter(r => r.subjectCode !== subjectCode);
-                return { ...student, ineligibilityRecords: newRecords };
-            }
-            return student;
-        });
-        return newStudents;
+    const updatedStudents = students.map(student => {
+        if (student.id === dialogState.student?.id) {
+             studentName = student.name;
+            const newRecords = student.ineligibilityRecords.filter(r => r.subjectCode !== subjectCode);
+            return { ...student, ineligibilityRecords: newRecords };
+        }
+        return student;
     });
+    setStudents(updatedStudents);
 
     toast({
         title: `Eligibility Updated for ${studentName}`,
         description: `${studentName} is now eligible for ${subjectCode}.`,
     });
     // Refresh dialog state
-    setDialogState(prev => ({ ...prev, student: students.find(s => s.id === prev.student?.id) || null }));
+    const updatedStudent = updatedStudents.find(s => s.id === dialogState.student?.id) || null;
+    setDialogState({ isOpen: true, student: updatedStudent });
   };
 
   return (
@@ -259,12 +258,15 @@ export default function StudentsPage() {
                             <TableCell>{student.department}</TableCell>
                             <TableCell>{student.course}</TableCell>
                             <TableCell>
-                                <div className="flex flex-col gap-1">
-                                    {student.isDebarred && <Badge variant="destructive">Debarred</Badge>}
+                                <div className="flex flex-col gap-1 items-start">
+                                    {student.isDebarred && <Badge variant="destructive" title={student.debarmentReason}>Debarred</Badge>}
                                     {student.ineligibilityRecords && student.ineligibilityRecords.length > 0 && (
                                         <Badge variant="secondary" title={student.ineligibilityRecords.map(r => `${r.subjectCode}: ${r.reason}`).join('\n')}>
                                             Ineligible ({student.ineligibilityRecords.length} subjects)
                                         </Badge>
+                                    )}
+                                    {!student.isDebarred && (!student.ineligibilityRecords || student.ineligibilityRecords.length === 0) && (
+                                        <Badge variant="outline">Eligible</Badge>
                                     )}
                                 </div>
                             </TableCell>
