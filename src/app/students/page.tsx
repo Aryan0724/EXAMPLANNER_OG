@@ -6,21 +6,24 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Users, ChevronLeft, ChevronRight } from 'lucide-react';
-import { STUDENTS } from '@/lib/data';
+import { Users, ChevronLeft, ChevronRight, Ban } from 'lucide-react';
+import { STUDENTS as initialStudents } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Student } from '@/lib/types';
+import { toast } from '@/hooks/use-toast';
 
 const STUDENTS_PER_PAGE = 20;
 
 export default function StudentsPage() {
+  const [students, setStudents] = useState<Student[]>(initialStudents);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const totalPages = Math.ceil(STUDENTS.length / STUDENTS_PER_PAGE);
+  const totalPages = Math.ceil(students.length / STUDENTS_PER_PAGE);
   const startIndex = (currentPage - 1) * STUDENTS_PER_PAGE;
   const endIndex = startIndex + STUDENTS_PER_PAGE;
-  const currentStudents = STUDENTS.slice(startIndex, endIndex);
+  const currentStudents = students.slice(startIndex, endIndex);
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
@@ -28,6 +31,23 @@ export default function StudentsPage() {
 
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+
+  const handleToggleDebarred = (studentId: string) => {
+    setStudents(prevStudents => {
+        const newStudents = prevStudents.map(student => {
+            if (student.id === studentId) {
+                const updatedStudent = { ...student, isDebarred: !student.isDebarred };
+                toast({
+                    title: `Status Updated`,
+                    description: `${updatedStudent.name} is now ${updatedStudent.isDebarred ? 'debarred' : 'eligible'}.`,
+                });
+                return updatedStudent;
+            }
+            return student;
+        });
+        return newStudents;
+    });
   };
 
 
@@ -45,7 +65,7 @@ export default function StudentsPage() {
                     <Users className="h-6 w-6" />
                     <CardTitle>Students</CardTitle>
                   </div>
-                  <CardDescription>List of all students registered for exams.</CardDescription>
+                  <CardDescription>List of all students registered for exams. You can toggle their debarred status here.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="border rounded-md">
@@ -58,6 +78,7 @@ export default function StudentsPage() {
                           <TableHead>Department</TableHead>
                           <TableHead>Course</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -70,6 +91,12 @@ export default function StudentsPage() {
                             <TableCell>{student.course}</TableCell>
                             <TableCell>
                                {student.isDebarred && <Badge variant="destructive">Debarred</Badge>}
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="outline" size="sm" onClick={() => handleToggleDebarred(student.id)}>
+                                    <Ban className="mr-2 h-3 w-3" />
+                                    Toggle Status
+                                </Button>
                             </TableCell>
                           </TableRow>
                         ))}

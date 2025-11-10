@@ -9,10 +9,10 @@ export const DEPARTMENTS = [
 ];
 
 export const COURSES = {
-  'Computer Science': ['CS101'],
-  'Mechanical Engineering': ['ME101'],
-  'Civil Engineering': ['CE101'],
-  'Electrical Engineering': ['EE101'],
+  'Computer Science': ['B.Tech in CS'],
+  'Mechanical Engineering': ['B.Tech in ME'],
+  'Civil Engineering': ['B.Tech in CE'],
+  'Electrical Engineering': ['B.Tech in EE'],
 };
 
 // --- Generate 5000 Students of 1st year in 4 courses ---
@@ -24,13 +24,6 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
     const semester = 1; // All are 1st year students
     const isDebarred = (i + 1) % 50 === 0;
 
-    // Make some students ineligible for a specific subject
-    let eligibleSubjects: string[] = [];
-    if ((i + 1) % 20 === 0) { // Approx 5% of students
-      // Let's assume they are not eligible for '...102' subjects
-      eligibleSubjects = ['CS101', 'ME101', 'CE101', 'EE101', 'CS103', 'ME103', 'CE103', 'EE103'];
-    }
-    
     return {
       id: `S${String(i + 1).padStart(4, '0')}`,
       name: `Student ${i + 1}`,
@@ -39,7 +32,7 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
       course: course,
       semester: semester,
       section: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][i % 8],
-      eligibleSubjects: eligibleSubjects,
+      eligibleSubjects: [], // Initially eligible for all subjects in their course
       unavailableSlots: [],
       seatAssignment: null,
       isDebarred: isDebarred,
