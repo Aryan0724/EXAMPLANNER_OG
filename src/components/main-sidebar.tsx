@@ -43,7 +43,7 @@ export function MainSidebar() {
   const activeItem = pathname.split('/')[1] || 'dashboard';
 
   return (
-    <Sidebar>
+    <Sidebar className="no-print">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           <ExamplannerLogo className="text-primary-foreground size-8" />

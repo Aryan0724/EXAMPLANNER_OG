@@ -89,19 +89,20 @@ body {
 }
 
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  .printable-area, .printable-area * {
-    visibility: visible;
+  .no-print {
+    display: none !important;
   }
   .printable-area {
+    display: block !important;
     position: absolute;
-    left: 0;
     top: 0;
+    left: 0;
     width: 100%;
   }
-  .no-print {
+  body > * {
     display: none;
+  }
+  body > .printable-area {
+    display: block;
   }
 }

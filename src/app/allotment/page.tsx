@@ -89,8 +89,8 @@ export default function AllotmentPage() {
         <SidebarInset>
           <div className="flex flex-col h-full">
             <MainHeader />
-            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-print">
-              <div className="space-y-8">
+            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+              <div className="space-y-8 no-print">
                 <Card>
                   <CardHeader>
                     <CardTitle>Seat Plan Generation & Allotment</CardTitle>
@@ -146,7 +146,7 @@ export default function AllotmentPage() {
                     </CardHeader>
                     <CardContent>
                       {selectedClassroom && (
-                          <div key={selectedClassroom.id} className="printable-area">
+                          <div key={selectedClassroom.id}>
                               <h3 className="flex items-center gap-2 text-xl font-semibold mb-4 text-center justify-center">
                                   <Building className="w-6 h-6" />
                                   Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
@@ -168,6 +168,20 @@ export default function AllotmentPage() {
                   </Card>
                 )}
               </div>
+               {selectedClassroom && (
+                  <div className="printable-area">
+                      <h3 className="flex items-center gap-2 text-xl font-semibold mb-4 text-center justify-center">
+                          <Building className="w-6 h-6" />
+                          Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
+                      </h3>
+                       <p className="text-center mb-1 text-muted-foreground">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
+                       <p className="text-center mb-4 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
+                      <ClassroomVisualizer
+                          classroom={selectedClassroom}
+                          assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
+                      />
+                  </div>
+              )}
             </main>
           </div>
         </SidebarInset>
