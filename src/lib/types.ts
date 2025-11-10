@@ -31,6 +31,7 @@ export interface Student {
   seatAssignment: SeatAssignment | null; // Persisted seat
   isDebarred?: boolean;
   debarmentReason?: string;
+  exam?: ExamSlot; // Temporary property for planning
 }
 
 export interface Classroom {
@@ -92,5 +93,3 @@ export interface InvigilatorAssignment {
   classroom: Classroom;
   invigilator: Invigilator;
 }
-
-    

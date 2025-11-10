@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -5,28 +6,105 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Search } from 'lucide-react';
-import { CLASSROOMS } from '@/lib/data';
+import { Building, Search, CalendarOff } from 'lucide-react';
+import { CLASSROOMS as initialClassrooms } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { Classroom } from '@/lib/types';
+import { AvailabilityDialog } from '@/components/availability-dialog';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 export default function ClassroomsPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [classrooms, setClassrooms] = useState<Classroom[]>(initialClassrooms);
+  const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Classroom | null }>({ isOpen: false, resource: null });
 
   const filteredClassrooms = useMemo(() => {
     if (!searchQuery) {
-      return CLASSROOMS;
+      return classrooms;
     }
     const lowercasedQuery = searchQuery.toLowerCase();
-    return CLASSROOMS.filter(room =>
+    return classrooms.filter(room =>
       room.id.toLowerCase().includes(lowercasedQuery) ||
       room.roomNo.toLowerCase().includes(lowercasedQuery) ||
       room.building.toLowerCase().includes(lowercasedQuery)
     );
-  }, [searchQuery]);
+  }, [searchQuery, classrooms]);
+
+  const openDialog = (classroom: Classroom) => {
+    setDialogState({ isOpen: true, resource: classroom });
+  };
+  
+  const closeDialog = () => {
+    setDialogState({ isOpen: false, resource: null });
+  }
+
+  const handleAddUnavailability = (slotId: string, reason: string) => {
+    if (!dialogState.resource) return;
+
+    let resourceName = '';
+    const updatedClassrooms = classrooms.map(c => {
+      if (c.id === dialogState.resource?.id) {
+        resourceName = c.id;
+        // Avoid adding duplicate unavailability
+        if (c.unavailableSlots.some(s => s.slotId === slotId)) {
+          toast({
+            variant: 'destructive',
+            title: 'Already Unavailable',
+            description: `${resourceName} is already marked as unavailable for this slot.`,
+          });
+          return c;
+        }
+        const newSlots = [...c.unavailableSlots, { slotId, reason }];
+        return { ...c, unavailableSlots: newSlots };
+      }
+      return c;
+    });
+
+    setDialogState(prev => ({ ...prev, resource: updatedClassrooms.find(c => c.id === prev.resource?.id) || null }));
+    setClassrooms(updatedClassrooms);
+    
+    if (resourceName) {
+        toast({
+            title: 'Unavailability Added',
+            description: `${resourceName} is now unavailable for the selected slot.`,
+        });
+    }
+  };
+
+  const handleRemoveUnavailability = (slotId: string) => {
+    if (!dialogState.resource) return;
+
+    let resourceName = '';
+    const updatedClassrooms = classrooms.map(c => {
+        if (c.id === dialogState.resource?.id) {
+            resourceName = c.id;
+            const newSlots = c.unavailableSlots.filter(s => s.slotId !== slotId);
+            return { ...c, unavailableSlots: newSlots };
+        }
+        return c;
+    });
+    
+    setDialogState(prev => ({ ...prev, resource: updatedClassrooms.find(c => c.id === prev.resource?.id) || null }));
+    setClassrooms(updatedClassrooms);
+    toast({
+        title: 'Unavailability Removed',
+        description: `${resourceName} is now available for the selected slot.`,
+    });
+  };
 
   return (
     <SidebarProvider>
+      <AvailabilityDialog
+        isOpen={dialogState.isOpen}
+        onClose={closeDialog}
+        resource={dialogState.resource}
+        resourceType="Classroom"
+        onSubmit={handleAddUnavailability}
+        onRemove={handleRemoveUnavailability}
+      />
       <div className="flex min-h-screen">
         <MainSidebar />
         <SidebarInset>
@@ -63,9 +141,8 @@ export default function ClassroomsPage() {
                           <TableHead>Room No.</TableHead>
                           <TableHead>Building</TableHead>
                           <TableHead>Capacity</TableHead>
-                          <TableHead>Rows</TableHead>
-                          <TableHead>Cols/Bench</TableHead>
-                          <TableHead>Bench Capacity</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -75,9 +152,19 @@ export default function ClassroomsPage() {
                             <TableCell>{room.roomNo}</TableCell>
                             <TableCell>{room.building}</TableCell>
                             <TableCell>{room.capacity}</TableCell>
-                            <TableCell>{room.rows}</TableCell>
-                            <TableCell>{room.columns}</TableCell>
-                            <TableCell>{room.benchCapacity}</TableCell>
+                            <TableCell>
+                                {room.unavailableSlots.length > 0 ? (
+                                    <Badge variant="destructive">Unavailable ({room.unavailableSlots.length} slots)</Badge>
+                                ) : (
+                                    <Badge variant="secondary">Available</Badge>
+                                )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="outline" size="sm" onClick={() => openDialog(room)}>
+                                    <CalendarOff className="mr-2 h-3 w-3" />
+                                    Manage Availability
+                                </Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

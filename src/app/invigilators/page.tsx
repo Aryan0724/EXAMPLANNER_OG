@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -5,29 +6,104 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCheck, Search } from 'lucide-react';
-import { INVIGILATORS } from '@/lib/data';
+import { UserCheck, Search, CalendarOff } from 'lucide-react';
+import { INVIGILATORS as initialInvigilators } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Invigilator } from '@/lib/types';
+import { AvailabilityDialog } from '@/components/availability-dialog';
+import { toast } from '@/hooks/use-toast';
 
 export default function InvigilatorsPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [invigilators, setInvigilators] = useState<Invigilator[]>(initialInvigilators);
+  const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Invigilator | null }>({ isOpen: false, resource: null });
 
   const filteredInvigilators = useMemo(() => {
     if (!searchQuery) {
-      return INVIGILATORS;
+      return invigilators;
     }
     const lowercasedQuery = searchQuery.toLowerCase();
-    return INVIGILATORS.filter(inv =>
+    return invigilators.filter(inv =>
       inv.id.toLowerCase().includes(lowercasedQuery) ||
       inv.name.toLowerCase().includes(lowercasedQuery) ||
       inv.department.toLowerCase().includes(lowercasedQuery)
     );
-  }, [searchQuery]);
+  }, [searchQuery, invigilators]);
+
+  const openDialog = (invigilator: Invigilator) => {
+    setDialogState({ isOpen: true, resource: invigilator });
+  };
+  
+  const closeDialog = () => {
+    setDialogState({ isOpen: false, resource: null });
+  }
+
+  const handleAddUnavailability = (slotId: string, reason: string) => {
+    if (!dialogState.resource) return;
+    
+    let resourceName = '';
+    const updatedInvigilators = invigilators.map(inv => {
+      if (inv.id === dialogState.resource?.id) {
+        resourceName = inv.name;
+        if (inv.unavailableSlots.some(s => s.slotId === slotId)) {
+          toast({
+            variant: 'destructive',
+            title: 'Already Unavailable',
+            description: `${resourceName} is already marked as unavailable for this slot.`,
+          });
+          return inv;
+        }
+        const newSlots = [...inv.unavailableSlots, { slotId, reason }];
+        return { ...inv, unavailableSlots: newSlots };
+      }
+      return inv;
+    });
+
+    setDialogState(prev => ({ ...prev, resource: updatedInvigilators.find(i => i.id === prev.resource?.id) || null }));
+    setInvigilators(updatedInvigilators);
+
+    if (resourceName) {
+      toast({
+          title: 'Unavailability Added',
+          description: `${resourceName} is now unavailable for the selected slot.`,
+      });
+    }
+  };
+
+  const handleRemoveUnavailability = (slotId: string) => {
+    if (!dialogState.resource) return;
+
+    let resourceName = '';
+    const updatedInvigilators = invigilators.map(inv => {
+        if (inv.id === dialogState.resource?.id) {
+            resourceName = inv.name;
+            const newSlots = inv.unavailableSlots.filter(s => s.slotId !== slotId);
+            return { ...inv, unavailableSlots: newSlots };
+        }
+        return inv;
+    });
+
+    setDialogState(prev => ({ ...prev, resource: updatedInvigilators.find(i => i.id === prev.resource?.id) || null }));
+    setInvigilators(updatedInvigilators);
+    toast({
+        title: 'Unavailability Removed',
+        description: `${resourceName} is now available for the selected slot.`,
+    });
+  };
 
   return (
     <SidebarProvider>
+      <AvailabilityDialog
+        isOpen={dialogState.isOpen}
+        onClose={closeDialog}
+        resource={dialogState.resource}
+        resourceType="Invigilator"
+        onSubmit={handleAddUnavailability}
+        onRemove={handleRemoveUnavailability}
+      />
       <div className="flex min-h-screen">
         <MainSidebar />
         <SidebarInset>
@@ -64,6 +140,7 @@ export default function InvigilatorsPage() {
                             <TableHead>Name</TableHead>
                             <TableHead>Department</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Action</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -73,7 +150,17 @@ export default function InvigilatorsPage() {
                               <TableCell>{inv.name}</TableCell>
                               <TableCell>{inv.department}</TableCell>
                               <TableCell>
-                                {inv.isAvailable ? <Badge variant="secondary">Available</Badge> : <Badge variant="destructive">Unavailable</Badge>}
+                                {inv.unavailableSlots.length > 0 ? (
+                                    <Badge variant="destructive">Unavailable ({inv.unavailableSlots.length} slots)</Badge>
+                                ) : (
+                                  inv.isAvailable ? <Badge variant="secondary">Available</Badge> : <Badge variant="outline">Generally Unavailable</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="outline" size="sm" onClick={() => openDialog(inv)}>
+                                    <CalendarOff className="mr-2 h-3 w-3" />
+                                    Manage Availability
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))}
