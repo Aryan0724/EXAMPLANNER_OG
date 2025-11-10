@@ -6,7 +6,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Telescope, GraduationCap, ChevronRight } from 'lucide-react';
+import { Telescope, GraduationCap, ChevronRight, UserCheck } from 'lucide-react';
 import { DEPARTMENTS } from '@/lib/data';
 
 export default function ExplorerPage() {
@@ -29,13 +29,14 @@ export default function ExplorerPage() {
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <Telescope className="h-6 w-6" />
-                    <CardTitle>Student & Subject Explorer</CardTitle>
+                    <CardTitle>Data Explorer</CardTitle>
                   </div>
                   <CardDescription>
-                    Select a department to explore its courses and subjects.
+                    Select a category to explore its data.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Student & Course Data</p>
                   {departments.map(dept => (
                     <Link
                       key={dept.id}
@@ -49,6 +50,17 @@ export default function ExplorerPage() {
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </Link>
                   ))}
+                   <p className="text-sm font-medium text-muted-foreground mt-6 mb-2">Staff Data</p>
+                    <Link
+                      href="/settings/invigilators"
+                      className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <UserCheck className="h-5 w-5 text-accent" />
+                        <span className="text-lg font-medium">Invigilators</span>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </Link>
                 </CardContent>
               </Card>
             </main>

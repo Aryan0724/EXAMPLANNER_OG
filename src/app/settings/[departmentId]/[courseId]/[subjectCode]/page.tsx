@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -14,8 +14,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Ban } from 'lucide-react';
+import { Ban, Search } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
+import { Input } from '@/components/ui/input';
 
 interface IneligibilityDialogProps { 
     isOpen: boolean; 
@@ -72,6 +73,7 @@ const IneligibilityDialog = ({ isOpen, onClose, onSubmit, studentName, subjectCo
 export default function SubjectStudentsPage({ params }: { params: { departmentId: string, courseId: string, subjectCode: string } }) {
     const [students, setStudents] = useState<Student[]>(initialStudents);
     const [dialogState, setDialogState] = useState<{isOpen: boolean; studentId: string | null; studentName: string | null}>({ isOpen: false, studentId: null, studentName: null });
+    const [searchQuery, setSearchQuery] = useState('');
 
     const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
     
@@ -79,7 +81,19 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
 
     const subjectName = EXAM_SCHEDULE.find(e => e.subjectCode === params.subjectCode)?.subjectName || 'Unknown Subject';
 
-    const relevantStudents = students.filter(s => s.course === courseName && s.department === departmentName);
+    const relevantStudents = useMemo(() => {
+        const baseStudents = students.filter(s => s.course === courseName && s.department === departmentName);
+        if (!searchQuery) {
+            return baseStudents;
+        }
+        const lowercasedQuery = searchQuery.toLowerCase();
+        return baseStudents.filter(student =>
+            student.id.toLowerCase().includes(lowercasedQuery) ||
+            student.rollNo.toLowerCase().includes(lowercasedQuery) ||
+            student.name.toLowerCase().includes(lowercasedQuery)
+        );
+    }, [students, courseName, departmentName, searchQuery]);
+
 
     const handleToggleEligibility = (studentId: string) => {
         const student = students.find(s => s.id === studentId);
@@ -172,8 +186,21 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
                               </div>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Student Eligibility for {subjectName} ({params.subjectCode})</CardTitle>
-                                    <CardDescription>Manage which students are eligible to write the exam for this subject.</CardDescription>
+                                  <div className="flex justify-between items-center">
+                                      <div>
+                                        <CardTitle>Student Eligibility for {subjectName} ({params.subjectCode})</CardTitle>
+                                        <CardDescription>Manage which students are eligible to write the exam for this subject.</CardDescription>
+                                      </div>
+                                      <div className="w-full max-w-sm">
+                                        <Input
+                                          placeholder="Search students..."
+                                          value={searchQuery}
+                                          onChange={(e) => setSearchQuery(e.target.value)}
+                                          className="pl-8"
+                                          icon={<Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
+                                        />
+                                      </div>
+                                  </div>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="border rounded-md">
@@ -212,6 +239,11 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
                                             </TableBody>
                                         </Table>
                                     </div>
+                                    {relevantStudents.length === 0 && (
+                                      <div className="text-center text-muted-foreground py-8">
+                                          No students found for this filter.
+                                      </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </main>

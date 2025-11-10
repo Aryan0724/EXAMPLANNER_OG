@@ -6,7 +6,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Users, ChevronLeft, ChevronRight, Ban, X } from 'lucide-react';
+import { Users, ChevronLeft, ChevronRight, Ban, X, Search } from 'lucide-react';
 import { STUDENTS as initialStudents } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 
 const STUDENTS_PER_PAGE = 20;
 
@@ -123,18 +124,30 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'debarred' | 'ineligible'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; student: Student | null }>({ isOpen: false, student: null });
 
 
   const filteredStudents = useMemo(() => {
+    let studentsToFilter = students;
+
     if (filter === 'debarred') {
-      return students.filter(s => s.isDebarred);
+      studentsToFilter = studentsToFilter.filter(s => s.isDebarred);
+    } else if (filter === 'ineligible') {
+      studentsToFilter = studentsToFilter.filter(s => s.ineligibilityRecords && s.ineligibilityRecords.length > 0);
     }
-    if (filter === 'ineligible') {
-      return students.filter(s => s.ineligibilityRecords && s.ineligibilityRecords.length > 0);
+    
+    if (searchQuery) {
+        const lowercasedQuery = searchQuery.toLowerCase();
+        studentsToFilter = studentsToFilter.filter(student =>
+            student.id.toLowerCase().includes(lowercasedQuery) ||
+            student.rollNo.toLowerCase().includes(lowercasedQuery) ||
+            student.name.toLowerCase().includes(lowercasedQuery)
+        );
     }
-    return students;
-  }, [students, filter]);
+
+    return studentsToFilter;
+  }, [students, filter, searchQuery]);
 
   const totalPages = Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE);
   const startIndex = (currentPage - 1) * STUDENTS_PER_PAGE;
@@ -220,7 +233,7 @@ export default function StudentsPage() {
             <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
               <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start flex-wrap gap-4">
                     <div>
                       <div className="flex items-center gap-2">
                           <Users className="h-6 w-6" />
@@ -228,10 +241,21 @@ export default function StudentsPage() {
                       </div>
                       <CardDescription>Manage student eligibility and debarment status.</CardDescription>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>All Students</Button>
-                        <Button variant={filter === 'debarred' ? 'default' : 'outline'} onClick={() => setFilter('debarred')}>Globally Debarred</Button>
-                        <Button variant={filter === 'ineligible' ? 'default' : 'outline'} onClick={() => setFilter('ineligible')}>Subject Ineligible</Button>
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                        <div className="w-full sm:w-auto max-w-sm">
+                          <Input
+                            placeholder="Search students..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-8"
+                            icon={<Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>All</Button>
+                            <Button variant={filter === 'debarred' ? 'default' : 'outline'} onClick={() => setFilter('debarred')}>Debarred</Button>
+                            <Button variant={filter === 'ineligible' ? 'default' : 'outline'} onClick={() => setFilter('ineligible')}>Ineligible</Button>
+                        </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -280,6 +304,11 @@ export default function StudentsPage() {
                         ))}
                       </TableBody>
                     </Table>
+                    {currentStudents.length === 0 && (
+                      <div className="text-center text-muted-foreground py-8">
+                          No students found for this filter.
+                      </div>
+                    )}
                   </div>
                 </CardContent>
                 <CardFooter className="flex items-center justify-between">
@@ -313,5 +342,3 @@ export default function StudentsPage() {
     </SidebarProvider>
   );
 }
-
-    
