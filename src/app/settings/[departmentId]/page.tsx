@@ -11,11 +11,10 @@ import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
 export default function DepartmentCoursesPage({ params }: { params: { departmentId: string } }) {
-  const { departmentId } = params;
 
   const departmentName = useMemo(() => 
-    DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === departmentId) || 'Unknown Department'
-  , [departmentId]);
+    DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department'
+  , [params.departmentId]);
 
   const courses = useMemo(() => 
     (COURSES[departmentName as keyof typeof COURSES] || []).map(course => ({
@@ -56,7 +55,7 @@ export default function DepartmentCoursesPage({ params }: { params: { department
                   {courses.map(course => (
                     <Link
                       key={course.id}
-                      href={`/settings/${departmentId}/${course.id}`}
+                      href={`/settings/${params.departmentId}/${course.id}`}
                       className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
