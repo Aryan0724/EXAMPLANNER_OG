@@ -3,17 +3,17 @@
 import { Student, Classroom, createClassroom, Invigilator, ExamSlot } from './types';
 
 export const DEPARTMENTS = [
-  'Computer Science & Engineering',
-  'Mechanical Engineering',
-  'Civil Engineering',
-  'Electrical & Electronics Engineering',
+  'B.Tech Computer Science & Engineering',
+  'B.Tech Mechanical Engineering',
+  'B.Tech Civil Engineering',
+  'B.Tech Electronics & Communication Engineering',
 ];
 
 export const COURSES = {
-  'Computer Science & Engineering': ['Bachelor of Technology in CSE'],
-  'Mechanical Engineering': ['Bachelor of Technology in ME'],
-  'Civil Engineering': ['Bachelor of Technology in CE'],
-  'Electrical & Electronics Engineering': ['Bachelor of Technology in EEE'],
+  'B.Tech Computer Science & Engineering': ['CSE Core', 'CSE with specialization in AI & ML', 'CSE with specialization in Cyber Security'],
+  'B.Tech Mechanical Engineering': ['ME Core', 'ME with specialization in Robotics', 'ME with specialization in Automotive'],
+  'B.Tech Civil Engineering': ['CE Core', 'CE with specialization in Structural Engineering', 'CE with specialization in Environmental Engineering'],
+  'B.Tech Electronics & Communication Engineering': ['ECE Core', 'ECE with specialization in VLSI Design', 'ECE with specialization in Telecommunications'],
 };
 
 const firstNames = ["Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Sai", "Reyansh", "Ayaan", "Krishna", "Ishaan", "Saanvi", "Aadhya", "Kiara", "Diya", "Pari", "Ananya", "Riya", "Sitara", "Avni", "Zoya", "Liam", "Olivia", "Noah", "Emma", "Oliver", "Ava", "Elijah", "Charlotte", "William", "Sophia", "James", "Amelia", "Benjamin", "Isabella", "Lucas", "Mia", "Henry", "Evelyn", "Alexander", "Harper"];
@@ -22,24 +22,25 @@ const lastNames = ["Sharma", "Verma", "Gupta", "Singh", "Kumar", "Patel", "Shah"
 const generateName = () => `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
 
 
-// --- Generate 5000 Students of 1st year in 4 courses ---
+// --- Generate 5000 Students of 1st year in various courses ---
 export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
     const deptIndex = i % DEPARTMENTS.length;
     const dept = DEPARTMENTS[deptIndex];
     const deptCourses = COURSES[dept as keyof typeof COURSES];
-    const course = deptCourses[0];
+    const courseIndex = i % deptCourses.length;
+    const course = deptCourses[courseIndex];
     const semester = 1; // All are 1st year students
     const isDebarred = (i + 1) % 50 === 0;
 
     return {
       id: `S${String(i + 1).padStart(4, '0')}`,
       name: generateName(),
-      rollNo: `${dept.substring(0,2).toUpperCase()}${String(new Date().getFullYear()).slice(2)}-${String(i + 1).padStart(4,'0')}`,
+      rollNo: `${dept.substring(8,11).toUpperCase()}${String(new Date().getFullYear()).slice(2)}-${String(i + 1).padStart(4,'0')}`,
       department: dept,
       course: course,
       semester: semester,
       section: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][i % 8],
-      eligibleSubjects: [], // Initially eligible for all subjects in their course
+      eligibleSubjects: [], 
       ineligibilityRecords: [],
       unavailableSlots: [],
       seatAssignment: null,
@@ -84,27 +85,26 @@ export const INVIGILATORS: Invigilator[] = Array.from({ length: 100 }, (_, i) =>
 }));
 
 
-// Realistic Subjects
+// Realistic 1st year common and department-specific subjects
 const subjectsByDept = {
-  'Computer Science & Engineering': [
-    { code: "CS101", name: "Introduction to Programming" },
-    { code: "CS102", name: "Discrete Mathematics" },
-    { code: "HS101", name: "Communication Skills" },
+  'common': [
+    { code: "MA-101", name: "Engineering Mathematics-I" },
+    { code: "PH-101", name: "Engineering Physics" },
+    { code: "CH-101", name: "Engineering Chemistry" },
+    { code: "HS-101", name: "Professional Communication" },
+    { code: "EV-101", name: "Environmental Science" },
   ],
-  'Mechanical Engineering': [
-    { code: "ME101", name: "Engineering Mechanics" },
-    { code: "ME102", name: "Workshop Practice" },
-    { code: "PH101", name: "Engineering Physics" },
+  'B.Tech Computer Science & Engineering': [
+    { code: "CS-101", name: "Programming for Problem Solving" },
   ],
-  'Civil Engineering': [
-    { code: "CE101", name: "Engineering Drawing" },
-    { code: "CE102", name: "Surveying" },
-    { code: "CH101", name: "Engineering Chemistry" },
+  'B.Tech Mechanical Engineering': [
+    { code: "ME-101", name: "Engineering Mechanics" },
   ],
-  'Electrical & Electronics Engineering': [
-    { code: "EE101", name: "Basic Electrical Engineering" },
-    { code: "EE102", name: "Analog Electronics" },
-    { code: "MA101", name: "Engineering Mathematics I" },
+  'B.Tech Civil Engineering': [
+    { code: "CE-101", name: "Basic Civil Engineering" },
+  ],
+  'B.Tech Electronics & Communication Engineering': [
+    { code: "EC-101", name: "Basic Electronics Engineering" },
   ],
 };
 
@@ -115,40 +115,51 @@ const examDates = ['2024-09-10', '2024-09-11', '2024-09-12', '2024-09-13', '2024
 const examTimes = ['09:00', '14:00'];
 let examCounter = 1;
 
+let allSubjects: { dept: string, subject: {code: string, name: string} }[] = [];
+for (const dept of DEPARTMENTS) {
+    const commonSubjects = subjectsByDept.common.map(s => ({dept, subject: s}));
+    const deptSubjects = subjectsByDept[dept as keyof typeof subjectsByDept].map(s => ({dept, subject: s}));
+    allSubjects.push(...commonSubjects, ...deptSubjects);
+}
+// Unique subjects per department
+allSubjects = allSubjects.filter((item, index, self) => 
+    index === self.findIndex(t => t.dept === item.dept && t.subject.code === item.subject.code)
+);
+
+// Shuffle exams for more realistic scheduling
+for (let i = allSubjects.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allSubjects[i], allSubjects[j]] = [allSubjects[j], allSubjects[i]];
+}
+
+
 for (const date of examDates) {
-  for (const time of examTimes) {
-    if(examCounter > 50) break;
-
-    // Create concurrent exams for the 4 departments
-    for (let i = 0; i < DEPARTMENTS.length; i++) {
-        if(examCounter > 50) break;
+    for (const time of examTimes) {
+        if(examCounter > 50 || allSubjects.length === 0) break;
         
-        const dept = DEPARTMENTS[i % DEPARTMENTS.length];
-        const course = COURSES[dept as keyof typeof COURSES][0];
-        const semester = 1;
-        const deptSubjects = subjectsByDept[dept as keyof typeof subjectsByDept];
-        const subject = deptSubjects[(examCounter-1) % deptSubjects.length];
+        const subjectInfo = allSubjects.shift();
+        if (!subjectInfo) continue;
 
-        const isAlreadyScheduled = EXAM_SCHEDULE.some(e => e.date === date && e.time === time && e.course === course);
-        if (isAlreadyScheduled) continue;
-        
-        const isSubjectScheduled = EXAM_SCHEDULE.some(e => e.subjectCode === subject.code && e.department === dept);
-        if (isSubjectScheduled) continue;
+        const { dept, subject } = subjectInfo;
+        const coursesInDept = COURSES[dept as keyof typeof COURSES];
 
-        EXAM_SCHEDULE.push({
-            id: `E${String(examCounter).padStart(3, '0')}`,
-            subjectName: subject.name,
-            subjectCode: subject.code,
-            department: dept,
-            course: course,
-            semester: semester,
-            date: date,
-            time: time,
-            duration: 180,
-        });
-        examCounter++;
+        // Schedule this exam for all courses in the department
+        for(const course of coursesInDept) {
+             if(examCounter > 50) break;
+
+             EXAM_SCHEDULE.push({
+                id: `E${String(examCounter).padStart(3, '0')}`,
+                subjectName: subject.name,
+                subjectCode: subject.code,
+                department: dept,
+                course: course,
+                semester: 1,
+                date: date,
+                time: time,
+                duration: 180,
+            });
+            examCounter++;
+        }
     }
      if(examCounter > 50) break;
-  }
-   if(examCounter > 50) break;
 }
