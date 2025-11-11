@@ -2,18 +2,13 @@
 
 import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat } from './types';
 
-// This is a simplified logic for demonstration purposes.
-// It will be expanded upon based on the detailed algorithm provided.
-
-function getEligibleStudentsForExam(students: Student[], exam: ExamSlot): Student[] {
-    return students.filter(s => {
+function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Student[] {
+    return allStudents.filter(s => {
         if (s.isDebarred) {
             return false;
         }
-        // A student is eligible if their course and department match the exam
         const isTakingExam = s.course === exam.course && s.department === exam.department;
         
-        // Student is ineligible if they have a specific record for this subject
         const isSpecificallyIneligible = s.ineligibilityRecords?.some(r => r.subjectCode === exam.subjectCode);
         if (isSpecificallyIneligible) {
             return false;
@@ -26,25 +21,48 @@ function getEligibleStudentsForExam(students: Student[], exam: ExamSlot): Studen
 }
 
 
-export function generateSeatPlan(students: Student[], classrooms: Classroom[], exams: ExamSlot[]): SeatPlan {
+export function generateSeatPlan(
+    allStudents: Student[], 
+    classrooms: Classroom[], 
+    exams: ExamSlot[]
+): { plan: SeatPlan; updatedStudents: Student[] } {
     let assignments: Seat[] = [];
-    
-    // 1. Get all students for the current concurrent exam session
-    const allEligibleStudents = exams.flatMap(exam =>
-        getEligibleStudentsForExam(students, exam).map(student => ({ ...student, exam: exam }))
+    const studentMasterList = [...allStudents]; // Create a mutable copy
+
+    // 1. Get all students for the current concurrent exam session from the master list
+    const eligibleStudentPool = exams.flatMap(exam =>
+        getEligibleStudentsForExam(studentMasterList, exam).map(student => ({ ...student, exam: exam }))
     );
 
-    // TODO: Implement seat retention logic here. For now, we assign all.
-    const studentsToAssign = allEligibleStudents.filter(s => !s.seatAssignment);
-    
-    // Handle debarred students - find them and reserve their seats
-    const debarredStudents = students.filter(s => s.isDebarred && s.seatAssignment);
-    for (const debarred of debarredStudents) {
-         // This logic is simple for now. A full implementation would need to look up the classroom from seatAssignment.
+    // 2. Separate students who already have a seat from those who don't
+    const studentsWithSeats = eligibleStudentPool.filter(s => s.seatAssignment);
+    const studentsToAssign = eligibleStudentPool.filter(s => !s.seatAssignment);
+
+    // 3. Handle students who already have seats (including debarred ones)
+    const assignedSeats = new Map<string, Seat>(); // classroomId-seatNumber -> Seat
+    for (const student of studentsWithSeats) {
+        if (student.seatAssignment) {
+            const { classroomId, seatNumber } = student.seatAssignment;
+            const classroom = classrooms.find(c => c.id === classroomId);
+            if (classroom) {
+                 const key = `${classroomId}-${seatNumber}`;
+                 const seat: Seat = {
+                     student: student.isDebarred ? null : student, // Show debarred student seat as empty
+                     classroom: classroom,
+                     seatNumber: seatNumber
+                 };
+                 assignments.push(seat);
+                 assignedSeats.set(key, seat);
+            }
+        }
     }
 
+    // 4. Sort classrooms and prepare for new assignments
+    const sortedClassrooms = [...classrooms]
+        .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
+        .sort((a, b) => a.capacity - b.capacity);
 
-    // 2. Group students by course
+    // 5. Group students needing seats by course
     const studentsByCourse = studentsToAssign.reduce((acc, student) => {
         const courseKey = (student as any).exam.course;
         if (!acc[courseKey]) {
@@ -53,39 +71,31 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
         acc[courseKey].push(student);
         return acc;
     }, {} as Record<string, (Student & { exam: ExamSlot })[]>);
-
+    
     const courseQueues = Object.values(studentsByCourse);
     let totalStudentsToSeat = studentsToAssign.length;
-
-    // 3. Sort classrooms by capacity (smallest to largest to fill them up first)
-    const sortedClassrooms = [...classrooms]
-        .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
-        .sort((a, b) => a.capacity - b.capacity);
-
-    let seatCounter = 0;
-    // 4. Iterate through classrooms and fill them
+    
+    // 6. Iterate through classrooms and benches to assign remaining students
     for (const room of sortedClassrooms) {
         if (totalStudentsToSeat === 0) break;
 
-        const benchesInRoom = room.benchCapacities;
-        
-        for (let benchIndex = 0; benchIndex < benchesInRoom.length; benchIndex++) {
+        let seatCounterInRoom = 0;
+        for (let benchIndex = 0; benchIndex < room.benchCapacities.length; benchIndex++) {
             if (totalStudentsToSeat === 0) break;
-
-            const benchCapacity = benchesInRoom[benchIndex];
+            
+            const benchCapacity = room.benchCapacities[benchIndex];
             const benchAssignments: Seat[] = [];
-
-            // Try to fill one bench
+            
             for (let seatOnBench = 0; seatOnBench < benchCapacity; seatOnBench++) {
-                if (totalStudentsToSeat === 0) {
-                     // Fill rest of bench with empty seats
-                     benchAssignments.push({
-                        student: null,
-                        classroom: room,
-                        seatNumber: ++seatCounter,
-                    });
+                seatCounterInRoom++;
+                const seatKey = `${room.id}-${seatCounterInRoom}`;
+                
+                // If seat is already taken by a returning student, skip it
+                if (assignedSeats.has(seatKey)) {
                     continue;
-                };
+                }
+
+                if (totalStudentsToSeat === 0) break;
 
                 // Sort queues to prioritize the one with the most students remaining
                 courseQueues.sort((a, b) => b.length - a.length);
@@ -99,48 +109,43 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
                         
                         // Ensure no two students from the same course are on the same bench
                         if (!studentCoursesOnBench.includes((candidateStudent as any).exam.course)) {
-                            const student = currentQueue.shift(); // Take student from queue
-                            if (student) {
-                                benchAssignments.push({
-                                    student: student,
+                            const studentToPlace = currentQueue.shift();
+                            if (studentToPlace) {
+                                // PERSIST the seat assignment back to the master list
+                                const studentIndexInMaster = studentMasterList.findIndex(s => s.id === studentToPlace.id);
+                                if (studentIndexInMaster !== -1) {
+                                    studentMasterList[studentIndexInMaster].seatAssignment = {
+                                        classroomId: room.id,
+                                        seatNumber: seatCounterInRoom
+                                    };
+                                }
+
+                                const newSeat: Seat = {
+                                    student: studentToPlace,
                                     classroom: room,
-                                    seatNumber: ++seatCounter
-                                });
+                                    seatNumber: seatCounterInRoom
+                                };
+                                benchAssignments.push(newSeat);
+                                assignments.push(newSeat); // Add to final plan
                                 totalStudentsToSeat--;
                                 studentPlaced = true;
-                                break; // Student found and placed, move to next seat on bench
+                                break; 
                             }
                         }
                     }
                 }
-                
-                if(!studentPlaced) {
-                    // Could not find a suitable student (either no students left, or all remaining students are of a course already on the bench)
-                    // So we add an empty seat.
-                     benchAssignments.push({
-                        student: null,
-                        classroom: room,
-                        seatNumber: ++seatCounter,
-                    });
-                }
+                 // If a student couldn't be placed (e.g., conflicts on bench), we'll leave the seat empty in the plan for this session.
+                 // The seat remains available for the next session's generation.
             }
-            assignments.push(...benchAssignments);
         }
     }
-    
-    // Add reserved seats for debarred students to the final assignments
-    const debarredSeats = students.filter(s => s.isDebarred).map(s => ({
-        student: s,
-        // This is a simplification; we'd need to find the correct classroom
-        classroom: classrooms[0], 
-        seatNumber: -1, // Indicates a reserved but unplaced (in this plan) seat
-    }));
 
-
-    return {
-        exam: exams[0],
+    const plan: SeatPlan = {
+        exam: exams[0], // Representative exam
         assignments,
     };
+    
+    return { plan, updatedStudents: studentMasterList };
 }
 
 

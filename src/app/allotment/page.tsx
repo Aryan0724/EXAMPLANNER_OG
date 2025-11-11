@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useContext } from 'react';
@@ -28,9 +29,9 @@ const examSlotsByTime = EXAM_SCHEDULE.reduce((acc, exam) => {
 const getSlotOptions = (allotment: Record<string, any> | null) => {
   const source = allotment ? Object.keys(allotment) : Object.keys(examSlotsByTime);
   return source.map(key => {
-    const exams = examSlotsByTime[key];
-    const representativeExam = exams[0];
-    const examNames = exams.map(e => e.subjectCode).join(', ');
+    const exams = allotment ? allotment[key].seatPlan.exam : examSlotsByTime[key];
+    const representativeExam = Array.isArray(exams) ? exams[0] : exams;
+    const examNames = Array.isArray(exams) ? exams.map(e => e.subjectCode).join(', ') : representativeExam.subjectCode;
     return {
       id: key,
       label: `${representativeExam.date} @ ${representativeExam.time} (${examNames})`,
@@ -72,7 +73,9 @@ export default function AllotmentPage() {
       const { seatPlan: newSeatPlan, invigilatorAssignments: newInvigilatorAssignments } = fullAllotment[slotKey];
       setSeatPlan(newSeatPlan);
       setInvigilatorAssignments(newInvigilatorAssignments);
-      setSelectedClassroomId(newSeatPlan.assignments[0]?.classroom.id || null);
+      // Select the first classroom in the new plan automatically
+      const firstClassroomId = newSeatPlan.assignments.length > 0 ? newSeatPlan.assignments[0].classroom.id : null;
+      setSelectedClassroomId(firstClassroomId);
     } else {
        setSeatPlan(null);
        setInvigilatorAssignments(null);
@@ -102,7 +105,6 @@ export default function AllotmentPage() {
       return;
     }
 
-    // This function is now only for generating a SINGLE plan if no full allotment exists
     if (fullAllotment) {
         toast({
             title: 'Already Generated',
@@ -113,14 +115,14 @@ export default function AllotmentPage() {
 
     setIsGenerating(true);
     setTimeout(() => {
-      const selectedExams = examSlotsByTime[selectedSlotKey];
+      const selectedExams = examSlotsByTime[selectedSlotKey!];
       if (!selectedExams || selectedExams.length === 0) return;
 
-      const newSeatPlan = generateSeatPlan(STUDENTS, CLASSROOMS, selectedExams);
-      setSeatPlan(newSeatPlan);
-      setSelectedClassroomId(newSeatPlan.assignments[0]?.classroom.id || null);
+      const { plan, updatedStudents } = generateSeatPlan(STUDENTS, CLASSROOMS, selectedExams);
+      setSeatPlan(plan);
+      setSelectedClassroomId(plan.assignments[0]?.classroom.id || null);
 
-      const classroomsInUse = [...new Map(newSeatPlan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
+      const classroomsInUse = [...new Map(plan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
       const newInvigilatorAssignments = assignInvigilators(INVIGILATORS, classroomsInUse, selectedExams[0]);
       setInvigilatorAssignments(newInvigilatorAssignments);
 
@@ -144,7 +146,9 @@ export default function AllotmentPage() {
     ? invigilatorAssignments.filter(a => a.classroom.id === selectedClassroom?.id).map(a => a.invigilator)
     : [];
 
-  const representativeExam = selectedSlotKey ? examSlotsByTime[selectedSlotKey!]?.[0] : null;
+  const representativeExam = selectedSlotKey && seatPlan ? seatPlan.exam : null;
+  const currentExams = selectedSlotKey && fullAllotment ? fullAllotment[selectedSlotKey].seatPlan.exam : (selectedSlotKey ? examSlotsByTime[selectedSlotKey] : []);
+
 
   return (
     <>
@@ -154,7 +158,7 @@ export default function AllotmentPage() {
           <SidebarInset>
             <div className="flex flex-col h-full">
               <MainHeader />
-              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-print">
+              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
                 <div className="space-y-8">
                   <Card>
                     <CardHeader>
@@ -217,7 +221,7 @@ export default function AllotmentPage() {
                                     <Building className="w-6 h-6" />
                                     Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
                                 </h3>
-                                <p className="text-center mb-1 text-muted-foreground">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
+                                <p className="text-center mb-1 text-muted-foreground">Exam(s): {(Array.isArray(currentExams) ? currentExams : [currentExams]).map(e => e.subjectName).join(', ')}</p>
                                 <p className="text-center mb-2 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
                                 <div className="text-center mb-4">
                                   <p className="text-sm font-medium text-muted-foreground inline-flex items-center gap-2">
@@ -262,7 +266,7 @@ export default function AllotmentPage() {
                     <Building className="w-8 h-8" />
                     Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
                 </h3>
-                 <p className="text-center text-lg mb-1">Exam: {examSlotsByTime[selectedSlotKey!].map(e => e.subjectName).join(', ')}</p>
+                 <p className="text-center text-lg mb-1">Exam(s): {(Array.isArray(currentExams) ? currentExams : [currentExams]).map(e => e.subjectName).join(', ')}</p>
                  <p className="text-center text-lg mb-2">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
                  <div className="text-center mb-6">
                     <p className="text-md font-medium inline-flex items-center gap-2">

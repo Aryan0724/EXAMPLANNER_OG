@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useContext } from 'react';
@@ -11,14 +12,15 @@ import { CalendarDays, FileUp, Sparkles, Loader2, Download, Search } from 'lucid
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { EXAM_SCHEDULE as initialSchedule, STUDENTS, CLASSROOMS, INVIGILATORS } from '@/lib/data';
-import { ExamSlot, SeatPlan, InvigilatorAssignment } from '@/lib/types';
+import { EXAM_SCHEDULE as initialSchedule, STUDENTS as initialStudents, CLASSROOMS, INVIGILATORS } from '@/lib/data';
+import { ExamSlot, SeatPlan, InvigilatorAssignment, Student } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AllotmentContext } from '@/context/AllotmentContext';
 
 
 export default function SchedulePage() {
     const [examSchedule, setExamSchedule] = useState<ExamSlot[]>(initialSchedule);
+    const [students, setStudents] = useState<Student[]>(initialStudents);
     const [searchQuery, setSearchQuery] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -60,6 +62,8 @@ export default function SchedulePage() {
         setIsGenerating(true);
         
         setTimeout(() => {
+            let studentMasterList = [...students]; // Use a mutable master list for students
+
             // Group exams by date and time
             const examSlotsByTime = examSchedule.reduce((acc, exam) => {
               const key = `${exam.date} ${exam.time}`;
@@ -75,14 +79,16 @@ export default function SchedulePage() {
             for (const key in examSlotsByTime) {
                 const concurrentExams = examSlotsByTime[key];
                 
-                const seatPlan = generateSeatPlan(STUDENTS, CLASSROOMS, concurrentExams);
+                const { plan, updatedStudents } = generateSeatPlan(studentMasterList, CLASSROOMS, concurrentExams);
+                studentMasterList = updatedStudents; // IMPORTANT: Update the master list with new assignments for the next iteration
                 
-                const classroomsInUse = [...new Map(seatPlan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
+                const classroomsInUse = [...new Map(plan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
                 const invigilatorAssignments = assignInvigilators(INVIGILATORS, classroomsInUse, concurrentExams[0]);
 
-                generatedPlans[key] = { seatPlan, invigilatorAssignments };
+                generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
             
+            setStudents(studentMasterList); // Persist the final student list with all assignments in the component's state
             setFullAllotment(generatedPlans);
             setIsGenerating(false);
             toast({
