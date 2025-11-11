@@ -10,8 +10,8 @@ function getEligibleStudentsForExam(students: Student[], exam: ExamSlot): Studen
         if (s.isDebarred) {
             return false;
         }
-        // A student is eligible if their course and semester match the exam
-        const isTakingExam = s.course === exam.course && s.semester === exam.semester;
+        // A student is eligible if their course and department match the exam
+        const isTakingExam = s.course === exam.course && s.department === exam.department;
         
         // Student is ineligible if they have a specific record for this subject
         const isSpecificallyIneligible = s.ineligibilityRecords?.some(r => r.subjectCode === exam.subjectCode);
@@ -62,21 +62,31 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
         .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
         .sort((a, b) => a.capacity - b.capacity);
 
-    // 4. Iterate through classrooms and fill them completely
+    let seatCounter = 0;
+    // 4. Iterate through classrooms and fill them
     for (const room of sortedClassrooms) {
         if (totalStudentsToSeat === 0) break;
 
-        const roomAssignments: Seat[] = [];
-        const totalSeatsInRoom = room.capacity;
-        let seatsFilledInRoom = 0;
+        const benchesInRoom = room.benchCapacities;
+        
+        for (let benchIndex = 0; benchIndex < benchesInRoom.length; benchIndex++) {
+            if (totalStudentsToSeat === 0) break;
 
-        // Iterate until the room is full or we run out of students
-        while(seatsFilledInRoom < totalSeatsInRoom && totalStudentsToSeat > 0) {
-            const bench: Seat[] = [];
-            const seatStartIndex = seatsFilledInRoom;
+            const benchCapacity = benchesInRoom[benchIndex];
+            const benchAssignments: Seat[] = [];
 
             // Try to fill one bench
-            for (let seatOnBench = 0; seatOnBench < room.benchCapacity; seatOnBench++) {
+            for (let seatOnBench = 0; seatOnBench < benchCapacity; seatOnBench++) {
+                if (totalStudentsToSeat === 0) {
+                     // Fill rest of bench with empty seats
+                     benchAssignments.push({
+                        student: null,
+                        classroom: room,
+                        seatNumber: ++seatCounter,
+                    });
+                    continue;
+                };
+
                 // Sort queues to prioritize the one with the most students remaining
                 courseQueues.sort((a, b) => b.length - a.length);
 
@@ -84,19 +94,19 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
                 for (let i = 0; i < courseQueues.length; i++) {
                     const currentQueue = courseQueues[i];
                     if (currentQueue.length > 0) {
-                        const studentCoursesOnBench = bench.map(s => (s.student as any).exam.course);
+                        const studentCoursesOnBench = benchAssignments.map(s => (s.student as any).exam.course);
                         const candidateStudent = currentQueue[0];
                         
+                        // Ensure no two students from the same course are on the same bench
                         if (!studentCoursesOnBench.includes((candidateStudent as any).exam.course)) {
                             const student = currentQueue.shift(); // Take student from queue
                             if (student) {
-                                bench.push({
+                                benchAssignments.push({
                                     student: student,
                                     classroom: room,
-                                    seatNumber: seatStartIndex + seatOnBench + 1
+                                    seatNumber: ++seatCounter
                                 });
                                 totalStudentsToSeat--;
-                                seatsFilledInRoom++;
                                 studentPlaced = true;
                                 break; // Student found and placed, move to next seat on bench
                             }
@@ -107,30 +117,15 @@ export function generateSeatPlan(students: Student[], classrooms: Classroom[], e
                 if(!studentPlaced) {
                     // Could not find a suitable student (either no students left, or all remaining students are of a course already on the bench)
                     // So we add an empty seat.
-                     bench.push({
+                     benchAssignments.push({
                         student: null,
                         classroom: room,
-                        seatNumber: seatStartIndex + seatOnBench + 1,
+                        seatNumber: ++seatCounter,
                     });
-                    seatsFilledInRoom++;
                 }
-
-                if (totalStudentsToSeat === 0) {
-                    // Fill rest of the bench with empty seats if we ran out of students
-                    while(bench.length < room.benchCapacity && seatsFilledInRoom < totalSeatsInRoom) {
-                         bench.push({
-                            student: null,
-                            classroom: room,
-                            seatNumber: seatStartIndex + bench.length + 1,
-                        });
-                        seatsFilledInRoom++;
-                    }
-                    break; // Exit bench-filling loop
-                };
             }
-            roomAssignments.push(...bench);
+            assignments.push(...benchAssignments);
         }
-        assignments.push(...roomAssignments);
     }
     
     // Add reserved seats for debarred students to the final assignments

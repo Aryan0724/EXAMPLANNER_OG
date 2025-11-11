@@ -11,7 +11,7 @@ interface ClassroomVisualizerProps {
     id: string;
     rows: number;
     columns: number;
-    benchCapacity: number;
+    benchCapacities: number[];
   };
 }
 
@@ -31,13 +31,24 @@ const StudentTooltip = ({ student, seatNumber }: { student: Student | null, seat
 
 
 export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisualizerProps) {
-  const benches = [];
-  const totalBenches = classroom.rows * classroom.columns;
-
-  for (let i = 0; i < totalBenches; i++) {
-    const benchAssignments = assignments.slice(i * classroom.benchCapacity, (i + 1) * classroom.benchCapacity);
-    benches.push(benchAssignments);
+  const benches: Seat[][] = [];
+  let seatIndex = 0;
+  
+  for (const benchCapacity of classroom.benchCapacities) {
+      const bench: Seat[] = [];
+      for(let i = 0; i < benchCapacity; i++) {
+          const assignment = assignments.find(a => a.seatNumber === seatIndex + 1);
+          if (assignment) {
+              bench.push(assignment);
+          }
+          seatIndex++;
+      }
+      // Only push non-empty benches
+      if (bench.length > 0) {
+          benches.push(bench);
+      }
   }
+
 
   return (
     <TooltipProvider>

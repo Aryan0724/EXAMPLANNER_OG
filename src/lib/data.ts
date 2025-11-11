@@ -48,29 +48,41 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
     };
 });
 
-// --- Generate Classrooms with bench capacity of 2 ---
+const generateBenchCapacities = (rows: number, cols: number, specialRows: number[] = [], specialCapacity: number = 3, defaultCapacity: number = 2): number[] => {
+    const capacities: number[] = [];
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            capacities.push(specialRows.includes(r + 1) ? specialCapacity : defaultCapacity);
+        }
+    }
+    return capacities;
+};
+
+// --- Generate Classrooms with some having 3-seater benches ---
 export const CLASSROOMS: Classroom[] = [
-  // Block A (CS/IT) - All bench capacity 2
-  createClassroom({ id: 'CRA101', roomNo: 'A-101', building: 'Academic Block A', rows: 8, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'CS/IT' }), // 80
-  createClassroom({ id: 'CRA102', roomNo: 'A-102', building: 'Academic Block A', rows: 10, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'CS/IT' }), // 100
-  createClassroom({ id: 'CRA201', roomNo: 'A-201', building: 'Academic Block A', rows: 10, columns: 6, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'CS/IT' }), // 120
-  createClassroom({ id: 'CRA202', roomNo: 'A-202', building: 'Academic Block A', rows: 12, columns: 6, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'CS/IT' }), // 144
+  // Block A (CS/IT) 
+  createClassroom({ id: 'CRA101', roomNo: 'A-101', building: 'Academic Block A', rows: 8, columns: 5, benchCapacities: generateBenchCapacities(8, 5), unavailableSlots: [], departmentBlock: 'CS/IT' }),
+  createClassroom({ id: 'CRA102', roomNo: 'A-102', building: 'Academic Block A', rows: 10, columns: 5, benchCapacities: generateBenchCapacities(10, 5), unavailableSlots: [], departmentBlock: 'CS/IT' }),
+  // Room A201 with 3-seaters in middle rows 5 and 6
+  createClassroom({ id: 'CRA201', roomNo: 'A-201', building: 'Academic Block A', rows: 10, columns: 6, benchCapacities: generateBenchCapacities(10, 6, [5, 6]), unavailableSlots: [], departmentBlock: 'CS/IT' }),
+  createClassroom({ id: 'CRA202', roomNo: 'A-202', building: 'Academic Block A', rows: 12, columns: 6, benchCapacities: generateBenchCapacities(12, 6), unavailableSlots: [], departmentBlock: 'CS/IT' }),
 
-  // Block B (ME/CE/AE) - All bench capacity 2
-  createClassroom({ id: 'CRB101', roomNo: 'B-101', building: 'Academic Block B', rows: 10, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'ME/CE/AE' }), // 100
-  createClassroom({ id: 'CRB102', roomNo: 'B-102', building: 'Academic Block B', rows: 10, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'ME/CE/AE' }), // 100
-  createClassroom({ id: 'CRB201', roomNo: 'B-201', building: 'Academic Block B', rows: 15, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'ME/CE/AE' }), // 150
-  createClassroom({ id: 'CRB202', roomNo: 'B-202', building: 'Academic Block B', rows: 20, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'ME/CE/AE' }), // 200
+  // Block B (ME/CE/AE)
+  createClassroom({ id: 'CRB101', roomNo: 'B-101', building: 'Academic Block B', rows: 10, columns: 5, benchCapacities: generateBenchCapacities(10, 5), unavailableSlots: [], departmentBlock: 'ME/CE/AE' }),
+  createClassroom({ id: 'CRB102', roomNo: 'B-102', building: 'Academic Block B', rows: 10, columns: 5, benchCapacities: generateBenchCapacities(10, 5), unavailableSlots: [], departmentBlock: 'ME/CE/AE' }),
+  // Room B201 with 3-seaters in middle rows 7, 8, 9
+  createClassroom({ id: 'CRB201', roomNo: 'B-201', building: 'Academic Block B', rows: 15, columns: 5, benchCapacities: generateBenchCapacities(15, 5, [7, 8, 9]), unavailableSlots: [], departmentBlock: 'ME/CE/AE' }),
+  createClassroom({ id: 'CRB202', roomNo: 'B-202', building: 'Academic Block B', rows: 20, columns: 5, benchCapacities: generateBenchCapacities(20, 5), unavailableSlots: [], departmentBlock: 'ME/CE/AE' }),
   
-  // Block C (EE/EC/BT/CH) - All bench capacity 2
-  createClassroom({ id: 'CRC101', roomNo: 'C-101', building: 'Academic Block C', rows: 7, columns: 4, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'EE/EC/BT' }), // 56
-  createClassroom({ id: 'CRC102', roomNo: 'C-102', building: 'Academic Block C', rows: 8, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'EE/EC/BT' }), // 80
-  createClassroom({ id: 'CRC201', roomNo: 'C-201', building: 'Academic Block C', rows: 10, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'EE/EC/BT' }), // 100
-  createClassroom({ id: 'CRC202', roomNo: 'C-202', building: 'Academic Block C', rows: 10, columns: 6, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'EE/EC/BT' }), // 120
+  // Block C (EE/EC/BT/CH)
+  createClassroom({ id: 'CRC101', roomNo: 'C-101', building: 'Academic Block C', rows: 7, columns: 4, benchCapacities: generateBenchCapacities(7, 4), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
+  createClassroom({ id: 'CRC102', roomNo: 'C-102', building: 'Academic Block C', rows: 8, columns: 5, benchCapacities: generateBenchCapacities(8, 5), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
+  createClassroom({ id: 'CRC201', roomNo: 'C-201', building: 'Academic Block C', rows: 10, columns: 5, benchCapacities: generateBenchCapacities(10, 5), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
+  createClassroom({ id: 'CRC202', roomNo: 'C-202', building: 'Academic Block C', rows: 10, columns: 6, benchCapacities: generateBenchCapacities(10, 6, [5]), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
 
-  // Block D (Arch) - All bench capacity 2
-  createClassroom({ id: 'CRD101', roomNo: 'D-101', building: 'Architecture Block D', rows: 10, columns: 4, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'Arch' }), // 80
-  createClassroom({ id: 'CRD102', roomNo: 'D-102', building: 'Architecture Block D', rows: 12, columns: 5, benchCapacity: 2, unavailableSlots: [], departmentBlock: 'Arch' }), // 120
+  // Block D (Arch)
+  createClassroom({ id: 'CRD101', roomNo: 'D-101', building: 'Architecture Block D', rows: 10, columns: 4, benchCapacities: generateBenchCapacities(10, 4), unavailableSlots: [], departmentBlock: 'Arch' }),
+  createClassroom({ id: 'CRD102', roomNo: 'D-102', building: 'Architecture Block D', rows: 12, columns: 5, benchCapacities: generateBenchCapacities(12, 5), unavailableSlots: [], departmentBlock: 'Arch' }),
 ];
 
 
@@ -118,7 +130,7 @@ let examCounter = 1;
 let allSubjects: { dept: string, subject: {code: string, name: string} }[] = [];
 for (const dept of DEPARTMENTS) {
     const commonSubjects = subjectsByDept.common.map(s => ({dept, subject: s}));
-    const deptSubjects = subjectsByDept[dept as keyof typeof subjectsByDept].map(s => ({dept, subject: s}));
+    const deptSubjects = (subjectsByDept[dept as keyof typeof subjectsByDept] || []).map(s => ({dept, subject: s}));
     allSubjects.push(...commonSubjects, ...deptSubjects);
 }
 // Unique subjects per department

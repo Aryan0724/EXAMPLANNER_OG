@@ -40,7 +40,7 @@ export interface Classroom {
   building: string;
   rows: number;
   columns: number;
-  benchCapacity: number; // Students per bench
+  benchCapacities: number[]; // Array of capacities for each bench
   get capacity(): number; // Calculated property
   unavailableSlots: AvailabilitySlot[];
   departmentBlock: string; // For filtering, can be derived from building/room
@@ -51,7 +51,7 @@ export function createClassroom(data: Omit<Classroom, 'capacity'>): Classroom {
   return {
     ...data,
     get capacity() {
-      return this.rows * this.columns * this.benchCapacity;
+      return this.benchCapacities.reduce((sum, current) => sum + current, 0);
     }
   };
 }
@@ -71,6 +71,7 @@ export interface ExamSlot {
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
   course: string;
+  department: string;
   semester: number;
   subjectName: string;
   subjectCode: string;
