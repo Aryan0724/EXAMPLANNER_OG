@@ -3,18 +3,24 @@
 import { Student, Classroom, createClassroom, Invigilator, ExamSlot } from './types';
 
 export const DEPARTMENTS = [
-  'Computer Science',
+  'Computer Science & Engineering',
   'Mechanical Engineering',
   'Civil Engineering',
-  'Electrical Engineering',
+  'Electrical & Electronics Engineering',
 ];
 
 export const COURSES = {
-  'Computer Science': ['B.Tech in CS'],
-  'Mechanical Engineering': ['B.Tech in ME'],
-  'Civil Engineering': ['B.Tech in CE'],
-  'Electrical Engineering': ['B.Tech in EE'],
+  'Computer Science & Engineering': ['Bachelor of Technology in CSE'],
+  'Mechanical Engineering': ['Bachelor of Technology in ME'],
+  'Civil Engineering': ['Bachelor of Technology in CE'],
+  'Electrical & Electronics Engineering': ['Bachelor of Technology in EEE'],
 };
+
+const firstNames = ["Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Sai", "Reyansh", "Ayaan", "Krishna", "Ishaan", "Saanvi", "Aadhya", "Kiara", "Diya", "Pari", "Ananya", "Riya", "Sitara", "Avni", "Zoya", "Liam", "Olivia", "Noah", "Emma", "Oliver", "Ava", "Elijah", "Charlotte", "William", "Sophia", "James", "Amelia", "Benjamin", "Isabella", "Lucas", "Mia", "Henry", "Evelyn", "Alexander", "Harper"];
+const lastNames = ["Sharma", "Verma", "Gupta", "Singh", "Kumar", "Patel", "Shah", "Mehta", "Joshi", "Das", "Reddy", "Menon", "Nair", "Pillai", "Smith", "Jones", "Williams", "Brown", "Davis", "Miller", "Wilson", "Moore", "Taylor", "Anderson", "Thomas", "Jackson", "White", "Harris", "Martin", "Thompson"];
+
+const generateName = () => `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+
 
 // --- Generate 5000 Students of 1st year in 4 courses ---
 export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
@@ -27,8 +33,8 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
 
     return {
       id: `S${String(i + 1).padStart(4, '0')}`,
-      name: `Student ${i + 1}`,
-      rollNo: `${dept.substring(0,2).toUpperCase()}-${String(i + 1).padStart(4,'0')}`,
+      name: generateName(),
+      rollNo: `${dept.substring(0,2).toUpperCase()}${String(new Date().getFullYear()).slice(2)}-${String(i + 1).padStart(4,'0')}`,
       department: dept,
       course: course,
       semester: semester,
@@ -70,38 +76,69 @@ export const CLASSROOMS: Classroom[] = [
 // --- Generate 100 Invigilators ---
 export const INVIGILATORS: Invigilator[] = Array.from({ length: 100 }, (_, i) => ({
   id: `I${String(i + 1).padStart(3, '0')}`,
-  name: `Professor ${i + 1}`,
+  name: `Prof. ${generateName()}`,
   department: DEPARTMENTS[i % DEPARTMENTS.length],
-  isAvailable: (i + 1) % 10 !== 0, // Deterministic: 90% available
+  isAvailable: (i + 1) % 10 !== 0,
   unavailableSlots: [],
   assignedSessionIds: [],
 }));
 
 
+// Realistic Subjects
+const subjectsByDept = {
+  'Computer Science & Engineering': [
+    { code: "CS101", name: "Introduction to Programming" },
+    { code: "CS102", name: "Discrete Mathematics" },
+    { code: "HS101", name: "Communication Skills" },
+  ],
+  'Mechanical Engineering': [
+    { code: "ME101", name: "Engineering Mechanics" },
+    { code: "ME102", name: "Workshop Practice" },
+    { code: "PH101", name: "Engineering Physics" },
+  ],
+  'Civil Engineering': [
+    { code: "CE101", name: "Engineering Drawing" },
+    { code: "CE102", name: "Surveying" },
+    { code: "CH101", name: "Engineering Chemistry" },
+  ],
+  'Electrical & Electronics Engineering': [
+    { code: "EE101", name: "Basic Electrical Engineering" },
+    { code: "EE102", name: "Analog Electronics" },
+    { code: "MA101", name: "Engineering Mathematics I" },
+  ],
+};
+
+
 // --- Generate ~50 Exam Slots for 1st year students ---
 export const EXAM_SCHEDULE: ExamSlot[] = [];
-const examDates = ['2024-09-10', '2024-09-11', '2024-09-12', '2024-09-13', '2024-09-14'];
+const examDates = ['2024-09-10', '2024-09-11', '2024-09-12', '2024-09-13', '2024-09-14', '2024-09-15', '2024-09-16', '2024-09-17', '2024-09-18', '2024-09-19'];
 const examTimes = ['09:00', '14:00'];
 let examCounter = 1;
 
 for (const date of examDates) {
   for (const time of examTimes) {
-    // Create up to 4 concurrent exams for the 4 courses
+    if(examCounter > 50) break;
+
+    // Create concurrent exams for the 4 departments
     for (let i = 0; i < DEPARTMENTS.length; i++) {
         if(examCounter > 50) break;
         
         const dept = DEPARTMENTS[i % DEPARTMENTS.length];
         const course = COURSES[dept as keyof typeof COURSES][0];
         const semester = 1;
-        
-        // Ensure we don't schedule the same course twice in the same slot
+        const deptSubjects = subjectsByDept[dept as keyof typeof subjectsByDept];
+        const subject = deptSubjects[(examCounter-1) % deptSubjects.length];
+
         const isAlreadyScheduled = EXAM_SCHEDULE.some(e => e.date === date && e.time === time && e.course === course);
         if (isAlreadyScheduled) continue;
         
+        const isSubjectScheduled = EXAM_SCHEDULE.some(e => e.subjectCode === subject.code && e.department === dept);
+        if (isSubjectScheduled) continue;
+
         EXAM_SCHEDULE.push({
             id: `E${String(examCounter).padStart(3, '0')}`,
-            subjectName: `${dept} Subject ${examCounter}`,
-            subjectCode: `${dept.substring(0,2).toUpperCase()}10${(examCounter % 3) + 1}`,
+            subjectName: subject.name,
+            subjectCode: subject.code,
             department: dept,
             course: course,
             semester: semester,
@@ -111,5 +148,7 @@ for (const date of examDates) {
         });
         examCounter++;
     }
+     if(examCounter > 50) break;
   }
+   if(examCounter > 50) break;
 }
