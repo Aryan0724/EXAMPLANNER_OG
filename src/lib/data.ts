@@ -139,17 +139,12 @@ allSubjects = allSubjects.filter((item, index, self) =>
     index === self.findIndex(t => t.dept === item.dept && t.subject.code === item.subject.code)
 );
 
-// Shuffle exams for more realistic scheduling
-for (let i = allSubjects.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [allSubjects[i], allSubjects[j]] = [allSubjects[j], allSubjects[i]];
-}
-
-
+// Deterministic loop instead of random shuffle
 for (const date of examDates) {
     for (const time of examTimes) {
         if(examCounter > 50 || allSubjects.length === 0) break;
         
+        // Take the next subject in the deterministic list
         const subjectInfo = allSubjects.shift();
         if (!subjectInfo) continue;
 
