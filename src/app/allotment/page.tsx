@@ -29,9 +29,9 @@ const examSlotsByTime = EXAM_SCHEDULE.reduce((acc, exam) => {
 const getSlotOptions = (allotment: Record<string, any> | null) => {
   const source = allotment ? Object.keys(allotment) : Object.keys(examSlotsByTime);
   return source.map(key => {
-    const exams = allotment ? allotment[key].seatPlan.exam : examSlotsByTime[key];
-    const representativeExam = Array.isArray(exams) ? exams[0] : exams;
-    const examNames = Array.isArray(exams) ? exams.map(e => e.subjectCode).join(', ') : representativeExam.subjectCode;
+    const examsInSlot = allotment ? allotment[key].seatPlan.exam : examSlotsByTime[key];
+    const representativeExam = Array.isArray(examsInSlot) ? examsInSlot[0] : examsInSlot;
+    const examNames = Array.isArray(examsInSlot) ? examsInSlot.map(e => `${e.subjectCode}${e.group ? ` (G${e.group})` : ''}`).join(', ') : `${representativeExam.subjectCode}${representativeExam.group ? ` (G${representativeExam.group})` : ''}`;
     return {
       id: key,
       label: `${representativeExam.date} @ ${representativeExam.time} (${examNames})`,
@@ -123,7 +123,7 @@ export default function AllotmentPage() {
       setSelectedClassroomId(plan.assignments[0]?.classroom.id || null);
 
       const classroomsInUse = [...new Map(plan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
-      const newInvigilatorAssignments = assignInvigilators(INVIGILATORS, classroomsInUse, selectedExams[0]);
+      const { assignments: newInvigilatorAssignments } = assignInvigilators(INVIGILATORS, classroomsInUse, selectedExams[0]);
       setInvigilatorAssignments(newInvigilatorAssignments);
 
       setIsGenerating(false);
@@ -146,9 +146,8 @@ export default function AllotmentPage() {
     ? invigilatorAssignments.filter(a => a.classroom.id === selectedClassroom?.id).map(a => a.invigilator)
     : [];
 
-  const representativeExam = selectedSlotKey && seatPlan ? seatPlan.exam : null;
-  const currentExams = selectedSlotKey && fullAllotment ? fullAllotment[selectedSlotKey].seatPlan.exam : (selectedSlotKey ? examSlotsByTime[selectedSlotKey] : []);
-
+  const currentExams = seatPlan?.exam ? (Array.isArray(seatPlan.exam) ? seatPlan.exam : [seatPlan.exam]) : [];
+  const representativeExam = currentExams[0];
 
   return (
     <>
@@ -156,7 +155,7 @@ export default function AllotmentPage() {
         <div className="flex min-h-screen">
           <MainSidebar />
           <SidebarInset>
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full no-print">
               <MainHeader />
               <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
                 <div className="space-y-8">
@@ -221,7 +220,7 @@ export default function AllotmentPage() {
                                     <Building className="w-6 h-6" />
                                     Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
                                 </h3>
-                                <p className="text-center mb-1 text-muted-foreground">Exam(s): {(Array.isArray(currentExams) ? currentExams : [currentExams]).map(e => e.subjectName).join(', ')}</p>
+                                <p className="text-center mb-1 text-muted-foreground">Exam(s): {currentExams.map(e => `${e.subjectName}${e.group ? ` (G${e.group})` : ''}`).join(', ')}</p>
                                 <p className="text-center mb-2 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
                                 <div className="text-center mb-4">
                                   <p className="text-sm font-medium text-muted-foreground inline-flex items-center gap-2">
@@ -266,7 +265,7 @@ export default function AllotmentPage() {
                     <Building className="w-8 h-8" />
                     Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
                 </h3>
-                 <p className="text-center text-lg mb-1">Exam(s): {(Array.isArray(currentExams) ? currentExams : [currentExams]).map(e => e.subjectName).join(', ')}</p>
+                 <p className="text-center text-lg mb-1">Exam(s): {currentExams.map(e => `${e.subjectName}${e.group ? ` (G${e.group})` : ''}`).join(', ')}</p>
                  <p className="text-center text-lg mb-2">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
                  <div className="text-center mb-6">
                     <p className="text-md font-medium inline-flex items-center gap-2">

@@ -23,7 +23,7 @@ export interface Student {
   course: string;
   semester: number;
   section: string;
-  eligibleSubjects: string[]; // Array of subject codes
+  group: 'A' | 'B'; // For subject cycles like Physics/Chemistry
   ineligibilityRecords: IneligibilityRecord[];
   unavailableSlots: AvailabilitySlot[];
   seatAssignment: SeatAssignment | null; // Persisted seat
@@ -58,10 +58,10 @@ export interface Invigilator {
   id: string;
   name: string;
   department: string;
-  isAvailable: boolean; // Kept for simplicity, can be derived from unavailableSlots
+  isAvailable: boolean; 
   maxDailySessions?: number;
   unavailableSlots: AvailabilitySlot[];
-  assignedSessionIds: string[];
+  assignedDuties: { date: string, count: number }[]; // To track duties per day
 }
 
 export interface ExamSlot {
@@ -74,16 +74,18 @@ export interface ExamSlot {
   subjectName: string;
   subjectCode: string;
   duration: number; // in minutes
+  group?: 'A' | 'B'; // For group-specific exams
 }
 
 export interface Seat {
-  student: Student | null; // Null if debarred or empty
+  student: Student | null; // Null if empty
+  isDebarredSeat?: boolean; // True if the seat is reserved for a debarred student
   classroom: Classroom;
   seatNumber: number; // 1-based index in the classroom
 }
 
 export interface SeatPlan {
-  exam: ExamSlot;
+  exam: ExamSlot | ExamSlot[]; // Can be for one or more concurrent exams
   assignments: Seat[];
 }
 

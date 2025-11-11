@@ -12,8 +12,8 @@ import { CalendarDays, FileUp, Sparkles, Loader2, Download, Search } from 'lucid
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { EXAM_SCHEDULE as initialSchedule, STUDENTS as initialStudents, CLASSROOMS, INVIGILATORS } from '@/lib/data';
-import { ExamSlot, SeatPlan, InvigilatorAssignment, Student } from '@/lib/types';
+import { EXAM_SCHEDULE as initialSchedule, STUDENTS as initialStudents, CLASSROOMS, INVIGILATORS as initialInvigilators } from '@/lib/data';
+import { ExamSlot, SeatPlan, InvigilatorAssignment, Student, Invigilator } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AllotmentContext } from '@/context/AllotmentContext';
 
@@ -21,6 +21,7 @@ import { AllotmentContext } from '@/context/AllotmentContext';
 export default function SchedulePage() {
     const [examSchedule, setExamSchedule] = useState<ExamSlot[]>(initialSchedule);
     const [students, setStudents] = useState<Student[]>(initialStudents);
+    const [invigilators, setInvigilators] = useState<Invigilator[]>(initialInvigilators);
     const [searchQuery, setSearchQuery] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -62,7 +63,8 @@ export default function SchedulePage() {
         setIsGenerating(true);
         
         setTimeout(() => {
-            let studentMasterList = [...students]; // Use a mutable master list for students
+            let studentMasterList: Student[] = JSON.parse(JSON.stringify(students));
+            let invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
 
             // Group exams by date and time
             const examSlotsByTime = examSchedule.reduce((acc, exam) => {
@@ -76,20 +78,30 @@ export default function SchedulePage() {
 
             const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
 
-            for (const key in examSlotsByTime) {
+            // Sort session keys chronologically
+            const sortedSessionKeys = Object.keys(examSlotsByTime).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+            for (const key of sortedSessionKeys) {
                 const concurrentExams = examSlotsByTime[key];
                 
+                // Generate seating plan, getting back the updated student list
                 const { plan, updatedStudents } = generateSeatPlan(studentMasterList, CLASSROOMS, concurrentExams);
-                studentMasterList = updatedStudents; // IMPORTANT: Update the master list with new assignments for the next iteration
+                studentMasterList = updatedStudents; // IMPORTANT: Update the master list for the next iteration
                 
                 const classroomsInUse = [...new Map(plan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
-                const invigilatorAssignments = assignInvigilators(INVIGILATORS, classroomsInUse, concurrentExams[0]);
+
+                // Generate invigilator assignments, getting back the updated invigilator list
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, classroomsInUse, concurrentExams[0]);
+                invigilatorMasterList = updatedInvigilators; // IMPORTANT: Update the master list
 
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
             
-            setStudents(studentMasterList); // Persist the final student list with all assignments in the component's state
+            // Persist the final state
+            setStudents(studentMasterList); 
+            setInvigilators(invigilatorMasterList);
             setFullAllotment(generatedPlans);
+
             setIsGenerating(false);
             toast({
                 title: 'Generation Complete',
@@ -158,6 +170,7 @@ export default function SchedulePage() {
                                                     <TableHead>Time</TableHead>
                                                     <TableHead>Subject</TableHead>
                                                     <TableHead>Code</TableHead>
+                                                    <TableHead>Group</TableHead>
                                                     <TableHead>Department</TableHead>
                                                     <TableHead>Course</TableHead>
                                                 </TableRow>
@@ -169,6 +182,7 @@ export default function SchedulePage() {
                                                         <TableCell>{exam.time}</TableCell>
                                                         <TableCell className="font-medium">{exam.subjectName}</TableCell>
                                                         <TableCell>{exam.subjectCode}</TableCell>
+                                                        <TableCell>{exam.group || 'All'}</TableCell>
                                                         <TableCell>{exam.department}</TableCell>
                                                         <TableCell>{exam.course}</TableCell>
                                                     </TableRow>

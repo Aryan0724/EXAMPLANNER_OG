@@ -40,7 +40,7 @@ export const STUDENTS: Student[] = Array.from({ length: 5000 }, (_, i) => {
       course: course,
       semester: semester,
       section: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][i % 8],
-      eligibleSubjects: [], 
+      group: i % 2 === 0 ? 'A' : 'B', // Assign students to Group A or B
       ineligibilityRecords: [],
       unavailableSlots: [],
       seatAssignment: null,
@@ -93,7 +93,7 @@ export const INVIGILATORS: Invigilator[] = Array.from({ length: 100 }, (_, i) =>
   department: DEPARTMENTS[i % DEPARTMENTS.length],
   isAvailable: (i + 1) % 10 !== 0,
   unavailableSlots: [],
-  assignedSessionIds: [],
+  assignedDuties: [],
 }));
 
 
@@ -101,8 +101,8 @@ export const INVIGILATORS: Invigilator[] = Array.from({ length: 100 }, (_, i) =>
 const subjectsByDept = {
   'common': [
     { code: "MA-101", name: "Engineering Mathematics-I" },
-    { code: "PH-101", name: "Engineering Physics" },
-    { code: "CH-101", name: "Engineering Chemistry" },
+    { code: "PH-101", name: "Engineering Physics", group: 'A' },
+    { code: "CH-101", name: "Engineering Chemistry", group: 'B' },
     { code: "HS-101", name: "Professional Communication" },
     { code: "EV-101", name: "Environmental Science" },
   ],
@@ -111,6 +111,7 @@ const subjectsByDept = {
   ],
   'B.Tech Mechanical Engineering': [
     { code: "ME-101", name: "Engineering Mechanics" },
+    { code: "ME-102", name: "Workshop Practice" },
   ],
   'B.Tech Civil Engineering': [
     { code: "CE-101", name: "Basic Civil Engineering" },
@@ -127,7 +128,7 @@ const examDates = ['2024-09-10', '2024-09-11', '2024-09-12', '2024-09-13', '2024
 const examTimes = ['09:00', '14:00'];
 let examCounter = 1;
 
-let allSubjects: { dept: string, subject: {code: string, name: string} }[] = [];
+let allSubjects: { dept: string, subject: {code: string, name: string, group?: 'A' | 'B'} }[] = [];
 for (const dept of DEPARTMENTS) {
     const commonSubjects = subjectsByDept.common.map(s => ({dept, subject: s}));
     const deptSubjects = (subjectsByDept[dept as keyof typeof subjectsByDept] || []).map(s => ({dept, subject: s}));
@@ -169,6 +170,7 @@ for (const date of examDates) {
                 date: date,
                 time: time,
                 duration: 180,
+                group: subject.group,
             });
             examCounter++;
         }
