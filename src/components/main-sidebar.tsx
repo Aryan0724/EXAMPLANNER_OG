@@ -21,11 +21,13 @@ import {
   CircleHelp,
   ShieldBan,
   Printer,
+  CalendarDays,
 } from 'lucide-react';
 import Link from 'next/link';
 
 const menuItems = [
     { id: 'dashboard', href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'schedule', href: '/schedule', icon: CalendarDays, label: 'Schedule' },
     { id: 'allotment', href: '/allotment', icon: Printer, label: 'Allotment' },
     { id: 'students', href: '/students', icon: Users, label: 'Students' },
     { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
