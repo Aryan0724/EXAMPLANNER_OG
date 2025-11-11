@@ -2,9 +2,7 @@
 
 export interface SeatAssignment {
   classroomId: string;
-  roomNo: string;
-  row: number;
-  col: number;
+  seatNumber: number;
 }
 
 export interface AvailabilitySlot {
