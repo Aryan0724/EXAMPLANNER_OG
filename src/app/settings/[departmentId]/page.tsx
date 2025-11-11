@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -10,12 +11,18 @@ import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
 export default function DepartmentCoursesPage({ params }: { params: { departmentId: string } }) {
-  const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
+  const { departmentId } = params;
 
-  const courses = (COURSES[departmentName as keyof typeof COURSES] || []).map(course => ({
-    name: course,
-    id: encodeURIComponent(course.toLowerCase().replace(/ /g, '-')),
-  }));
+  const departmentName = useMemo(() => 
+    DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === departmentId) || 'Unknown Department'
+  , [departmentId]);
+
+  const courses = useMemo(() => 
+    (COURSES[departmentName as keyof typeof COURSES] || []).map(course => ({
+      name: course,
+      id: encodeURIComponent(course.toLowerCase().replace(/ /g, '-')),
+    }))
+  , [departmentName]);
 
   return (
     <SidebarProvider>
@@ -49,7 +56,7 @@ export default function DepartmentCoursesPage({ params }: { params: { department
                   {courses.map(course => (
                     <Link
                       key={course.id}
-                      href={`/settings/${params.departmentId}/${course.id}`}
+                      href={`/settings/${departmentId}/${course.id}`}
                       className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
