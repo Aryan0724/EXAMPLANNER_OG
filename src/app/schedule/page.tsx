@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
+import { useRouter } from 'next/navigation';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -10,8 +11,10 @@ import { CalendarDays, FileUp, Sparkles, Loader2, Download, Search } from 'lucid
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { EXAM_SCHEDULE as initialSchedule } from '@/lib/data';
-import { ExamSlot } from '@/lib/types';
+import { EXAM_SCHEDULE as initialSchedule, STUDENTS, CLASSROOMS, INVIGILATORS } from '@/lib/data';
+import { ExamSlot, SeatPlan, InvigilatorAssignment } from '@/lib/types';
+import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
+import { AllotmentContext } from '@/context/AllotmentContext';
 
 
 export default function SchedulePage() {
@@ -19,6 +22,8 @@ export default function SchedulePage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const { setFullAllotment } = useContext(AllotmentContext);
+    const router = useRouter();
 
     const filteredSchedule = useMemo(() => {
         if (!searchQuery) {
@@ -53,14 +58,41 @@ export default function SchedulePage() {
 
     const handleGenerateAll = () => {
         setIsGenerating(true);
-        // This would trigger a complex backend process or a long-running client-side task
+        
         setTimeout(() => {
+            // Group exams by date and time
+            const examSlotsByTime = examSchedule.reduce((acc, exam) => {
+              const key = `${exam.date} ${exam.time}`;
+              if (!acc[key]) {
+                acc[key] = [];
+              }
+              acc[key].push(exam);
+              return acc;
+            }, {} as Record<string, ExamSlot[]>);
+
+            const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
+
+            for (const key in examSlotsByTime) {
+                const concurrentExams = examSlotsByTime[key];
+                
+                const seatPlan = generateSeatPlan(STUDENTS, CLASSROOMS, concurrentExams);
+                
+                const classroomsInUse = [...new Map(seatPlan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
+                const invigilatorAssignments = assignInvigilators(INVIGILATORS, classroomsInUse, concurrentExams[0]);
+
+                generatedPlans[key] = { seatPlan, invigilatorAssignments };
+            }
+            
+            setFullAllotment(generatedPlans);
             setIsGenerating(false);
             toast({
                 title: 'Generation Complete',
-                description: `Full allotment generated for all ${examSchedule.length} exam slots. View results on the Allotment page.`,
+                description: `Full allotment generated for all ${examSchedule.length} exam slots.`,
+                action: (
+                    <Button onClick={() => router.push('/allotment')}>View Allotment</Button>
+                ),
             });
-        }, 5000);
+        }, 3000);
     };
 
     return (

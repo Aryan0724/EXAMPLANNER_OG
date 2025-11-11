@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -13,6 +13,7 @@ import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom } from '@/lib
 import { STUDENTS, CLASSROOMS, INVIGILATORS, EXAM_SCHEDULE } from '@/lib/data';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
+import { AllotmentContext } from '@/context/AllotmentContext';
 
 // Group exams by date and time to handle concurrent exams
 const examSlotsByTime = EXAM_SCHEDULE.reduce((acc, exam) => {
@@ -24,22 +25,72 @@ const examSlotsByTime = EXAM_SCHEDULE.reduce((acc, exam) => {
   return acc;
 }, {} as Record<string, ExamSlot[]>);
 
-const slotOptions = Object.entries(examSlotsByTime).map(([key, exams]) => {
-  const representativeExam = exams[0];
-  const examNames = exams.map(e => e.subjectCode).join(', ');
-  return {
-    id: key,
-    label: `${representativeExam.date} @ ${representativeExam.time} (${examNames})`,
-  };
-});
+const getSlotOptions = (allotment: Record<string, any> | null) => {
+  const source = allotment ? Object.keys(allotment) : Object.keys(examSlotsByTime);
+  return source.map(key => {
+    const exams = examSlotsByTime[key];
+    const representativeExam = exams[0];
+    const examNames = exams.map(e => e.subjectCode).join(', ');
+    return {
+      id: key,
+      label: `${representativeExam.date} @ ${representativeExam.time} (${examNames})`,
+    };
+  });
+};
+
 
 export default function AllotmentPage() {
   const { toast } = useToast();
+  const { fullAllotment } = useContext(AllotmentContext);
+
   const [isGenerating, setIsGenerating] = useState(false);
+  const [slotOptions, setSlotOptions] = useState(getSlotOptions(fullAllotment));
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | undefined>(slotOptions[0]?.id);
+  
   const [seatPlan, setSeatPlan] = useState<SeatPlan | null>(null);
   const [invigilatorAssignments, setInvigilatorAssignments] = useState<InvigilatorAssignment[] | null>(null);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const newSlotOptions = getSlotOptions(fullAllotment);
+    setSlotOptions(newSlotOptions);
+    if(fullAllotment && newSlotOptions.length > 0) {
+      const newSelectedSlotKey = newSlotOptions[0].id;
+      setSelectedSlotKey(newSelectedSlotKey);
+      updateStateForSlot(newSelectedSlotKey);
+    } else {
+      // Reset if there's no full allotment
+      setSeatPlan(null);
+      setInvigilatorAssignments(null);
+      setSelectedClassroomId(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullAllotment]);
+
+  const updateStateForSlot = (slotKey: string) => {
+    if (fullAllotment && fullAllotment[slotKey]) {
+      const { seatPlan: newSeatPlan, invigilatorAssignments: newInvigilatorAssignments } = fullAllotment[slotKey];
+      setSeatPlan(newSeatPlan);
+      setInvigilatorAssignments(newInvigilatorAssignments);
+      setSelectedClassroomId(newSeatPlan.assignments[0]?.classroom.id || null);
+    } else {
+       setSeatPlan(null);
+       setInvigilatorAssignments(null);
+       setSelectedClassroomId(null);
+    }
+  };
+
+  const handleSlotChange = (slotKey: string) => {
+      setSelectedSlotKey(slotKey);
+      if (fullAllotment) {
+          updateStateForSlot(slotKey);
+      } else {
+        // Clear previous plan if we are not in "full allotment" mode
+        setSeatPlan(null);
+        setInvigilatorAssignments(null);
+        setSelectedClassroomId(null);
+      }
+  };
 
   const handleGeneration = () => {
     if (!selectedSlotKey) {
@@ -49,6 +100,15 @@ export default function AllotmentPage() {
         description: 'Please select an exam slot before generating.',
       });
       return;
+    }
+
+    // This function is now only for generating a SINGLE plan if no full allotment exists
+    if (fullAllotment) {
+        toast({
+            title: 'Already Generated',
+            description: 'A full allotment plan has been generated from the Schedule page. Select a slot to view.',
+        });
+        return;
     }
 
     setIsGenerating(true);
@@ -84,26 +144,26 @@ export default function AllotmentPage() {
     ? invigilatorAssignments.filter(a => a.classroom.id === selectedClassroom?.id).map(a => a.invigilator)
     : [];
 
-  const representativeExam = seatPlan ? examSlotsByTime[selectedSlotKey!]?.[0] : null;
+  const representativeExam = selectedSlotKey ? examSlotsByTime[selectedSlotKey!]?.[0] : null;
 
   return (
     <>
       <SidebarProvider>
-        <div className="flex min-h-screen no-print">
+        <div className="flex min-h-screen">
           <MainSidebar />
           <SidebarInset>
             <div className="flex flex-col h-full">
               <MainHeader />
-              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 no-print">
                 <div className="space-y-8">
                   <Card>
                     <CardHeader>
                       <CardTitle>Seat Plan Generation & Allotment</CardTitle>
-                      <CardDescription>Select an exam session and generate the seat allotment and invigilator duties.</CardDescription>
+                      <CardDescription>{fullAllotment ? 'A full allotment has been generated. Select a session to view.' : 'Select an exam session and generate the seat allotment and invigilator duties.'}</CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col sm:flex-row items-center gap-4">
                       <div className="w-full sm:w-auto flex-grow">
-                        <Select onValueChange={setSelectedSlotKey} defaultValue={selectedSlotKey}>
+                        <Select onValueChange={handleSlotChange} value={selectedSlotKey}>
                           <SelectTrigger>
                             <SelectValue placeholder="Select an exam session..." />
                           </SelectTrigger>
@@ -111,10 +171,11 @@ export default function AllotmentPage() {
                             {slotOptions.map(slot => (
                               <SelectItem key={slot.id} value={slot.id}>{slot.label}</SelectItem>
                             ))}
+                             {slotOptions.length === 0 && <div className="p-4 text-center text-sm text-muted-foreground">No sessions available.</div>}
                           </SelectContent>
                         </Select>
                       </div>
-                      <Button onClick={handleGeneration} disabled={isGenerating || !selectedSlotKey} className="w-full sm:w-auto">
+                      <Button onClick={handleGeneration} disabled={isGenerating || fullAllotment || !selectedSlotKey} className="w-full sm:w-auto">
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                         Generate Plan
                       </Button>
@@ -177,13 +238,24 @@ export default function AllotmentPage() {
                       </CardContent>
                     </Card>
                   )}
+
+                   {!seatPlan && fullAllotment && (
+                     <Card>
+                        <CardContent className="pt-6">
+                            <div className="text-center py-12 text-muted-foreground">
+                                <p>Allotment generated successfully. Select an exam session to view details.</p>
+                            </div>
+                        </CardContent>
+                     </Card>
+                   )}
+
                 </div>
               </main>
             </div>
           </SidebarInset>
         </div>
       </SidebarProvider>
-      {selectedClassroom && (
+      {selectedClassroom && seatPlan && selectedSlotKey && (
         <div className="printable-area hidden">
              <div className="p-4 border rounded-lg">
                 <h3 className="flex items-center gap-2 text-2xl font-bold mb-2 text-center justify-center">
