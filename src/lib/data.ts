@@ -65,7 +65,7 @@ export const CLASSROOMS: Classroom[] = [
   createClassroom({ id: 'CRA102', roomNo: 'A-102', building: 'Academic Block A', rows: 10, columns: 5, benchCapacities: generateBenchCapacities(10, 5), unavailableSlots: [], departmentBlock: 'CS/IT' }),
   // Room A201 with 3-seaters in middle rows 5 and 6
   createClassroom({ id: 'CRA201', roomNo: 'A-201', building: 'Academic Block A', rows: 10, columns: 6, benchCapacities: generateBenchCapacities(10, 6, [5, 6]), unavailableSlots: [], departmentBlock: 'CS/IT' }),
-  createClassroom({ id: 'CRA202', roomNo: 'A-202', building: 'Academic Block A', rows: 12, columns: 6, benchCapacities: generateBenchCapacities(12, 6), unavailableSlots: [], departmentBlock: 'CS/IT' }),
+  createClassroom({ id: 'CRA202', roomNo: 'A-202', building: 'Academic Block A', rows: 12, columns: 6, benchCapacities: generateBenchCapacities(12, 6, [6,7]), unavailableSlots: [], departmentBlock: 'CS/IT' }),
 
   // Block B (ME/CE/AE)
   createClassroom({ id: 'CRB101', roomNo: 'B-101', building: 'Academic Block B', rows: 10, columns: 5, benchCapacities: generateBenchCapacities(10, 5), unavailableSlots: [], departmentBlock: 'ME/CE/AE' }),
@@ -76,7 +76,7 @@ export const CLASSROOMS: Classroom[] = [
   
   // Block C (EE/EC/BT/CH)
   createClassroom({ id: 'CRC101', roomNo: 'C-101', building: 'Academic Block C', rows: 7, columns: 4, benchCapacities: generateBenchCapacities(7, 4), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
-  createClassroom({ id: 'CRC102', roomNo: 'C-102', building: 'Academic Block C', rows: 8, columns: 5, benchCapacities: generateBenchCapacities(8, 5), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
+  createClassroom({ id: 'CRC102', roomNo: 'C-102', building: 'Academic Block C', rows: 8, columns: 5, benchCapacities: generateBenchCapacities(8, 5, [4]), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
   createClassroom({ id: 'CRC201', roomNo: 'C-201', building: 'Academic Block C', rows: 10, columns: 5, benchCapacities: generateBenchCapacities(10, 5), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
   createClassroom({ id: 'CRC202', roomNo: 'C-202', building: 'Academic Block C', rows: 10, columns: 6, benchCapacities: generateBenchCapacities(10, 6, [5]), unavailableSlots: [], departmentBlock: 'EE/EC/BT' }),
 

@@ -6,7 +6,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Search, CalendarOff } from 'lucide-react';
+import { Building, Search, CalendarOff, Users2 } from 'lucide-react';
 import { CLASSROOMS as initialClassrooms } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -141,6 +141,7 @@ export default function ClassroomsPage() {
                           <TableHead>Room No.</TableHead>
                           <TableHead>Building</TableHead>
                           <TableHead>Capacity</TableHead>
+                          <TableHead>Features</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right">Action</TableHead>
                         </TableRow>
@@ -152,6 +153,14 @@ export default function ClassroomsPage() {
                             <TableCell>{room.roomNo}</TableCell>
                             <TableCell>{room.building}</TableCell>
                             <TableCell>{room.capacity}</TableCell>
+                            <TableCell>
+                              {room.benchCapacities.some(c => c > 2) && (
+                                <Badge variant="outline" className="flex items-center gap-1.5">
+                                  <Users2 className="h-3 w-3" />
+                                  3-Seater Benches
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell>
                                 {room.unavailableSlots.length > 0 ? (
                                     <Badge variant="destructive">Unavailable ({room.unavailableSlots.length} slots)</Badge>
