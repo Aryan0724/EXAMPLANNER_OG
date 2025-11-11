@@ -94,5 +94,3 @@ export interface InvigilatorAssignment {
   classroom: Classroom;
   invigilator: Invigilator;
 }
-
-    
