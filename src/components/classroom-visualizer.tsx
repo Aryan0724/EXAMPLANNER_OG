@@ -4,6 +4,22 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Seat, Student } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { User, Ban } from 'lucide-react';
+import { useMemo } from 'react';
+
+
+// Simple hash function to get a color from a string
+const stringToColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (hash >> (i * 8)) & 0xFF;
+    color += ('00' + value.toString(16)).substr(-2);
+  }
+  return color;
+}
 
 interface ClassroomVisualizerProps {
   assignments: Seat[];
@@ -34,12 +50,19 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
   const benches: Seat[][] = [];
   let seatIndex = 0;
   
+  const courseColors = useMemo(() => {
+    const courses = new Set(assignments.map(a => a.student?.exam.subjectCode).filter(Boolean));
+    const colorMap = new Map<string, string>();
+    courses.forEach(courseCode => {
+      colorMap.set(courseCode, stringToColor(courseCode));
+    });
+    return colorMap;
+  }, [assignments]);
+
   for (const benchCapacity of classroom.benchCapacities) {
       const bench: Seat[] = [];
       for(let i = 0; i < benchCapacity; i++) {
           const assignment = assignments.find(a => a.seatNumber === seatIndex + 1);
-          // Even if assignment is not found, we may need a placeholder for an empty seat.
-          // Let's create a placeholder seat object to render the grid correctly.
           const seatObject = assignment || {
               student: null,
               classroom: classroom,
@@ -55,25 +78,29 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
   return (
     <TooltipProvider>
       <div
-        className="grid gap-4 p-4 rounded-lg border bg-muted/20"
+        className="grid gap-3 p-4 rounded-lg border bg-muted/20"
         style={{
-          gridTemplateColumns: `repeat(${classroom.columns}, minmax(0, 1fr))`,
+          gridTemplateColumns: `repeat(${classroom.columns}, minmax(0, auto))`,
+          justifyContent: 'center',
         }}
       >
         {benches.map((bench, benchIndex) => (
           <div
             key={benchIndex}
-            className="flex items-center justify-center gap-2 p-3 rounded-md bg-background border shadow-sm"
+            className="flex items-center justify-center gap-2 p-2 rounded-md bg-background border shadow-sm flex-nowrap"
           >
-            {bench.map((seat) => (
+            {bench.map((seat) => {
+              const seatColor = seat.student?.exam.subjectCode ? courseColors.get(seat.student.exam.subjectCode) : undefined;
+              return (
               <Tooltip key={seat.seatNumber}>
                 <TooltipTrigger asChild>
                   <div
                     className={cn(
                       "flex flex-col items-center justify-center w-24 h-16 rounded-md border-2 text-center p-1",
-                      seat.student ? 'border-primary bg-primary/10' : 'border-dashed border-muted-foreground/50',
+                      seat.student ? 'bg-primary/5' : 'border-dashed border-muted-foreground/50',
                       seat.isDebarredSeat && 'border-destructive bg-destructive/10'
                     )}
+                    style={{ borderColor: seat.student && seatColor ? seatColor : undefined }}
                   >
                     {seat.student ? (
                         <User className="w-5 h-5 text-primary" />
@@ -94,7 +121,7 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
                 </TooltipTrigger>
                 <StudentTooltip student={seat.student} seatNumber={seat.seatNumber} isDebarredSeat={seat.isDebarredSeat} />
               </Tooltip>
-            ))}
+            )})}
           </div>
         ))}
       </div>
