@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, use } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -71,7 +71,8 @@ const IneligibilityDialog = ({ isOpen, onClose, onSubmit, studentName, subjectCo
     );
 };
 
-export default function SubjectStudentsPage({ params }: { params: { departmentId: string, courseId: string, subjectCode: string } }) {
+export default function SubjectStudentsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string, subjectCode: string } }) {
+    const params = use(Promise.resolve(paramsProp));
     const [students, setStudents] = useState<Student[]>(initialStudents);
     const [dialogState, setDialogState] = useState<{isOpen: boolean; studentId: string | null; studentName: string | null}>({ isOpen: false, studentId: null, studentName: null });
     const [searchQuery, setSearchQuery] = useState('');
@@ -254,5 +255,4 @@ export default function SubjectStudentsPage({ params }: { params: { departmentId
         </SidebarProvider>
     );
 }
-
     

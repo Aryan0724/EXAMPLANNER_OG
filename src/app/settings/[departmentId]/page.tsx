@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, use } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -11,7 +11,8 @@ import { BookOpen, ChevronRight } from 'lucide-react';
 import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
-export default function DepartmentCoursesPage({ params }: { params: { departmentId: string } }) {
+export default function DepartmentCoursesPage({ params: paramsProp }: { params: { departmentId: string } }) {
+  const params = use(Promise.resolve(paramsProp));
 
   const departmentName = useMemo(() => 
     DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department'

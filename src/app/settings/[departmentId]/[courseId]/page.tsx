@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import { use } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -10,7 +11,8 @@ import { BookCopy, ChevronRight } from 'lucide-react';
 import { COURSES, DEPARTMENTS, EXAM_SCHEDULE } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
-export default function CourseSubjectsPage({ params }: { params: { departmentId: string, courseId: string } }) {
+export default function CourseSubjectsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string } }) {
+  const params = use(Promise.resolve(paramsProp));
   const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
   
   const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === params.courseId) || 'Unknown Course';
