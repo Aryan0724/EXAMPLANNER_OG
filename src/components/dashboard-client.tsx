@@ -13,7 +13,6 @@ import { FileUp, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Student, Classroom, Invigilator, ExamSlot } from '@/lib/types';
 import { STUDENTS, CLASSROOMS, INVIGILATORS, EXAM_SCHEDULE } from '@/lib/data';
-import { AiSuggestionCard } from '@/components/ai-suggestion-card';
 
 export function DashboardClient() {
   const { toast } = useToast();
@@ -61,7 +60,7 @@ export function DashboardClient() {
   return (
     <div className="space-y-8">
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Data Sources</CardTitle>
             <CardDescription>Confirm and load all necessary data for planning.</CardDescription>
@@ -86,7 +85,6 @@ export function DashboardClient() {
           </CardContent>
         </Card>
         
-        <AiSuggestionCard />
       </div>
        <Card>
         <CardHeader>
