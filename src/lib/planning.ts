@@ -39,7 +39,7 @@ export function generateSeatPlan(
     
     const assignedSeatsByLocation: Map<string, Seat> = new Map(); // "classroomId-seatNumber" -> Seat
 
-    // 1. Pre-process students with existing assignments (seat retention)
+    // 1. Pre-process students with existing assignments and debarred students
     const studentsNeedingSeats = new Map<string, (Student & { exam: ExamSlot })[]>();
     
     for (const exam of exams) {
@@ -59,8 +59,11 @@ export function generateSeatPlan(
                         classroom,
                         seatNumber
                     };
-                    finalAssignments.push(seat);
-                    assignedSeatsByLocation.set(key, seat);
+                    // Avoid duplicating assignments if already processed
+                    if (!assignedSeatsByLocation.has(key)) {
+                        finalAssignments.push(seat);
+                        assignedSeatsByLocation.set(key, seat);
+                    }
                 }
             } else if (!student.isDebarred) {
                 const subjectKey = `${student.exam.subjectCode}-${student.exam.course}`;
@@ -72,21 +75,22 @@ export function generateSeatPlan(
         }
     }
 
-    // 2. Pair up remaining course groups
+    // 2. Pair up remaining course groups strategically
     const courseQueues = Array.from(studentsNeedingSeats.values());
     
-    // Sort by department and then size to pair dissimilar departments
+    // Sort by department to group similar departments, then we'll pair first with last
     courseQueues.sort((a, b) => {
         const deptA = a[0].department;
         const deptB = b[0].department;
-        if (deptA.includes("Tech") && !deptB.includes("Tech")) return -1;
-        if (!deptA.includes("Tech") && deptB.includes("Tech")) return 1;
+        if (deptA < deptB) return -1;
+        if (deptA > deptB) return 1;
         return b.length - a.length;
     });
 
     const pairedQueues: ((Student & { exam: ExamSlot })[])[][] = [];
     while(courseQueues.length > 0) {
         if(courseQueues.length > 1) {
+            // Pair the first (largest of one dept) with the last (likely different dept)
             pairedQueues.push([courseQueues.shift()!, courseQueues.pop()!]);
         } else {
              pairedQueues.push([courseQueues.shift()!]);
@@ -109,65 +113,59 @@ export function generateSeatPlan(
             if (currentClassroomIndex >= availableClassrooms.length) break; 
             const room = availableClassrooms[currentClassroomIndex];
             
-            let filledSeatsInRoom = 0;
-            let totalSeatsInRoom = room.capacity;
-            const existingAssignmentsInRoom = finalAssignments.filter(a => a.classroom.id === room.id).length;
-            let availableSeatsInRoom = totalSeatsInRoom - existingAssignmentsInRoom;
+            let filledSeatsInRoom = false;
+            let roomIsFull = false;
 
             // Iterate through bench columns in the classroom
             for (let col = 0; col < room.columns; col++) {
-                if (availableSeatsInRoom <= 0) break;
+                if (roomIsFull) break;
 
-                // Each column is a pair of seats on each bench row
                 for(let row = 0; row < room.rows; row++){
-                    if (availableSeatsInRoom <= 0) break;
-                    
                     const benchIndex = row * room.columns + col;
-                    const benchCapacity = room.benchCapacities[benchIndex];
+                    const benchCapacity = room.benchCapacities[benchIndex] || 2;
 
-                    const baseSeatNumber = row * (room.columns * 2) + (col * 2); // Approximate
+                    for (let seatOnBench = 0; seatOnBench < benchCapacity; seatOnBench++) {
+                        const seatNumber = (benchIndex * benchCapacity) + seatOnBench + 1;
+                        const key = `${room.id}-${seatNumber}`;
+                        
+                        if (assignedSeatsByLocation.has(key)) {
+                            continue; // Seat already taken
+                        }
+                        
+                        // Alternate between queue1 and queue2 for seating
+                        const currentQueue = (seatOnBench % 2 === 0) ? queue1 : (queue2 || []);
+                        const studentToPlace = currentQueue.shift();
 
-                    // Simplified left/right for 2-seater benches
-                    const leftSeatNumber = baseSeatNumber + 1; 
-                    const rightSeatNumber = baseSeatNumber + 2;
+                        if (studentToPlace) {
+                            const newAssignment = { classroomId: room.id, seatNumber };
+                            studentToPlace.seatAssignment = newAssignment;
+                            
+                            const studentIndexInMaster = studentMasterList.findIndex(s => s.id === studentToPlace.id);
+                            if(studentIndexInMaster !== -1) {
+                                studentMasterList[studentIndexInMaster].seatAssignment = newAssignment;
+                            }
 
-                    const leftKey = `${room.id}-${leftSeatNumber}`;
-                    const rightKey = `${room.id}-${rightSeatNumber}`;
+                            const newSeat: Seat = { student: studentToPlace, classroom: room, seatNumber };
+                            finalAssignments.push(newSeat);
+                            assignedSeatsByLocation.set(key, newSeat);
+                            filledSeatsInRoom = true;
+                        }
 
-                    // Fill left side
-                    if (queue1.length > 0 && !assignedSeatsByLocation.has(leftKey)) {
-                        const student = queue1.shift()!;
-                        const newAssignment = { classroomId: room.id, seatNumber: leftSeatNumber };
-                        student.seatAssignment = newAssignment;
-                        const studentIndexInMaster = studentMasterList.findIndex(s => s.id === student.id);
-                        if(studentIndexInMaster !== -1) studentMasterList[studentIndexInMaster].seatAssignment = newAssignment;
-
-                        const newSeat: Seat = { student, classroom: room, seatNumber: leftSeatNumber };
-                        finalAssignments.push(newSeat);
-                        assignedSeatsByLocation.set(leftKey, newSeat);
-                        filledSeatsInRoom++;
-                        availableSeatsInRoom--;
+                        if (assignedSeatsByLocation.size >= availableClassrooms.reduce((acc, cr) => acc + cr.capacity, 0)) {
+                            roomIsFull = true;
+                            break;
+                        }
                     }
-
-                    // Fill right side
-                    if (queue2 && queue2.length > 0 && !assignedSeatsByLocation.has(rightKey)) {
-                         const student = queue2.shift()!;
-                         const newAssignment = { classroomId: room.id, seatNumber: rightSeatNumber };
-                         student.seatAssignment = newAssignment;
-                         const studentIndexInMaster = studentMasterList.findIndex(s => s.id === student.id);
-                         if(studentIndexInMaster !== -1) studentMasterList[studentIndexInMaster].seatAssignment = newAssignment;
-
-                         const newSeat: Seat = { student, classroom: room, seatNumber: rightSeatNumber };
-                         finalAssignments.push(newSeat);
-                         assignedSeatsByLocation.set(rightKey, newSeat);
-                         filledSeatsInRoom++;
-                         availableSeatsInRoom--;
-                    }
+                    if(roomIsFull) break;
                 }
+                 if(roomIsFull) break;
             }
-             if (filledSeatsInRoom > 0) {
+
+            if (filledSeatsInRoom) {
                 currentClassroomIndex++;
             } else {
+                // If we didn't fill any seats in this room, and there are still students, something is wrong.
+                // For now, break to avoid infinite loops.
                 break;
             }
         }
@@ -176,7 +174,7 @@ export function generateSeatPlan(
 
     const plan: SeatPlan = {
         exam: exams.length > 1 ? exams : exams[0],
-        assignments: finalAssignments,
+        assignments: finalAssignments.sort((a, b) => a.seatNumber - b.seatNumber),
     };
     
     return { plan, updatedStudents: studentMasterList };
@@ -253,3 +251,4 @@ export function assignInvigilators(
     }
     return { assignments, updatedInvigilators: invigilatorMasterList };
 }
+
