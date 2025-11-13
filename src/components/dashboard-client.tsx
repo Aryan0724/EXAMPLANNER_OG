@@ -1,7 +1,6 @@
 
 "use client";
 
-import { useState } from 'react';
 import Link from 'next/link';
 import {
   Card,
@@ -12,8 +11,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileUp, CalendarDays, Users, Building, UserCheck, Settings, Upload } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { CalendarDays, Users, Building, UserCheck, Settings, BookCopy, ShieldAlert, GraduationCap } from 'lucide-react';
 import { STUDENTS, CLASSROOMS, INVIGILATORS, EXAM_SCHEDULE } from '@/lib/data';
 
 const StatCard = ({ title, value, icon, description, link }: { title: string, value: string | number, icon: React.ReactNode, description: string, link: string }) => {
@@ -40,8 +38,6 @@ const StatCard = ({ title, value, icon, description, link }: { title: string, va
 
 
 export function DashboardClient() {
-  const { toast } = useToast();
-  
   const totalExams = EXAM_SCHEDULE.length;
   const totalStudents = STUDENTS.length;
   const eligibleStudents = STUDENTS.filter(s => !s.isDebarred && s.ineligibilityRecords.length === 0).length;
@@ -49,21 +45,6 @@ export function DashboardClient() {
   const availableClassrooms = CLASSROOMS.filter(c => c.unavailableSlots.length === 0).length;
   const totalInvigilators = INVIGILATORS.length;
   const availableInvigilators = INVIGILATORS.filter(i => i.isAvailable && i.unavailableSlots.length === 0).length;
-
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        // In a real app, you'd parse the file here.
-        // For this demo, we'll just simulate a delay and show a toast.
-        setTimeout(() => {
-            toast({
-                title: 'Data Uploaded',
-                description: `Successfully processed ${file.name}.`,
-            });
-        }, 1500);
-    };
 
   return (
     <div className="space-y-8">
@@ -100,42 +81,66 @@ export function DashboardClient() {
 
       <div className="grid gap-6 md:grid-cols-2">
          <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Upload data files or jump to key planning stages.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             <Button variant="outline" asChild size="lg">
-                <label htmlFor="data-upload" className="cursor-pointer">
-                    <Upload className="mr-2" />
-                    Upload Data
-                </label>
-            </Button>
-            <input id="data-upload" type="file" accept=".csv,.xlsx" className="hidden" onChange={handleFileUpload} />
-             <Button size="lg" asChild>
-                <Link href="/schedule">
-                    Generate Full Allotment
-                </Link>
-             </Button>
-          </CardContent>
+            <CardHeader>
+                <CardTitle>Getting Started Guide</CardTitle>
+                <CardDescription>Follow these steps to generate your first exam allotment.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 <div className="flex items-start gap-4">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">1</div>
+                    <div>
+                        <p className="font-semibold">Manage Your Data</p>
+                        <p className="text-sm text-muted-foreground">
+                            Visit the <Link href="/students" className="text-primary hover:underline">Students</Link>, <Link href="/classrooms" className="text-primary hover:underline">Classrooms</Link>, and <Link href="/invigilators" className="text-primary hover:underline">Invigilators</Link> pages to see the mock data. Use the "Manage Status" or "Manage Availability" buttons to mark resources as unavailable for specific exam slots.
+                        </p>
+                    </div>
+                </div>
+                 <div className="flex items-start gap-4">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">2</div>
+                    <div>
+                        <p className="font-semibold">Review the Exam Schedule</p>
+                        <p className="text-sm text-muted-foreground">
+                            Go to the <Link href="/schedule" className="text-primary hover:underline">Schedule</Link> page. Here, you can add, edit, or delete exam slots. This is the master list of all exams to be scheduled.
+                        </p>
+                    </div>
+                </div>
+                 <div className="flex items-start gap-4">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">3</div>
+                    <div>
+                        <p className="font-semibold">Generate Full Allotment</p>
+                        <p className="text-sm text-muted-foreground">
+                            Once your data and schedule are correct, click the <span className="font-semibold">"Generate Full Allotment"</span> button on the Schedule page. This will create seating plans and invigilator duties for all exam sessions at once.
+                        </p>
+                    </div>
+                </div>
+            </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Next Steps</CardTitle>
+            <CardTitle>About the Data</CardTitle>
             <CardDescription>
-              After uploading your data, generate a full allotment from the 'Schedule' page and then view the results in 'Allotment'.
+              The application is pre-populated with mock data to demonstrate its features.
             </CardDescription>
           </CardHeader>
-           <CardContent>
-             <p className="text-sm text-muted-foreground">
-                1. Use the <span className="font-semibold text-primary">Upload Data</span> button to import student lists, schedules, etc.
-             </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                2. Navigate to the <Link href="/schedule" className="font-semibold text-primary hover:underline">Schedule</Link> page to generate the master seat plan.
-             </p>
-             <p className="text-sm text-muted-foreground mt-2">
-                3. Go to the <Link href="/allotment" className="font-semibold text-primary hover:underline">Allotment</Link> page to view the detailed seating arrangements.
-             </p>
+           <CardContent className="space-y-3">
+             <div className="flex items-start gap-3">
+                <GraduationCap className="h-5 w-5 mt-1 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Students:</span> Data is generated with unique roll numbers, courses, and departments. Some students are marked as "debarred" or ineligible for specific subjects to test edge cases.
+                </p>
+             </div>
+             <div className="flex items-start gap-3">
+                <BookCopy className="h-5 w-5 mt-1 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Schedule:</span> A comprehensive schedule with over 700 exam slots across multiple departments, courses, and semesters is included.
+                </p>
+             </div>
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 mt-1 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Logic:</span> The allocation engine prioritizes seat retention, separates students from different departments, and ensures invigilators are rotated fairly.
+                </p>
+             </div>
            </CardContent>
         </Card>
       </div>
