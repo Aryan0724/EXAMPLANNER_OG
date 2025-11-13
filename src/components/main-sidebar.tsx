@@ -23,6 +23,7 @@ import {
   ShieldBan,
   Printer,
   CalendarDays,
+  Upload,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,7 +34,7 @@ const menuItems = [
     { id: 'students', href: '/students', icon: Users, label: 'Students' },
     { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
     { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
-    { id: 'reports', href: '/reports', icon: FileText, label: 'Reports' },
+    { id: 'import-export', href: '/import-export', icon: Upload, label: 'Import / Export' },
     { id: 'settings', href: '/settings', icon: Telescope, label: 'Explorer' },
 ];
 
@@ -62,7 +63,7 @@ export function MainSidebar() {
              <SidebarMenuItem key={item.id}>
                 <SidebarMenuButton
                   asChild
-                  isActive={activeItem === item.id || (item.id === 'settings' && activeItem === 'settings')}
+                  isActive={activeItem === item.id || (item.id === 'settings' && activeItem === 'settings') || (item.id === 'import-export' && activeItem === 'reports')}
                   tooltip={item.label}
                 >
                   <Link href={item.href}>
@@ -91,5 +92,3 @@ export function MainSidebar() {
     </Sidebar>
   );
 }
-
-    
