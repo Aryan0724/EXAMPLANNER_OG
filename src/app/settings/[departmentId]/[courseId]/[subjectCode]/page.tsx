@@ -72,7 +72,7 @@ const IneligibilityDialog = ({ isOpen, onClose, onSubmit, studentName, subjectCo
 };
 
 export default function SubjectStudentsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string, subjectCode: string } }) {
-    const params = use(Promise.resolve(paramsProp));
+    const params = use(paramsProp);
     const [students, setStudents] = useState<Student[]>(initialStudents);
     const [dialogState, setDialogState] = useState<{isOpen: boolean; studentId: string | null; studentName: string | null}>({ isOpen: false, studentId: null, studentName: null });
     const [searchQuery, setSearchQuery] = useState('');
@@ -255,4 +255,3 @@ export default function SubjectStudentsPage({ params: paramsProp }: { params: { 
         </SidebarProvider>
     );
 }
-    

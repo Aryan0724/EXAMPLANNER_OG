@@ -12,7 +12,7 @@ import { COURSES, DEPARTMENTS, EXAM_SCHEDULE } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
 export default function CourseSubjectsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string } }) {
-  const params = use(Promise.resolve(paramsProp));
+  const params = use(paramsProp);
   const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
   
   const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === params.courseId) || 'Unknown Course';
@@ -85,5 +85,3 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
     </SidebarProvider>
   );
 }
-
-    

@@ -12,7 +12,7 @@ import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
 export default function DepartmentCoursesPage({ params: paramsProp }: { params: { departmentId: string } }) {
-  const params = use(Promise.resolve(paramsProp));
+  const params = use(paramsProp);
 
   const departmentName = useMemo(() => 
     DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department'
@@ -81,5 +81,3 @@ export default function DepartmentCoursesPage({ params: paramsProp }: { params: 
     </SidebarProvider>
   );
 }
-
-    
