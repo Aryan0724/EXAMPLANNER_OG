@@ -27,7 +27,6 @@ import {
   LogOut
 } from 'lucide-react';
 import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
 
 const menuItems = [
     { id: 'dashboard', href: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -46,7 +45,6 @@ const helpMenuItems = [
 
 export function MainSidebar() {
   const pathname = usePathname();
-  const { logout } = useAuth();
   const activeItem = pathname.split('/')[1] || 'dashboard';
 
   return (
@@ -90,12 +88,6 @@ export function MainSidebar() {
                 </SidebarMenuButton>
             </SidebarMenuItem>
            ))}
-            <SidebarMenuItem>
-                <SidebarMenuButton onClick={logout} tooltip="Logout">
-                  <LogOut />
-                  <span>Logout</span>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
