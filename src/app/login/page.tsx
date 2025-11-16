@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,8 +23,16 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if(isAuthenticated) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, router]);
+
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -45,10 +54,14 @@ export default function LoginPage() {
           title: 'Login Failed',
           description: 'Invalid username or password.',
         });
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }, 1500);
   };
+
+  if (isAuthenticated) {
+    return <div className="flex h-screen items-center justify-center">Redirecting...</div>;
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

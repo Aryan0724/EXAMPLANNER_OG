@@ -28,26 +28,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (token && role) {
       setIsAuthenticated(true);
       setUserRole(role);
+      if (pathname === '/login') {
+        router.replace('/');
+      }
     } else {
       setIsAuthenticated(false);
       setUserRole(null);
+      if (pathname !== '/login') {
+        router.replace('/login');
+      }
     }
     setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (!loading && !isAuthenticated && pathname !== '/login') {
-      router.push('/login');
-    }
-  }, [isAuthenticated, loading, pathname, router]);
+  }, [pathname, router]);
 
   const login = (role: 'admin' | 'user') => {
-    const token = 'fake-auth-token'; // In a real app, this would come from Firebase Auth
+    const token = 'fake-auth-token'; // In a real app, this would come from a server
     Cookies.set('auth-token', token, { expires: 1 });
     Cookies.set('user-role', role, { expires: 1 });
     setIsAuthenticated(true);
     setUserRole(role);
-    router.push('/');
+    router.replace('/');
   };
 
   const logout = () => {
@@ -55,12 +55,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     Cookies.remove('user-role');
     setIsAuthenticated(false);
     setUserRole(null);
-    router.push('/login');
+    router.replace('/login');
   };
 
   if (loading) {
-    return <div>Loading...</div>; // Or a proper splash screen
+    return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
+  
+  if (!isAuthenticated && pathname !== '/login') {
+    return null; // Don't render children if not authenticated and not on login page
+  }
+  
+  if (isAuthenticated && pathname === '/login') {
+      return null; // Don't render login page if authenticated
+  }
+
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, userRole, login, logout, loading }}>
