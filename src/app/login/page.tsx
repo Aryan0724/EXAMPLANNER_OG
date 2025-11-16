@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -14,7 +15,7 @@ import { ExamplannerLogo } from '@/components/icons/examplanner-logo';
 import { Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  username: z.string().min(1, 'Username is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -32,17 +33,17 @@ export default function LoginPage() {
     setIsLoading(true);
     // Mock authentication
     setTimeout(() => {
-      if (data.email === 'admin@examplanner' && data.password === 'aryan_made_this') {
+      if (data.username === 'admin@examplanner' && data.password === 'aryan_made_this') {
         login('admin');
         toast({ title: 'Login Successful', description: 'Welcome, Admin!' });
-      } else if (data.email === 'user@examplanner' && data.password === 'aryan_made_this') {
+      } else if (data.username === 'user@examplanner' && data.password === 'aryan_made_this') {
         login('user');
         toast({ title: 'Login Successful', description: 'Welcome, User!' });
       } else {
         toast({
           variant: 'destructive',
           title: 'Login Failed',
-          description: 'Invalid email or password.',
+          description: 'Invalid username or password.',
         });
       }
       setIsLoading(false);
@@ -64,15 +65,15 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 placeholder="admin@examplanner"
-                {...register('email')}
+                {...register('username')}
                 disabled={isLoading}
               />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              {errors.username && <p className="text-xs text-destructive">{errors.username.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
