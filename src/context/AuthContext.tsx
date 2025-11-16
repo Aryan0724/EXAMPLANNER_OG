@@ -19,7 +19,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     const token = Cookies.get('auth-token');
@@ -28,18 +27,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (token && role) {
       setIsAuthenticated(true);
       setUserRole(role);
-      if (pathname === '/login') {
-        router.replace('/');
-      }
     } else {
       setIsAuthenticated(false);
       setUserRole(null);
-      if (pathname !== '/login') {
-        router.replace('/login');
-      }
     }
     setLoading(false);
-  }, [pathname, router]);
+  }, []);
 
   const login = (role: 'admin' | 'user') => {
     const token = 'fake-auth-token'; // In a real app, this would come from a server
@@ -61,15 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   if (loading) {
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
-  
-  if (!isAuthenticated && pathname !== '/login') {
-    return null; // Don't render children if not authenticated and not on login page
-  }
-  
-  if (isAuthenticated && pathname === '/login') {
-      return null; // Don't render login page if authenticated
-  }
-
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, userRole, login, logout, loading }}>
