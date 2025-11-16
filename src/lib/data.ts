@@ -14,7 +14,7 @@ export const DEPARTMENTS: string[] = [
     'Pharmacy',
     'Polytechnic',
     'Allied Sciences',
-    'Department of Personality Development',
+    'Department of Personality Development'
 ];
 
 export const COURSES: Record<string, string[]> = {
@@ -68,15 +68,15 @@ export const COURSES: Record<string, string[]> = {
         'Diploma In Mechanical Engineering',
     ],
     'Allied Sciences': [
-        'Mathematics',
-        'Physics',
-        'Chemistry',
-        'Statistics',
-        'Environmental Science',
+        'Mathematics', 
+        'Physics', 
+        'Chemistry', 
+        'Statistics', 
+        'Environmental Science'
     ],
     'Department of Personality Development': [
-        'Skills development',
-    ],
+        'Skills development'
+    ]
 };
 
 
