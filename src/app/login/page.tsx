@@ -23,15 +23,17 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if(isAuthenticated) {
+    // If the user is authenticated, redirect them away from the login page.
+    // This is handled by middleware, but as a fallback, we can do it here too.
+    if (!loading && isAuthenticated) {
       router.replace('/');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, loading, router]);
 
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
@@ -59,9 +61,11 @@ export default function LoginPage() {
     }, 1500);
   };
 
-  if (isAuthenticated) {
-    return <div className="flex h-screen items-center justify-center">Redirecting...</div>;
+  // While loading auth state, or if already authenticated, show a loading/redirecting message.
+  if (loading || isAuthenticated) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

@@ -1,7 +1,8 @@
+
 'use client';
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 
 interface AuthContextType {
@@ -51,13 +52,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.replace('/login');
   };
 
-  if (loading) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>;
-  }
-
   return (
     <AuthContext.Provider value={{ isAuthenticated, userRole, login, logout, loading }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
