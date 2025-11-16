@@ -16,45 +16,37 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const token = Cookies.get('auth-token');
     const role = Cookies.get('user-role') as 'admin' | 'user' | null;
-
-    if (token && role) {
-      setIsAuthenticated(true);
-      setUserRole(role);
-    } else {
-      setIsAuthenticated(false);
-      setUserRole(null);
-    }
+    setUserRole(role);
     setLoading(false);
   }, []);
+  
+  const isAuthenticated = !!userRole;
 
   const login = (role: 'admin' | 'user') => {
     const token = 'fake-auth-token'; // In a real app, this would come from a server
     Cookies.set('auth-token', token, { expires: 1 });
     Cookies.set('user-role', role, { expires: 1 });
-    setIsAuthenticated(true);
     setUserRole(role);
-    router.replace('/');
+    // Use a hard redirect to ensure the middleware re-evaluates the cookie
+    window.location.href = '/';
   };
 
   const logout = () => {
     Cookies.remove('auth-token');
     Cookies.remove('user-role');
-    setIsAuthenticated(false);
     setUserRole(null);
     router.replace('/login');
   };
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, userRole, login, logout, loading }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

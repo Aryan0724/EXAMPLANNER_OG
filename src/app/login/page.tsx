@@ -25,11 +25,10 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // If the user is authenticated, redirect them away from the login page.
-    // This is handled by middleware, but as a fallback, we can do it here too.
+    // If auth state is loaded and user is authenticated, redirect them.
     if (!loading && isAuthenticated) {
       router.replace('/');
     }
@@ -41,22 +40,22 @@ export default function LoginPage() {
   });
 
   const onSubmit = (data: LoginFormValues) => {
-    setIsLoading(true);
+    setIsSubmitting(true);
     // Mock authentication
     setTimeout(() => {
       if (data.username === 'admin@examplanner' && data.password === 'aryan_made_this') {
         login('admin');
-        toast({ title: 'Login Successful', description: 'Welcome, Admin!' });
+        // The login function will now handle redirection.
       } else if (data.username === 'user@examplanner' && data.password === 'aryan_made_this') {
         login('user');
-        toast({ title: 'Login Successful', description: 'Welcome, User!' });
+        // The login function will now handle redirection.
       } else {
         toast({
           variant: 'destructive',
           title: 'Login Failed',
           description: 'Invalid username or password.',
         });
-        setIsLoading(false);
+        setIsSubmitting(false);
       }
     }, 1500);
   };
@@ -88,7 +87,7 @@ export default function LoginPage() {
                 type="text"
                 placeholder="admin@examplanner"
                 {...register('username')}
-                disabled={isLoading}
+                disabled={isSubmitting}
               />
               {errors.username && <p className="text-xs text-destructive">{errors.username.message}</p>}
             </div>
@@ -99,12 +98,12 @@ export default function LoginPage() {
                 type="password"
                 placeholder="••••••••"
                 {...register('password')}
-                disabled={isLoading}
+                disabled={isSubmitting}
               />
               {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Login
             </Button>
           </form>
