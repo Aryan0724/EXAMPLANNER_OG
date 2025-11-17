@@ -2,6 +2,7 @@
 "use client";
 
 import Link from 'next/link';
+import { useContext } from 'react';
 import {
   Card,
   CardContent,
@@ -10,9 +11,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UploadCloud, CalendarDays, Users, Building, UserCheck } from 'lucide-react';
+import { UploadCloud } from 'lucide-react';
+import { DataContext } from '@/context/DataContext';
 
 export function DashboardClient() {
+  const { students, classrooms, invigilators, examSchedule } = useContext(DataContext);
+  const hasData = students.length > 0 || classrooms.length > 0 || invigilators.length > 0 || examSchedule.length > 0;
+
   return (
     <div className="space-y-8">
         <Card>
@@ -24,9 +29,9 @@ export function DashboardClient() {
                  <div className="flex items-start gap-4">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">1</div>
                     <div>
-                        <p className="font-semibold">Upload Your Data</p>
+                        <p className="font-semibold">Populate Your Data</p>
                         <p className="text-sm text-muted-foreground">
-                            The first step is to populate the application with your data. Go to the <Link href="/import-export" className="text-primary hover:underline">Import / Export</Link> page to upload your master files for students, classrooms, invigilators, and the exam schedule.
+                            The first step is to populate the application with your data. Go to the <Link href="/import-export" className="text-primary hover:underline">Import / Export</Link> page to upload your master files for students, classrooms, invigilators, and the exam schedule. Alternatively, you can generate mock data on the same page to explore the app's features.
                         </p>
                     </div>
                 </div>
@@ -59,22 +64,24 @@ export function DashboardClient() {
                 </div>
             </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Data Management</CardTitle>
-            <CardDescription>
-              Use the Import / Export page to upload your master data files. This is the primary way to get started with the application.
-            </CardDescription>
-          </CardHeader>
-           <CardContent>
-             <Link href="/import-export" passHref>
-                <Button className="w-full">
-                    <UploadCloud className="mr-2 h-4 w-4" />
-                    Go to Import / Export
-                </Button>
-            </Link>
-           </CardContent>
-        </Card>
+        {!hasData && (
+             <Card>
+                <CardHeader>
+                    <CardTitle>Get Started</CardTitle>
+                    <CardDescription>
+                    Your application is empty. Populate it with mock data to see how it works, or upload your own data files.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Link href="/import-export" passHref>
+                        <Button className="w-full">
+                            <UploadCloud className="mr-2 h-4 w-4" />
+                            Go to Import / Export / Data Management
+                        </Button>
+                    </Link>
+                </CardContent>
+            </Card>
+        )}
     </div>
   );
 }

@@ -11,22 +11,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sparkles, Loader2, Printer, Building, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom } from '@/lib/types';
-import { STUDENTS, CLASSROOMS, INVIGILATORS, EXAM_SCHEDULE } from '@/lib/data';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
+import { DataContext } from '@/context/DataContext';
 
-// Group exams by date and time to handle concurrent exams
-const examSlotsByTime = EXAM_SCHEDULE.reduce((acc, exam) => {
-  const key = `${exam.date} ${exam.time}`;
-  if (!acc[key]) {
-    acc[key] = [];
-  }
-  acc[key].push(exam);
-  return acc;
-}, {} as Record<string, ExamSlot[]>);
+const getExamSlotsByTime = (examSchedule: ExamSlot[]) => {
+  return examSchedule.reduce((acc, exam) => {
+    const key = `${exam.date} ${exam.time}`;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(exam);
+    return acc;
+  }, {} as Record<string, ExamSlot[]>);
+};
 
-const getSlotOptions = (allotment: Record<string, any> | null) => {
+
+const getSlotOptions = (allotment: Record<string, any> | null, examSchedule: ExamSlot[]) => {
+  const examSlotsByTime = getExamSlotsByTime(examSchedule);
   const source = allotment ? Object.keys(allotment) : Object.keys(examSlotsByTime);
   return source.map(key => {
     const examsInSlot = allotment ? allotment[key].seatPlan.exam : examSlotsByTime[key];
@@ -43,9 +46,12 @@ const getSlotOptions = (allotment: Record<string, any> | null) => {
 export default function AllotmentPage() {
   const { toast } = useToast();
   const { fullAllotment } = useContext(AllotmentContext);
+  const { students, classrooms, invigilators, examSchedule } = useContext(DataContext);
+  const examSlotsByTime = getExamSlotsByTime(examSchedule);
+
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [slotOptions, setSlotOptions] = useState(getSlotOptions(fullAllotment));
+  const [slotOptions, setSlotOptions] = useState(getSlotOptions(fullAllotment, examSchedule));
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | undefined>(slotOptions[0]?.id);
   
   const [seatPlan, setSeatPlan] = useState<SeatPlan | null>(null);
@@ -53,20 +59,28 @@ export default function AllotmentPage() {
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   
   useEffect(() => {
-    const newSlotOptions = getSlotOptions(fullAllotment);
+    const newSlotOptions = getSlotOptions(fullAllotment, examSchedule);
     setSlotOptions(newSlotOptions);
     if(fullAllotment && newSlotOptions.length > 0) {
-      const newSelectedSlotKey = newSlotOptions[0].id;
+      const newSelectedSlotKey = newSlotOptions.find(opt => opt.id === selectedSlotKey) ? selectedSlotKey : newSlotOptions[0].id;
       setSelectedSlotKey(newSelectedSlotKey);
-      updateStateForSlot(newSelectedSlotKey);
+      if(newSelectedSlotKey) updateStateForSlot(newSelectedSlotKey);
     } else {
-      // Reset if there's no full allotment
+      setSelectedSlotKey(undefined);
       setSeatPlan(null);
       setInvigilatorAssignments(null);
       setSelectedClassroomId(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fullAllotment]);
+  }, [fullAllotment, examSchedule]);
+
+  useEffect(() => {
+    const newSlotOptions = getSlotOptions(fullAllotment, examSchedule);
+    setSlotOptions(newSlotOptions);
+    if (!selectedSlotKey && newSlotOptions.length > 0) {
+        setSelectedSlotKey(newSlotOptions[0].id);
+    }
+  }, [examSchedule, selectedSlotKey, fullAllotment]);
 
   const updateStateForSlot = (slotKey: string) => {
     if (fullAllotment && fullAllotment[slotKey]) {
@@ -112,18 +126,26 @@ export default function AllotmentPage() {
         });
         return;
     }
+     if (students.length === 0 || classrooms.length === 0 || invigilators.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Data',
+        description: 'Please populate student, classroom, and invigilator data before generating a plan.',
+      });
+      return;
+    }
 
     setIsGenerating(true);
     setTimeout(() => {
       const selectedExams = examSlotsByTime[selectedSlotKey!];
       if (!selectedExams || selectedExams.length === 0) return;
 
-      const { plan, updatedStudents } = generateSeatPlan(STUDENTS, CLASSROOMS, selectedExams);
+      const { plan, updatedStudents } = generateSeatPlan(students, classrooms, selectedExams);
       setSeatPlan(plan);
       setSelectedClassroomId(plan.assignments[0]?.classroom.id || null);
 
       const classroomsInUse = [...new Map(plan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
-      const { assignments: newInvigilatorAssignments } = assignInvigilators(INVIGILATORS, classroomsInUse, selectedExams[0]);
+      const { assignments: newInvigilatorAssignments } = assignInvigilators(invigilators, classroomsInUse, selectedExams[0]);
       setInvigilatorAssignments(newInvigilatorAssignments);
 
       setIsGenerating(false);
@@ -242,7 +264,7 @@ export default function AllotmentPage() {
                     </Card>
                   )}
 
-                   {!seatPlan && fullAllotment && (
+                   {(!seatPlan && fullAllotment && Object.keys(fullAllotment).length > 0) && (
                      <Card>
                         <CardContent className="pt-6">
                             <div className="text-center py-12 text-muted-foreground">
@@ -251,7 +273,15 @@ export default function AllotmentPage() {
                         </CardContent>
                      </Card>
                    )}
-
+                    {examSchedule.length === 0 && (
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <p>No exam data found. Please populate mock data or import a schedule.</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
               </main>
             </div>

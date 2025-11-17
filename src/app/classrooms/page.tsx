@@ -1,13 +1,12 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building, Search, CalendarOff, Users2 } from 'lucide-react';
-import { CLASSROOMS as initialClassrooms } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Classroom } from '@/lib/types';
@@ -15,10 +14,11 @@ import { AvailabilityDialog } from '@/components/availability-dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { DataContext } from '@/context/DataContext';
 
 export default function ClassroomsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [classrooms, setClassrooms] = useState<Classroom[]>(initialClassrooms);
+  const { classrooms, setClassrooms } = useContext(DataContext);
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Classroom | null }>({ isOpen: false, resource: null });
 
   const filteredClassrooms = useMemo(() => {
@@ -178,6 +178,11 @@ export default function ClassroomsPage() {
                         ))}
                       </TableBody>
                     </Table>
+                     {filteredClassrooms.length === 0 && (
+                        <div className="text-center p-8 text-muted-foreground">
+                            No classrooms found.
+                        </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -188,5 +193,3 @@ export default function ClassroomsPage() {
     </SidebarProvider>
   );
 }
-
-    

@@ -1,13 +1,12 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCheck, Search, CalendarOff } from 'lucide-react';
-import { INVIGILATORS as initialInvigilators } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -15,10 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Invigilator } from '@/lib/types';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { toast } from '@/hooks/use-toast';
+import { DataContext } from '@/context/DataContext';
 
 export default function InvigilatorsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [invigilators, setInvigilators] = useState<Invigilator[]>(initialInvigilators);
+  const { invigilators, setInvigilators } = useContext(DataContext);
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Invigilator | null }>({ isOpen: false, resource: null });
 
   const filteredInvigilators = useMemo(() => {
@@ -167,6 +167,11 @@ export default function InvigilatorsPage() {
                         </TableBody>
                       </Table>
                    </div>
+                    {filteredInvigilators.length === 0 && (
+                        <div className="text-center p-8 text-muted-foreground">
+                            No invigilators found.
+                        </div>
+                    )}
                 </CardContent>
               </Card>
             </main>
@@ -176,5 +181,3 @@ export default function InvigilatorsPage() {
     </SidebarProvider>
   );
 }
-
-    

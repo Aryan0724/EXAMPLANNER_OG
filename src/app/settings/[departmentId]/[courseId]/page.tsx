@@ -2,22 +2,24 @@
 'use client';
 
 import Link from 'next/link';
-import { use } from 'react';
+import { use, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookCopy, ChevronRight } from 'lucide-react';
-import { COURSES, DEPARTMENTS, EXAM_SCHEDULE } from '@/lib/data';
+import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
+import { DataContext } from '@/context/DataContext';
 
 export default function CourseSubjectsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string } }) {
   const params = use(paramsProp);
+  const { examSchedule } = useContext(DataContext);
   const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
   
   const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === params.courseId) || 'Unknown Course';
 
-  const subjectsForCourse = EXAM_SCHEDULE.filter(
+  const subjectsForCourse = examSchedule.filter(
     exam => exam.department === departmentName && exam.course === courseName
   );
   const subjects = [...new Map(subjectsForCourse.map(s => [s.subjectCode, { code: s.subjectCode, name: s.subjectName }])).values()];

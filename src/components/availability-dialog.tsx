@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { X, CalendarOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { EXAM_SCHEDULE } from '@/lib/data';
 import { AvailabilitySlot, Classroom, Invigilator } from '@/lib/types';
+import { DataContext } from '@/context/DataContext';
 
 
 interface AvailabilityDialogProps {
@@ -26,6 +26,7 @@ interface AvailabilityDialogProps {
 export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, onSubmit, onRemove }: AvailabilityDialogProps) {
   const [selectedSlot, setSelectedSlot] = useState('');
   const [reason, setReason] = useState('');
+  const { examSchedule } = useContext(DataContext);
 
   if (!resource) return null;
 
@@ -44,7 +45,7 @@ export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, on
   };
 
   const getSlotLabel = (slotId: string) => {
-    const slot = EXAM_SCHEDULE.find(s => s.id === slotId);
+    const slot = examSchedule.find(s => s.id === slotId);
     return slot ? `${slot.date} @ ${slot.time} (${slot.subjectCode})` : 'Unknown Slot';
   }
 
@@ -74,7 +75,7 @@ export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, on
                     <SelectValue placeholder="Select an exam slot..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {EXAM_SCHEDULE.map(slot => (
+                    {examSchedule.map(slot => (
                       <SelectItem key={slot.id} value={slot.id}>
                         {slot.date} @ {slot.time} ({slot.subjectCode} - {slot.subjectName})
                       </SelectItem>
@@ -131,5 +132,3 @@ export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, on
     </Dialog>
   );
 }
-
-    

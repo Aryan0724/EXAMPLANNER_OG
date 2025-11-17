@@ -12,19 +12,17 @@ import { CalendarDays, Sparkles, Loader2, Search, PlusCircle, MoreHorizontal } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { EXAM_SCHEDULE as initialSchedule, STUDENTS as initialStudents, CLASSROOMS, INVIGILATORS as initialInvigilators, DEPARTMENTS, COURSES } from '@/lib/data';
-import { ExamSlot, SeatPlan, InvigilatorAssignment, Student, Invigilator } from '@/lib/types';
+import { COURSES, DEPARTMENTS } from '@/lib/data';
+import { ExamSlot } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AllotmentContext } from '@/context/AllotmentContext';
+import { DataContext } from '@/context/DataContext';
 import { ExamDialog } from '@/components/exam-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 export default function SchedulePage() {
-    const [examSchedule, setExamSchedule] = useState<ExamSlot[]>(initialSchedule);
-    const [students, setStudents] = useState<Student[]>(initialStudents);
-    const [invigilators, setInvigilators] = useState<Invigilator[]>(initialInvigilators);
+    const { students, classrooms, invigilators, examSchedule, setExamSchedule, setStudents, setInvigilators } = useContext(DataContext);
     const [searchQuery, setSearchQuery] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -49,11 +47,21 @@ export default function SchedulePage() {
     }, [searchQuery, examSchedule]);
 
     const handleGenerateAll = () => {
+        if (students.length === 0 || classrooms.length === 0 || invigilators.length === 0 || examSchedule.length === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Cannot Generate Allotment',
+                description: 'Please ensure students, classrooms, invigilators, and a schedule have been populated or imported.',
+            });
+            return;
+        }
+
         setIsGenerating(true);
         
         setTimeout(() => {
-            let studentMasterList: Student[] = JSON.parse(JSON.stringify(students));
-            let invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
+            let studentMasterList = JSON.parse(JSON.stringify(students));
+            let invigilatorMasterList = JSON.parse(JSON.stringify(invigilators));
+            let classroomMasterList = JSON.parse(JSON.stringify(classrooms));
 
             // Group exams by date and time
             const examSlotsByTime = examSchedule.reduce((acc, exam) => {
@@ -73,7 +81,7 @@ export default function SchedulePage() {
             for (const key of sortedSessionKeys) {
                 const concurrentExams = examSlotsByTime[key];
                 
-                const { plan, updatedStudents } = generateSeatPlan(studentMasterList, CLASSROOMS, concurrentExams);
+                const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams);
                 studentMasterList = updatedStudents; 
                 
                 const classroomsInUse = [...new Map(plan.assignments.map(item => [item.classroom.id, item.classroom])).values()];

@@ -1,41 +1,42 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import Link from 'next/link';
+import { useState, useMemo, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCheck, Search } from 'lucide-react';
-import { INVIGILATORS, DEPARTMENTS } from '@/lib/data';
+import { DEPARTMENTS } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { DataContext } from '@/context/DataContext';
 
 export default function InvigilatorExplorerPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const { invigilators } = useContext(DataContext);
 
   const filteredInvigilators = useMemo(() => {
-    let invigilators = INVIGILATORS;
+    let invigilatorsToFilter = invigilators;
 
     if (departmentFilter !== 'all') {
-      invigilators = invigilators.filter(inv => inv.department === departmentFilter);
+      invigilatorsToFilter = invigilatorsToFilter.filter(inv => inv.department === departmentFilter);
     }
 
     if (searchQuery) {
       const lowercasedQuery = searchQuery.toLowerCase();
-      invigilators = invigilators.filter(inv =>
+      invigilatorsToFilter = invigilatorsToFilter.filter(inv =>
         inv.id.toLowerCase().includes(lowercasedQuery) ||
         inv.name.toLowerCase().includes(lowercasedQuery)
       );
     }
     
-    return invigilators;
-  }, [searchQuery, departmentFilter]);
+    return invigilatorsToFilter;
+  }, [searchQuery, departmentFilter, invigilators]);
 
   return (
     <SidebarProvider>
@@ -133,5 +134,3 @@ export default function InvigilatorExplorerPage() {
     </SidebarProvider>
   );
 }
-
-    

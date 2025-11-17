@@ -1,13 +1,12 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Users, ChevronLeft, ChevronRight, Ban, X, Search } from 'lucide-react';
-import { STUDENTS as initialStudents } from '@/lib/data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { DataContext } from '@/context/DataContext';
 
 const STUDENTS_PER_PAGE = 20;
 
@@ -121,7 +121,7 @@ const DebarmentStatusDialog = ({ isOpen, onClose, student, onSubmitDebarred, onR
 
 
 export default function StudentsPage() {
-  const [students, setStudents] = useState<Student[]>(initialStudents);
+  const { students, setStudents } = useContext(DataContext);
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'debarred' | 'ineligible'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -342,5 +342,3 @@ export default function StudentsPage() {
     </SidebarProvider>
   );
 }
-
-    

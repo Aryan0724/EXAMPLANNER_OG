@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useState, useMemo, use } from 'react';
+import { useState, useMemo, use, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { STUDENTS as initialStudents, COURSES, DEPARTMENTS, EXAM_SCHEDULE } from '@/lib/data';
+import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Student } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Ban, Search } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Input } from '@/components/ui/input';
+import { DataContext } from '@/context/DataContext';
 
 interface IneligibilityDialogProps { 
     isOpen: boolean; 
@@ -73,7 +74,7 @@ const IneligibilityDialog = ({ isOpen, onClose, onSubmit, studentName, subjectCo
 
 export default function SubjectStudentsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string, subjectCode: string } }) {
     const params = use(paramsProp);
-    const [students, setStudents] = useState<Student[]>(initialStudents);
+    const { students, setStudents, examSchedule } = useContext(DataContext);
     const [dialogState, setDialogState] = useState<{isOpen: boolean; studentId: string | null; studentName: string | null}>({ isOpen: false, studentId: null, studentName: null });
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -81,7 +82,7 @@ export default function SubjectStudentsPage({ params: paramsProp }: { params: { 
     
     const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === params.courseId) || 'Unknown Course';
 
-    const subjectName = EXAM_SCHEDULE.find(e => e.subjectCode === params.subjectCode)?.subjectName || 'Unknown Subject';
+    const subjectName = examSchedule.find(e => e.subjectCode === params.subjectCode)?.subjectName || 'Unknown Subject';
 
     const relevantStudents = useMemo(() => {
         const baseStudents = students.filter(s => s.course === courseName && s.department === departmentName);
