@@ -64,7 +64,7 @@ export function MainSidebar() {
              <SidebarMenuItem key={item.id}>
                 <SidebarMenuButton
                   asChild
-                  isActive={activeItem === item.id || (item.id === 'settings' && activeItem === 'settings') || (item.id === 'import-export' && activeItem === 'reports')}
+                  isActive={activeItem === item.id}
                   tooltip={item.label}
                 >
                   <Link href={item.href}>

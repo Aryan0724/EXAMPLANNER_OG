@@ -2,11 +2,12 @@
 'use client';
 
 import { useState, useMemo, useContext } from 'react';
+import { useRouter } from 'next/navigation';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCheck, Search, CalendarOff } from 'lucide-react';
+import { UserCheck, Search, CalendarOff, History } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -15,11 +16,14 @@ import { Invigilator } from '@/lib/types';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { toast } from '@/hooks/use-toast';
 import { DataContext } from '@/context/DataContext';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal } from 'lucide-react';
 
 export default function InvigilatorsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { invigilators, setInvigilators } = useContext(DataContext);
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Invigilator | null }>({ isOpen: false, resource: null });
+  const router = useRouter();
 
   const filteredInvigilators = useMemo(() => {
     if (!searchQuery) {
@@ -94,6 +98,10 @@ export default function InvigilatorsPage() {
     });
   };
 
+  const handleViewHistory = (invigilatorId: string) => {
+    router.push(`/invigilators/${invigilatorId}`);
+  }
+
   return (
     <SidebarProvider>
       <AvailabilityDialog
@@ -140,7 +148,7 @@ export default function InvigilatorsPage() {
                             <TableHead>Name</TableHead>
                             <TableHead>Department</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Action</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -157,10 +165,24 @@ export default function InvigilatorsPage() {
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button variant="outline" size="sm" onClick={() => openDialog(inv)}>
-                                    <CalendarOff className="mr-2 h-3 w-3" />
-                                    Manage Availability
-                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                      <span className="sr-only">Open menu</span>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewHistory(inv.id)}>
+                                      <History className="mr-2 h-4 w-4" />
+                                      View History
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openDialog(inv)}>
+                                      <CalendarOff className="mr-2 h-4 w-4" />
+                                      Manage Availability
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </TableCell>
                             </TableRow>
                           ))}
