@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sparkles, Loader2, Printer, Building, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom } from '@/lib/types';
+import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
+import { ExclusionReport } from '@/components/exclusion-report';
 
 const getExamSlotsByTime = (examSchedule: ExamSlot[]) => {
   return examSchedule.reduce((acc, exam) => {
@@ -58,6 +59,13 @@ export default function AllotmentPage() {
   const [invigilatorAssignments, setInvigilatorAssignments] = useState<InvigilatorAssignment[] | null>(null);
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   
+  const [excludedData, setExcludedData] = useState<{
+      debarredStudents: Student[];
+      ineligibleStudents: (Student & { reason: string; subjectCode: string })[];
+      unavailableClassrooms: (Classroom & { reason: string })[];
+      unavailableInvigilators: (Invigilator & { reason: string })[];
+    } | null>(null);
+
   useEffect(() => {
     const newSlotOptions = getSlotOptions(fullAllotment, examSchedule);
     setSlotOptions(newSlotOptions);
@@ -65,48 +73,84 @@ export default function AllotmentPage() {
       const newSelectedSlotKey = newSlotOptions.find(opt => opt.id === selectedSlotKey) ? selectedSlotKey : newSlotOptions[0].id;
       setSelectedSlotKey(newSelectedSlotKey);
       if(newSelectedSlotKey) updateStateForSlot(newSelectedSlotKey);
-    } else {
+    } else if (newSlotOptions.length > 0 && !selectedSlotKey) {
+      setSelectedSlotKey(newSlotOptions[0].id);
+      updateStateForSlot(newSlotOptions[0].id);
+    } else if (newSlotOptions.length === 0) {
       setSelectedSlotKey(undefined);
       setSeatPlan(null);
       setInvigilatorAssignments(null);
       setSelectedClassroomId(null);
+      setExcludedData(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullAllotment, examSchedule]);
 
   useEffect(() => {
-    const newSlotOptions = getSlotOptions(fullAllotment, examSchedule);
-    setSlotOptions(newSlotOptions);
-    if (!selectedSlotKey && newSlotOptions.length > 0) {
-        setSelectedSlotKey(newSlotOptions[0].id);
-    }
-  }, [examSchedule, selectedSlotKey, fullAllotment]);
+     if (selectedSlotKey) {
+        updateStateForSlot(selectedSlotKey);
+     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSlotKey, students, classrooms, invigilators]);
 
   const updateStateForSlot = (slotKey: string) => {
     if (fullAllotment && fullAllotment[slotKey]) {
       const { seatPlan: newSeatPlan, invigilatorAssignments: newInvigilatorAssignments } = fullAllotment[slotKey];
       setSeatPlan(newSeatPlan);
       setInvigilatorAssignments(newInvigilatorAssignments);
-      // Select the first classroom in the new plan automatically
       const firstClassroomId = newSeatPlan.assignments.length > 0 ? newSeatPlan.assignments[0].classroom.id : null;
       setSelectedClassroomId(firstClassroomId);
+      setExcludedData(null); // Data is part of a final plan, no need to show exclusions
     } else {
        setSeatPlan(null);
        setInvigilatorAssignments(null);
        setSelectedClassroomId(null);
+       calculateExclusions(slotKey);
     }
+  };
+
+  const calculateExclusions = (slotKey: string) => {
+    const examsInSlot = examSlotsByTime[slotKey] || [];
+    if (examsInSlot.length === 0) {
+        setExcludedData(null);
+        return;
+    }
+    const examIdsInSlot = new Set(examsInSlot.map(e => e.id));
+
+    const debarredStudents = students.filter(s => s.isDebarred);
+    const ineligibleStudents: (Student & { reason: string, subjectCode: string })[] = [];
+    
+    students.forEach(student => {
+        examsInSlot.forEach(exam => {
+            if (student.course === exam.course && student.department === exam.department) {
+                const record = student.ineligibilityRecords.find(r => r.subjectCode === exam.subjectCode);
+                if (record) {
+                    ineligibleStudents.push({ ...student, reason: record.reason, subjectCode: exam.subjectCode });
+                }
+            }
+        });
+    });
+
+    const unavailableClassrooms = classrooms.map(c => {
+        const unavailability = c.unavailableSlots.find(s => examIdsInSlot.has(s.slotId));
+        return unavailability ? { ...c, reason: unavailability.reason } : null;
+    }).filter((c): c is Classroom & { reason: string } => c !== null);
+
+    const unavailableInvigilators = invigilators.map(i => {
+        const unavailability = i.unavailableSlots.find(s => examIdsInSlot.has(s.slotId));
+        return unavailability ? { ...i, reason: unavailability.reason } : null;
+    }).filter((i): i is Invigilator & { reason: string } => i !== null);
+    
+    setExcludedData({
+        debarredStudents,
+        ineligibleStudents,
+        unavailableClassrooms,
+        unavailableInvigilators
+    });
   };
 
   const handleSlotChange = (slotKey: string) => {
       setSelectedSlotKey(slotKey);
-      if (fullAllotment) {
-          updateStateForSlot(slotKey);
-      } else {
-        // Clear previous plan if we are not in "full allotment" mode
-        setSeatPlan(null);
-        setInvigilatorAssignments(null);
-        setSelectedClassroomId(null);
-      }
   };
 
   const handleGeneration = () => {
@@ -168,7 +212,7 @@ export default function AllotmentPage() {
     ? invigilatorAssignments.filter(a => a.classroom.id === selectedClassroom?.id).map(a => a.invigilator)
     : [];
 
-  const currentExams = seatPlan?.exam ? (Array.isArray(seatPlan.exam) ? seatPlan.exam : [seatPlan.exam]) : [];
+  const currentExams = seatPlan?.exam ? (Array.isArray(seatPlan.exam) ? seatPlan.exam : [seatPlan.exam]) : (examSlotsByTime[selectedSlotKey!] || []);
   const representativeExam = currentExams[0];
 
   return (
@@ -206,6 +250,8 @@ export default function AllotmentPage() {
                       </Button>
                     </CardContent>
                   </Card>
+
+                  {excludedData && <ExclusionReport data={excludedData} />}
 
                   {seatPlan && (
                     <Card>
