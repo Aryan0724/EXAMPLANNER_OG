@@ -14,8 +14,8 @@ import { ExamSlot } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 
 const examSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
-  time: z.string().regex(/^\d{2}:\d{2}$/, 'Time must be in HH:MM format').optional(),
+  date: z.string().optional(),
+  time: z.string().optional(),
   subjectName: z.string().min(3, 'Subject name is required'),
   subjectCode: z.string().min(3, 'Subject code is required'),
   department: z.string().min(1, 'Department is required'),
