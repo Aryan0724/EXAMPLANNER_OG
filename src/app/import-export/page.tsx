@@ -188,6 +188,14 @@ export default function ImportExportPage() {
                   </CardHeader>
                   <CardContent>
                     <Accordion type="single" collapsible className="w-full">
+                       <ImportItem
+                        title="Department & Course Data"
+                        format={['department_name', 'course_name']}
+                      />
+                      <ImportItem
+                        title="Course, Semester & Subject Data"
+                        format={['course_name', 'semester', 'subject_name', 'subject_code']}
+                      />
                       <ImportItem 
                         title="Student Data"
                         format={['id', 'name', 'rollNo', 'department', 'course', 'semester', 'section', 'group']}
@@ -228,6 +236,10 @@ export default function ImportExportPage() {
                     <Button variant="secondary" disabled>
                       <FileDown className="mr-2 h-4 w-4" />
                       Student List (CSV)
+                    </Button>
+                     <Button variant="secondary" disabled>
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Exclusion Report (CSV)
                     </Button>
                   </CardContent>
                 </Card>
