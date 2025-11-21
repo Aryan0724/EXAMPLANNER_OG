@@ -28,11 +28,6 @@ function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Stu
     });
 }
 
-// Function to get the seat index for column-wise filling
-function getSeatIndex(row: number, col: number, numRows: number): number {
-    return col * numRows + row;
-}
-
 export function generateSeatPlan(
     allStudents: Student[],
     classrooms: Classroom[],
@@ -56,67 +51,88 @@ export function generateSeatPlan(
     // 2. Filter and sort available classrooms
     const availableClassrooms = classrooms
         .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
-        .sort((a, b) => b.capacity - a.capacity);
+        .sort((a, b) => a.capacity - b.capacity); // Start with smaller rooms to fill them up
 
     // 3. Fill classrooms one by one
     for (const room of availableClassrooms) {
-        if (studentQueues.every(q => q.students.length === 0)) break; // All students seated
-
-        // Identify the top 2 departments with the most students remaining
-        const sortedQueues = studentQueues.sort((a, b) => b.students.length - a.students.length);
-        const queueA = sortedQueues[0];
-        const queueB = sortedQueues.find(q => q.department !== queueA?.department);
-
-        const queuesForRoom = [queueA, queueB].filter(Boolean);
-        if (queuesForRoom.length === 0) continue;
+        if (studentQueues.every(q => q.students.length === 0)) break;
 
         const assignmentsForThisRoom: Seat[] = [];
-        
-        // Create an empty seating grid for the classroom
         const roomGrid: ((Student & { exam: ExamSlot }) | null)[] = Array(room.capacity).fill(null);
-        let seatCounter = 0;
 
-        // Assign students column by column
+        // Keep track of which queues are being used in this room
+        const queuesInRoom = [];
+
+        // Fill the room column by column
         for (let c = 0; c < room.columns; c++) {
-            for (let r = 0; r < room.rows; r++) {
-                 const benchIndexInGrid = r * room.columns + c;
-                 const seatsInBench = room.benchCapacities[benchIndexInGrid];
+            // Find a queue for this column
+            let currentQueue;
+            // Try to find a new queue not already in this room, from a different department than the previous column
+            const lastDept = queuesInRoom[queuesInRoom.length - 1]?.department;
+            
+            studentQueues.sort((a, b) => b.students.length - a.students.length); // Keep queues sorted by remaining size
 
-                 for (let s = 0; s < seatsInBench; s++) {
-                     if (seatCounter >= room.capacity) continue;
+            currentQueue = studentQueues.find(q => q.department !== lastDept);
 
-                     // Alternate which queue is assigned based on the column
-                     const currentQueue = c % 2 === 0 ? queuesForRoom[0] : (queuesForRoom[1] || queuesForRoom[0]);
-                     
-                     if (currentQueue && currentQueue.students.length > 0) {
-                         const student = currentQueue.students.shift();
-                         if (student) {
-                             roomGrid[seatCounter] = student;
-                         }
-                     }
-                     seatCounter++;
-                 }
+            if (!currentQueue || currentQueue.students.length === 0) {
+                 // If no suitable different-department queue, or all queues are empty, try any available queue
+                 currentQueue = studentQueues.find(q => q.students.length > 0);
             }
+
+            if (!currentQueue) continue; // No more students to seat
+
+            // Add to room's queue list if it's new
+            if (!queuesInRoom.find(q => q.exam.id === currentQueue.exam.id)) {
+                queuesInRoom.push(currentQueue);
+            }
+
+            // Fill the current column `c`
+            for (let r = 0; r < room.rows; r++) {
+                const benchIndex = r * room.columns + c;
+                const benchCapacity = room.benchCapacities[benchIndex];
+
+                for (let seatInBench = 0; seatInBench < benchCapacity; seatInBench++) {
+                     // This calculation needs to be column-major
+                    let seatIndex = 0;
+                    for (let i = 0; i < c; i++) {
+                        for(let j = 0; j < room.rows; j++){
+                           seatIndex += room.benchCapacities[j * room.columns + i];
+                        }
+                    }
+                    for(let j = 0; j < r; j++) {
+                        seatIndex += room.benchCapacities[j * room.columns + c];
+                    }
+                    seatIndex += seatInBench;
+
+                    if (seatIndex < room.capacity && roomGrid[seatIndex] === null) {
+                        const studentToSeat = currentQueue.students.shift();
+                        if (studentToSeat) {
+                            roomGrid[seatIndex] = studentToSeat;
+                        } else {
+                            // Current queue is empty, break from inner loops for this column
+                            r = room.rows;
+                            break;
+                        }
+                    }
+                }
+            }
+            // After filling a column, re-filter the main queues
+            studentQueues = studentQueues.filter(q => q.students.length > 0);
+        }
+
+        // Convert the grid into final assignment objects
+        for (let i = 0; i < room.capacity; i++) {
+            const student = roomGrid[i];
+            assignmentsForThisRoom.push({
+                student: student || null,
+                classroom: room,
+                seatNumber: i + 1,
+            });
         }
         
-         // Convert the grid into final assignment objects
-         for (let i = 0; i < room.capacity; i++) {
-             const student = roomGrid[i];
-             assignmentsForThisRoom.push({
-                 student: student || null,
-                 classroom: room,
-                 seatNumber: i + 1,
-             });
-         }
-
-
         finalAssignments.push(...assignmentsForThisRoom);
-        
-        // Clean up empty queues
-        studentQueues = studentQueues.filter(q => q.students.length > 0);
     }
     
-    // Update master list with seat assignments
     finalAssignments.forEach(assignment => {
         if (assignment.student) {
             const masterListIndex = studentMasterList.findIndex((s: Student) => s.id === assignment.student!.id);
@@ -157,22 +173,19 @@ export function assignInvigilators(
 
     const assignments: InvigilatorAssignment[] = [];
     
-    // Create a temporary pool for this session to track assignments
     let sessionPool = [...availablePool];
 
     for (const room of classroomsInUse) {
         const requiredInvigilators = room.capacity > 40 ? 2 : 1;
 
         for (let i = 0; i < requiredInvigilators; i++) {
-            // If the pool runs out, reset it but continue assigning.
             if (sessionPool.length === 0) {
                  if (availablePool.length === 0) {
                     console.error("No available invigilators to assign for room " + room.id);
                     break; 
                  }
                  console.warn(`Re-using invigilators as pool was exhausted. Room ${room.id} may have unbalanced duties for this session.`);
-                 sessionPool = [...availablePool]; // Reset from the main available pool
-                 // Re-sort session pool based on duties already assigned in this session
+                 sessionPool = [...availablePool];
                  sessionPool.sort((a,b) => {
                      const aAssigned = assignments.filter(as => as.invigilator.id === a.id).length;
                      const bAssigned = assignments.filter(as => as.invigilator.id === b.id).length;
@@ -180,7 +193,7 @@ export function assignInvigilators(
                  })
             }
             
-            const invigilatorToAssign = sessionPool.shift()!; // Remove from session pool
+            const invigilatorToAssign = sessionPool.shift()!;
             
             assignments.push({
                 exam,
