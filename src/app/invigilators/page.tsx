@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCheck, Search, CalendarOff, History } from 'lucide-react';
+import { UserCheck, Search, CalendarOff, History, MoreHorizontal } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,6 @@ import { AvailabilityDialog } from '@/components/availability-dialog';
 import { toast } from '@/hooks/use-toast';
 import { DataContext } from '@/context/DataContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
 
 export default function InvigilatorsPage() {
   const [searchQuery, setSearchQuery] = useState('');
