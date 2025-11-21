@@ -24,11 +24,13 @@ export const COURSES: Record<string, string[]> = {
         'B.Tech Computer Science Engineering',
         'Diploma In Computer Science Engineering',
         'B.Tech CSE (Hons.) with specialization in Artificial Intelligence and Machine Learning',
+        'M.Tech CSE (Part Time)',
     ],
     'Civil Engineering': [
         'B.Tech Civil Engineering (Hons.) with specialization in Environmental Engineering',
         'B.Tech Civil Engineering (Hons.) with specialization in Geoinformatics',
         'B.Tech in Civil Engineering',
+        'Diploma In Civil Engineering',
     ],
     'Electronics and Communication Engineering': [
         'B.Tech Electronics & Communication Engg (Hons.) with Specialization in Drone Technology',
@@ -39,6 +41,7 @@ export const COURSES: Record<string, string[]> = {
         'B.Tech Mechanical Engineering (Hons.) with Specialization in Electric Vehicle',
         'B.Tech Mechanical Engineering (Hons.) with specialization in Mechatronics',
         'B.Tech Mechanical Engineering',
+        'Diploma In Mechanical Engineering',
     ],
     'Computer Application': [
         'BCA (Hons.) with AI and DS',
@@ -470,7 +473,7 @@ const SUBJECTS_BY_COURSE = {
       ]
     }
   };
-
+  
 // Functions to generate mock data
 export const generateMockStudents = (studentsPerCourse = 10): Student[] => {
     const students: Student[] = [];
@@ -482,7 +485,10 @@ export const generateMockStudents = (studentsPerCourse = 10): Student[] => {
         for (let i = 1; i <= studentsPerCourse; i++) {
             const personalId = String(i).padStart(3, '0');
             const rollNo = `${year}${courseInfo.code}${personalId}`;
-            const studentName = `${courseShortName}_Student_${personalId}`;
+            
+            // Generate a name using the first word of the course name
+            const nameParts = courseInfo.name.split(' ');
+            const studentName = `${nameParts[0]}_Student_${personalId}`;
 
             students.push({
                 id: `S${rollNo}`,
@@ -559,9 +565,23 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
         });
     });
 
-    for (const courseName in SUBJECTS_BY_COURSE) {
-        const courseSemesters = SUBJECTS_BY_COURSE[courseName as keyof typeof SUBJECTS_BY_COURSE];
-        const department = courseToDeptMap[courseName];
+    // A helper to find the full course name from a potential short name
+    const findFullCourseName = (shortOrFullName: string) => {
+        if (courseToDeptMap[shortOrFullName]) {
+            return shortOrFullName; // It's already a full name
+        }
+        for (const fullName of Object.keys(courseToDeptMap)) {
+            if (fullName.includes(shortOrFullName)) {
+                return fullName;
+            }
+        }
+        return shortOrFullName; // Fallback
+    };
+    
+    for (const courseKey in SUBJECTS_BY_COURSE) {
+        const fullCourseName = findFullCourseName(courseKey);
+        const courseSemesters = SUBJECTS_BY_COURSE[courseKey as keyof typeof SUBJECTS_BY_COURSE];
+        const department = courseToDeptMap[fullCourseName];
         if (!department) continue;
 
         for (const semester in courseSemesters) {
@@ -577,7 +597,7 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
                     id: `E${String(examIdCounter).padStart(4, '0')}`,
                     date: dateString,
                     time: time,
-                    course: courseName,
+                    course: fullCourseName,
                     department: department,
                     semester: parseInt(semester, 10),
                     subjectName: subject.subject_name,
@@ -587,17 +607,16 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
                 });
 
                 examIdCounter++;
-                // Increment day every 10 exams to spread them out
-                if (examIdCounter % 10 === 0) {
+                if (examIdCounter % 15 === 0) { // Spread exams more
                     dayOffset++;
                 }
             }
         }
     }
     
-    // Add common subjects for multiple courses
+    // Add common subjects for all B.Tech first years
     const commonSubjects = SUBJECTS_BY_COURSE["Allied Sciences (General)"]["1"];
-    const targetCourses = ["B.Tech Computer Science Engineering", "B.Tech in Electronics and Communication Engineering", "B.Tech Mechanical Engineering", "B.Tech in Civil Engineering"];
+    const targetCourses = Object.keys(courseToDeptMap).filter(name => name.startsWith("B.Tech"));
     
     for (const courseName of targetCourses) {
         const department = courseToDeptMap[courseName];
@@ -609,18 +628,23 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
              const dateString = date.toISOString().split('T')[0];
              const time = (examIdCounter % 2 === 0) ? '14:00' : '09:30';
 
-             schedule.push({
-                    id: `E${String(examIdCounter).padStart(4, '0')}`,
-                    date: dateString,
-                    time: time,
-                    course: courseName,
-                    department: department,
-                    semester: 1, // Common subjects are usually in 1st sem
-                    subjectName: subject.subject_name,
-                    subjectCode: subject.subject_code,
-                    duration: 120,
-                });
-            examIdCounter++;
+             // Check if this common subject is already in the schedule for this course's semester 1
+             const alreadyExists = schedule.some(s => s.course === courseName && s.semester === 1 && s.subjectCode === subject.subject_code);
+
+             if (!alreadyExists) {
+                 schedule.push({
+                        id: `E${String(examIdCounter).padStart(4, '0')}`,
+                        date: dateString,
+                        time: time,
+                        course: courseName,
+                        department: department,
+                        semester: 1,
+                        subjectName: subject.subject_name,
+                        subjectCode: subject.subject_code,
+                        duration: 120,
+                    });
+                examIdCounter++;
+             }
         }
          dayOffset++;
     }
