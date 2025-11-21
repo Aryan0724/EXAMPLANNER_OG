@@ -56,46 +56,25 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
     });
     return colorMap;
   }, [assignments]);
-  
-  const getAssignmentsForBench = (r: number, c: number): Seat[] => {
-    const benchIndexInGrid = r * classroom.columns + c;
-    const seatsInBench = classroom.benchCapacities[benchIndexInGrid];
-    
-    // Calculate the start seat number for this bench
-    let startingSeatNumberInGrid = 1;
-    for (let i = 0; i < benchIndexInGrid; i++) {
-        startingSeatNumberInGrid += classroom.benchCapacities[i];
-    }
-
-    const benchAssignments: Seat[] = [];
-    for (let i = 0; i < seatsInBench; i++) {
-        const seatNumberToFind = startingSeatNumberInGrid + i;
-        // Find the assignment that belongs to this specific classroom and has this seat number
-        const assignment = assignments.find(a => {
-            const assignmentInThisRoom = a.classroom.id === classroom.id;
-            if(!assignmentInThisRoom) return false;
-
-            const globalSeatNumber = a.seatNumber;
-            // This is tricky, we need to map global seat number to a room-local seat number
-            // For now, let's assume `assignments` prop is pre-filtered for the current room
-            return a.seatNumber === seatNumberToFind;
-
-        });
-         if (assignment) {
-            benchAssignments.push(assignment);
-        } else {
-             // Create a placeholder for empty seats to maintain layout
-             benchAssignments.push({ student: null, classroom, seatNumber: seatNumberToFind });
-        }
-    }
-    return benchAssignments;
-  };
 
   const seatsForThisRoom = useMemo(() => {
     return assignments
       .filter(a => a.classroom.id === classroom.id)
       .sort((a, b) => a.seatNumber - b.seatNumber);
   }, [assignments, classroom.id]);
+
+  // Create a grid representation of the classroom
+  const grid: (Seat | null)[][] = Array.from({ length: classroom.rows }, () => Array(classroom.columns * 2).fill(null));
+
+  let seatIndex = 0;
+  for (let c = 0; c < classroom.columns * 2; c++) {
+      for (let r = 0; r < classroom.rows; r++) {
+          if (seatIndex < seatsForThisRoom.length) {
+              grid[r][c] = seatsForThisRoom[seatIndex];
+              seatIndex++;
+          }
+      }
+  }
 
 
   return (
@@ -109,53 +88,43 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
         {Array.from({ length: classroom.columns }).map((_, c) => (
           <div key={`col-${c}`} className="flex flex-col gap-2">
             {Array.from({ length: classroom.rows }).map((_, r) => {
-              const benchIndexInGrid = r * classroom.columns + c;
-              const seatsOnBench = classroom.benchCapacities[benchIndexInGrid];
-
-              let startingSeatIndexForBench = 0;
-              for(let i=0; i < benchIndexInGrid; i++) {
-                startingSeatIndexForBench += classroom.benchCapacities[i];
-              }
-              
-              const benchAssignments = seatsForThisRoom.slice(startingSeatIndexForBench, startingSeatIndexForBench + seatsOnBench);
-              
-              // If there are fewer assignments than bench capacity, fill with empty seats
-              while(benchAssignments.length < seatsOnBench) {
-                benchAssignments.push({ student: null, classroom, seatNumber: 0 });
-              }
+              const leftSeat = grid[r][c * 2];
+              const rightSeat = grid[r][c * 2 + 1];
 
               return (
                 <div
                   key={`bench-${r}-${c}`}
                   className="flex items-center justify-center gap-1 p-1 rounded-md bg-background border shadow-sm flex-nowrap"
                 >
-                  {benchAssignments.map((seat, seatIdx) => {
+                  {[leftSeat, rightSeat].map((seat, seatIdx) => {
+                    if (!seat) return <div key={seatIdx} className="w-16 h-12 shrink-0" />; // Placeholder for empty part of bench
+                    
                     const seatColor = seat.student?.exam.subjectCode ? courseColors.get(seat.student.exam.subjectCode) : undefined;
                     return (
                       <Tooltip key={seat.student?.id || `empty-${r}-${c}-${seatIdx}`}>
                         <TooltipTrigger asChild>
                           <div
                             className={cn(
-                              "flex flex-col items-center justify-center w-20 h-14 rounded-md border text-center p-1 shrink-0",
+                              "flex flex-col items-center justify-center w-16 h-12 rounded-md border text-center p-1 shrink-0",
                               seat.student ? 'bg-primary/5' : 'bg-muted/30 border-dashed',
                               seat.isDebarredSeat && 'border-destructive bg-destructive/10'
                             )}
                             style={{ borderColor: seat.student && seatColor ? seatColor : undefined }}
                           >
                             {seat.student ? (
-                                <User className="w-3.5 h-3.5 text-primary" />
+                                <User className="w-3 h-3 text-primary" />
                             ) : (
                               seat.isDebarredSeat ? (
-                                <Ban className="w-3.5 h-3.5 text-destructive" />
+                                <Ban className="w-3 h-3 text-destructive" />
                               ) : (
-                                <div className="w-3.5 h-3.5" />
+                                <div className="w-3 h-3" />
                               )
                             )}
-                            <span className="text-[10px] text-foreground font-medium truncate w-full">
-                              {seat.student ? seat.student.name : (seat.isDebarredSeat ? 'Debarred' : `Empty`)}
+                            <span className="text-[9px] text-foreground font-medium truncate w-full">
+                              {seat.student ? seat.student.rollNo : (seat.isDebarredSeat ? 'Debarred' : `Empty`)}
                             </span>
-                            <span className="text-[9px] text-muted-foreground">
-                                {seat.student ? seat.student.rollNo : ''}
+                            <span className="text-[8px] text-muted-foreground truncate w-full">
+                                {seat.student ? seat.student.name : ''}
                             </span>
                           </div>
                         </TooltipTrigger>

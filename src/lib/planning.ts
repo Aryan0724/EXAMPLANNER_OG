@@ -49,81 +49,75 @@ export function generateSeatPlan(
 
     const availableClassrooms = classrooms
         .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
-        .sort((a, b) => b.capacity - a.capacity); // Start with largest rooms
+        .sort((a, b) => a.capacity - b.capacity); // Start with smallest rooms to fill them up completely
 
-    let seatNumberOffset = 0;
+    let globalSeatNumber = 1;
 
-    for (const room of availableClassrooms) {
-        if (studentQueues.every(q => q.students.length === 0)) break;
-
+    while (studentQueues.some(q => q.students.length > 0) && availableClassrooms.length > 0) {
+        const room = availableClassrooms.shift()!;
+        const assignmentsForThisRoom: Seat[] = [];
+        
         // Find the best pair of queues for this room
         studentQueues.sort((a, b) => b.students.length - a.students.length);
-        let queueA = studentQueues[0];
-        let queueB = studentQueues.find(q => q.department !== queueA.department);
+        
+        let queueA = studentQueues.find(q => q.students.length > 0);
+        let queueB = studentQueues.find(q => q.students.length > 0 && q.department !== queueA?.department);
 
-        if (!queueA) break; // No students left
+        if (!queueA) break;
 
-        const assignmentsForThisRoom: Seat[] = [];
-        const benches = Math.floor(room.capacity / 2); // Assuming 2-seater benches for simplicity here
-
+        const benches = Math.floor(room.capacity / 2);
+        
         for (let i = 0; i < benches; i++) {
-            const studentA = queueA.students.shift();
-            const studentB = queueB ? queueB.students.shift() : undefined;
+            const studentA = queueA?.students.shift();
+            const studentB = queueB?.students.shift();
 
-            const seatIndexA = i * 2;
-            const seatIndexB = i * 2 + 1;
-            
-            // Seat from Course A
+            // Seat from Course A (Left Side)
             if (studentA) {
-                assignmentsForThisRoom[seatIndexA] = {
+                assignmentsForThisRoom.push({
                     student: studentA,
                     classroom: room,
-                    seatNumber: seatNumberOffset + seatIndexA + 1,
-                };
+                    seatNumber: globalSeatNumber++,
+                });
+            } else {
+                 assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
             }
 
-            // Seat from Course B
+            // Seat from Course B (Right Side)
             if (studentB) {
-                 assignmentsForThisRoom[seatIndexB] = {
+                assignmentsForThisRoom.push({
                     student: studentB,
                     classroom: room,
-                    seatNumber: seatNumberOffset + seatIndexB + 1,
-                };
+                    seatNumber: globalSeatNumber++,
+                });
+            } else {
+                 assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
             }
         }
         
-        // Fill up any remaining single seats if total capacity is odd
-        if(room.capacity % 2 !== 0 && queueA.students.length > 0) {
+        // Handle odd capacity room
+        if (room.capacity % 2 !== 0 && queueA?.students.length > 0) {
             const studentA = queueA.students.shift();
-            const seatIndex = room.capacity - 1;
-            if(studentA){
-                 assignmentsForThisRoom[seatIndex] = {
+            if(studentA) {
+                assignmentsForThisRoom.push({
                     student: studentA,
                     classroom: room,
-                    seatNumber: seatNumberOffset + seatIndex + 1,
-                };
+                    seatNumber: globalSeatNumber++,
+                });
+            } else {
+                 assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
             }
+        } else if (room.capacity % 2 !== 0) {
+            assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
         }
 
 
-        // Fill placeholders for empty seats in this room
-        for (let i = 0; i < room.capacity; i++) {
-            if (!assignmentsForThisRoom[i]) {
-                assignmentsForThisRoom[i] = {
-                    student: null,
-                    classroom: room,
-                    seatNumber: seatNumberOffset + i + 1,
-                };
-            }
-        }
-        
         finalAssignments.push(...assignmentsForThisRoom);
-        seatNumberOffset += room.capacity;
-
+        
         // Remove empty queues
         studentQueues = studentQueues.filter(q => q.students.length > 0);
     }
     
+    // Update master list with seat assignments
     finalAssignments.forEach(assignment => {
         if (assignment.student) {
             const masterListIndex = studentMasterList.findIndex((s: Student) => s.id === assignment.student!.id);
@@ -144,26 +138,27 @@ export function generateSeatPlan(
     return { plan, updatedStudents: studentMasterList };
 }
 
+
 export function assignInvigilators(
     invigilators: Invigilator[], 
     classroomsInUse: Classroom[], 
     exam: ExamSlot
 ): { assignments: InvigilatorAssignment[], updatedInvigilators: Invigilator[] } {
-    const invigilatorMasterList = JSON.parse(JSON.stringify(invigilators));
+    const invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
 
-    let availablePool = invigilatorMasterList.filter((i: Invigilator) => 
+    const availablePool = invigilatorMasterList.filter((i: Invigilator) => 
         i.isAvailable && 
         !i.unavailableSlots.some(slot => slot.slotId === exam.id)
     );
 
-    availablePool.sort((a: Invigilator, b: Invigilator) => {
+    // Sort by total duties to balance load across the whole schedule
+    availablePool.sort((a, b) => {
         const aTotalDuties = a.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
         const bTotalDuties = b.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
         return aTotalDuties - bTotalDuties;
     });
 
     const assignments: InvigilatorAssignment[] = [];
-    
     let sessionPool = [...availablePool];
 
     for (const room of classroomsInUse) {
@@ -171,17 +166,23 @@ export function assignInvigilators(
 
         for (let i = 0; i < requiredInvigilators; i++) {
             if (sessionPool.length === 0) {
-                 if (availablePool.length === 0) {
-                    console.error("No available invigilators to assign for room " + room.id);
-                    break; 
-                 }
-                 console.warn(`Re-using invigilators as pool was exhausted. Room ${room.id} may have unbalanced duties for this session.`);
-                 sessionPool = [...availablePool];
-                 sessionPool.sort((a,b) => {
-                     const aAssigned = assignments.filter(as => as.invigilator.id === a.id).length;
-                     const bAssigned = assignments.filter(as => as.invigilator.id === b.id).length;
-                     return aAssigned - bAssigned;
-                 })
+                console.warn(`Invigilator pool exhausted for session ${exam.id}. Re-using invigilators. Duty balance may be affected for this session.`);
+                // If pool is empty, re-populate it with the initial available invigilators for this session
+                // This is a fallback to ensure all rooms get an invigilator
+                sessionPool = [...availablePool].sort((a,b) => {
+                     const aAssignedThisSession = assignments.filter(as => as.invigilator.id === a.id).length;
+                     const bAssignedThisSession = assignments.filter(as => as.invigilator.id === b.id).length;
+                     if(aAssignedThisSession !== bAssignedThisSession) return aAssignedThisSession - bAssignedThisSession;
+                     // If equal duties in this session, fall back to total duties
+                    const aTotalDuties = a.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
+                    const bTotalDuties = b.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
+                    return aTotalDuties - bTotalDuties;
+                });
+                
+                if (sessionPool.length === 0) {
+                    console.error("CRITICAL: No available invigilators to assign for room " + room.id);
+                    break;
+                }
             }
             
             const invigilatorToAssign = sessionPool.shift()!;
@@ -192,9 +193,10 @@ export function assignInvigilators(
                 invigilator: invigilatorToAssign,
             });
             
-            const invigilatorInMaster = invigilatorMasterList.find((inv: Invigilator) => inv.id === invigilatorToAssign.id);
+            // Find and update the invigilator in the master list
+            const invigilatorInMaster = invigilatorMasterList.find(inv => inv.id === invigilatorToAssign.id);
             if (invigilatorInMaster) {
-                let dutyRecord = invigilatorInMaster.assignedDuties.find((d: { date: string; }) => d.date === exam.date);
+                let dutyRecord = invigilatorInMaster.assignedDuties.find(d => d.date === exam.date);
                 if (dutyRecord) {
                     dutyRecord.count++;
                 } else {

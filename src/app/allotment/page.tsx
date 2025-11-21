@@ -104,10 +104,8 @@ export default function AllotmentPage() {
       const { seatPlan: newSeatPlan, invigilatorAssignments: newInvigilatorAssignments } = fullAllotment[slotKey];
       setSeatPlan(newSeatPlan);
       setInvigilatorAssignments(newInvigilatorAssignments);
-      const firstClassroomId = newSeatPlan.assignments.length > 0 ? newSeatPlan.assignments[0].classroom.id : null;
+      const firstClassroomId = newSeatPlan.assignments.length > 0 ? [...new Set(newSeatPlan.assignments.map(a => a.classroom.id))][0] : null;
       setSelectedClassroomId(firstClassroomId);
-      // Don't hide the report automatically, let the user decide
-      // setShowExclusionReport(false); 
     } else {
        setSeatPlan(null);
        setInvigilatorAssignments(null);
@@ -193,7 +191,8 @@ export default function AllotmentPage() {
 
       const { plan, updatedStudents } = generateSeatPlan(students, classrooms, selectedExams);
       setSeatPlan(plan);
-      setSelectedClassroomId(plan.assignments[0]?.classroom.id || null);
+      const firstClassroomId = plan.assignments.length > 0 ? [...new Set(plan.assignments.map(a => a.classroom.id))][0] : null;
+      setSelectedClassroomId(firstClassroomId);
 
       const classroomsInUse = [...new Map(plan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
       const { assignments: newInvigilatorAssignments } = assignInvigilators(invigilators, classroomsInUse, selectedExams[0]);
@@ -213,7 +212,7 @@ export default function AllotmentPage() {
   
   const classroomsInPlan = seatPlan ? [...new Map(seatPlan.assignments.map(item => [item.classroom.id, item.classroom])).values()] : [];
 
-  const selectedClassroom = selectedClassroomId ? classroomsInPlan.find(c => c.id === selectedClassroomId) : null;
+  const selectedClassroom = selectedClassroomId ? classrooms.find(c => c.id === selectedClassroomId) : null;
 
   const invigilatorsForClassroom = selectedClassroom && invigilatorAssignments
     ? invigilatorAssignments.filter(a => a.classroom.id === selectedClassroom?.id).map(a => a.invigilator)
@@ -234,7 +233,8 @@ export default function AllotmentPage() {
         if (!acc[subjectCode]) {
             acc[subjectCode] = { min: student.rollNo, max: student.rollNo, count: 0 };
         }
-        acc[subjectCode].max = student.rollNo;
+        if (student.rollNo > acc[subjectCode].max) acc[subjectCode].max = student.rollNo;
+        if (student.rollNo < acc[subjectCode].min) acc[subjectCode].min = student.rollNo;
         acc[subjectCode].count += 1;
         return acc;
     }, {} as Record<string, {min: string, max: string, count: number}>);
@@ -303,7 +303,7 @@ export default function AllotmentPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {classroomsInPlan.map(c => (
-                                            <SelectItem key={c.id} value={c.id}>{c.id} - {c.roomNo} ({c.building})</SelectItem>
+                                            <SelectItem key={c.id} value={c.id}>{c.roomNo} ({c.building})</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -319,7 +319,7 @@ export default function AllotmentPage() {
                             <div key={selectedClassroom.id}>
                                 <h3 className="flex items-center gap-2 text-xl font-semibold mb-2 text-center justify-center">
                                     <Building className="w-6 h-6" />
-                                    Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
+                                    Seat Plan: {selectedClassroom.roomNo} ({selectedClassroom.building})
                                 </h3>
                                 <p className="text-center mb-1 text-muted-foreground">Exam(s): {currentExams.map(e => `${e.subjectName}${e.group ? ` (G${e.group})` : ''}`).join(', ')}</p>
                                 <p className="text-center mb-2 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
@@ -386,7 +386,7 @@ export default function AllotmentPage() {
              <div className="p-4 border rounded-lg">
                 <h3 className="flex items-center gap-2 text-2xl font-bold mb-2 text-center justify-center">
                     <Building className="w-8 h-8" />
-                    Seat Plan: {selectedClassroom.id} ({selectedClassroom.roomNo})
+                    Seat Plan: {selectedClassroom.roomNo} ({selectedClassroom.building})
                 </h3>
                  <p className="text-center text-lg mb-1">Exam(s): {currentExams.map(e => `${e.subjectName}${e.group ? ` (G${e.group})` : ''}`).join(', ')}</p>
                  <p className="text-center text-lg mb-2">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
