@@ -10,21 +10,23 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { ExamplannerLogo } from '@/components/icons/examplanner-logo';
 import {
   LayoutDashboard,
   Users,
   Building,
   UserCheck,
-  FileText,
   Telescope,
   CircleHelp,
-  ShieldBan,
   Printer,
   CalendarDays,
   Upload,
-  LogOut
+  ChevronDown,
+  ShieldOff,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -36,7 +38,6 @@ const menuItems = [
     { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
     { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
     { id: 'import-export', href: '/import-export', icon: Upload, label: 'Import / Export' },
-    { id: 'settings', href: '/settings', icon: Telescope, label: 'Explorer' },
 ];
 
 const helpMenuItems = [
@@ -74,6 +75,42 @@ export function MainSidebar() {
                 </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
+           <SidebarMenuItem>
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton 
+                    isActive={activeItem === 'settings'}
+                    className="w-full justify-between"
+                  >
+                     <div className="flex items-center gap-2">
+                        <Telescope/>
+                        <span>Explorer</span>
+                      </div>
+                      <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:-rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                     <SidebarMenuItem>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/settings/invigilators'}>
+                           <Link href="/settings/invigilators">
+                              <UserCheck />
+                              <span>Invigilators</span>
+                           </Link>
+                        </SidebarMenuSubButton>
+                     </SidebarMenuItem>
+                     <SidebarMenuItem>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/settings/unavailability'}>
+                           <Link href="/settings/unavailability">
+                              <ShieldOff />
+                              <span>Unavailability</span>
+                           </Link>
+                        </SidebarMenuSubButton>
+                     </SidebarMenuItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </Collapsible>
+            </SidebarMenuItem>
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="p-2">

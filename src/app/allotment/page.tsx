@@ -90,24 +90,28 @@ export default function AllotmentPage() {
   useEffect(() => {
      if (selectedSlotKey) {
         updateStateForSlot(selectedSlotKey);
+     } else {
+        setExcludedData(null);
+        setSeatPlan(null);
+        setInvigilatorAssignments(null);
      }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSlotKey, students, classrooms, invigilators]);
 
   const updateStateForSlot = (slotKey: string) => {
+    calculateExclusions(slotKey);
     if (fullAllotment && fullAllotment[slotKey]) {
       const { seatPlan: newSeatPlan, invigilatorAssignments: newInvigilatorAssignments } = fullAllotment[slotKey];
       setSeatPlan(newSeatPlan);
       setInvigilatorAssignments(newInvigilatorAssignments);
       const firstClassroomId = newSeatPlan.assignments.length > 0 ? newSeatPlan.assignments[0].classroom.id : null;
       setSelectedClassroomId(firstClassroomId);
-      setExcludedData(null); 
-      setShowExclusionReport(false);
+      // Don't hide the report automatically, let the user decide
+      // setShowExclusionReport(false); 
     } else {
        setSeatPlan(null);
        setInvigilatorAssignments(null);
        setSelectedClassroomId(null);
-       calculateExclusions(slotKey);
     }
   };
 
@@ -250,7 +254,7 @@ export default function AllotmentPage() {
                        <Button 
                           onClick={() => setShowExclusionReport(!showExclusionReport)} 
                           variant="outline" 
-                          disabled={!excludedData || fullAllotment || seatPlan}
+                          disabled={!excludedData}
                         >
                           {showExclusionReport ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
                           Exclusion Report
