@@ -84,6 +84,7 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
         coursesByDept={COURSES}
         defaultDepartment={departmentName}
         defaultCourse={courseName}
+        isExplorerContext={true}
       />
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
           <AlertDialogContent>

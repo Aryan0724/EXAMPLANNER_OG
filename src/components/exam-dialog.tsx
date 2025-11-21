@@ -14,14 +14,14 @@ import { ExamSlot } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 
 const examSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
-  time: z.string().regex(/^\d{2}:\d{2}$/, 'Time must be in HH:MM format'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
+  time: z.string().regex(/^\d{2}:\d{2}$/, 'Time must be in HH:MM format').optional(),
   subjectName: z.string().min(3, 'Subject name is required'),
   subjectCode: z.string().min(3, 'Subject code is required'),
   department: z.string().min(1, 'Department is required'),
   course: z.string().min(1, 'Course is required'),
   semester: z.coerce.number().min(1, 'Semester is required'),
-  duration: z.coerce.number().min(30, 'Duration must be at least 30 minutes'),
+  duration: z.coerce.number().min(30, 'Duration must be at least 30 minutes').optional(),
   group: z.string().optional(),
 });
 
@@ -36,9 +36,20 @@ interface ExamDialogProps {
   coursesByDept: Record<string, string[]>;
   defaultDepartment?: string;
   defaultCourse?: string;
+  isExplorerContext?: boolean; // New prop
 }
 
-export function ExamDialog({ isOpen, onClose, onSave, exam, departments, coursesByDept, defaultDepartment, defaultCourse }: ExamDialogProps) {
+export function ExamDialog({ 
+    isOpen, 
+    onClose, 
+    onSave, 
+    exam, 
+    departments, 
+    coursesByDept, 
+    defaultDepartment, 
+    defaultCourse,
+    isExplorerContext = false // Default to false
+}: ExamDialogProps) {
   const { register, handleSubmit, control, watch, reset, setValue, formState: { errors } } = useForm<ExamFormValues>({
     resolver: zodResolver(examSchema),
     defaultValues: {
@@ -87,10 +98,27 @@ export function ExamDialog({ isOpen, onClose, onSave, exam, departments, courses
   }, [selectedDepartment, coursesByDept, watch, setValue]);
 
   const onSubmit = (data: ExamFormValues) => {
+    // If in explorer context, provide default values for hidden fields
+    const finalData = isExplorerContext ? {
+      ...data,
+      date: data.date || '1970-01-01', // Default placeholder date
+      time: data.time || '00:00', // Default placeholder time
+      duration: data.duration || 90,
+    } : data;
+
+
+    if (!finalData.date || !finalData.time || !finalData.duration) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Date, time, and duration are required.' });
+        return;
+    }
+
     const examData: ExamSlot = {
       id: exam?.id || `E${Date.now()}`,
-      ...data,
-      group: data.group === 'All' || !data.group ? undefined : (data.group as 'A' | 'B'),
+      ...finalData,
+      date: finalData.date,
+      time: finalData.time,
+      duration: finalData.duration,
+      group: finalData.group === 'All' || !finalData.group ? undefined : (finalData.group as 'A' | 'B'),
     };
     onSave(examData);
   };
@@ -101,22 +129,24 @@ export function ExamDialog({ isOpen, onClose, onSave, exam, departments, courses
         <DialogHeader>
           <DialogTitle>{exam ? 'Edit Subject' : 'Add New Subject'}</DialogTitle>
           <DialogDescription>
-            {exam ? 'Update the details for this subject and exam slot.' : 'Fill in the details for the new subject and exam slot.'}
+            {exam ? 'Update the details for this subject.' : 'Fill in the details for the new subject.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input id="date" type="date" {...register('date')} />
-              {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
+         {!isExplorerContext && (
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                <Label htmlFor="date">Date</Label>
+                <Input id="date" type="date" {...register('date')} />
+                {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
+                </div>
+                <div className="space-y-2">
+                <Label htmlFor="time">Time</Label>
+                <Input id="time" type="time" {...register('time')} />
+                {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
+                </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="time">Time</Label>
-              <Input id="time" type="time" {...register('time')} />
-              {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -172,11 +202,13 @@ export function ExamDialog({ isOpen, onClose, onSave, exam, departments, courses
                 <Input id="semester" type="number" {...register('semester')} />
                 {errors.semester && <p className="text-xs text-destructive">{errors.semester.message}</p>}
             </div>
-            <div className="space-y-2">
-                <Label htmlFor="duration">Duration (mins)</Label>
-                <Input id="duration" type="number" {...register('duration')} />
-                {errors.duration && <p className="text-xs text-destructive">{errors.duration.message}</p>}
-            </div>
+            {!isExplorerContext && (
+                <div className="space-y-2">
+                    <Label htmlFor="duration">Duration (mins)</Label>
+                    <Input id="duration" type="number" {...register('duration')} />
+                    {errors.duration && <p className="text-xs text-destructive">{errors.duration.message}</p>}
+                </div>
+            )}
              <div className="space-y-2">
                 <Label htmlFor="group">Group</Label>
                  <Controller
