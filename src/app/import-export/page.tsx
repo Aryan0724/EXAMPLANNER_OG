@@ -14,7 +14,7 @@ import { DataContext } from '@/context/DataContext';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { generateMasterReport } from '@/lib/report-generator';
+import { generateMasterReport, generateInvigilatorDutyRoster } from '@/lib/report-generator';
 
 
 const ImportItem = ({ title, format }: { title: string, format: string[] }) => {
@@ -106,6 +106,32 @@ export default function ImportExportPage() {
     }
   };
 
+  const handleExportDutyRoster = () => {
+     if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'No Allotment Data',
+            description: 'Please generate a full allotment from the Schedule page before exporting a roster.',
+        });
+        return;
+    }
+    
+    try {
+        generateInvigilatorDutyRoster(fullAllotment, invigilators);
+        toast({
+            title: 'Roster Generated',
+            description: 'The invigilator duty roster has been downloaded.',
+        });
+    } catch (error) {
+        console.error("Failed to generate roster:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Export Failed',
+            description: 'There was an error generating the roster. Check the console for details.',
+        });
+    }
+  }
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
@@ -195,13 +221,13 @@ export default function ImportExportPage() {
                       <FileDown className="mr-2 h-4 w-4" />
                       Generate Master Report (Excel)
                     </Button>
-                    <Button variant="secondary" disabled>
+                     <Button onClick={handleExportDutyRoster}>
                       <FileDown className="mr-2 h-4 w-4" />
-                      Student List (CSV)
+                      Generate Duty Roster (Excel)
                     </Button>
                     <Button variant="secondary" disabled>
                       <FileDown className="mr-2 h-4 w-4" />
-                      Admit Cards (PDF)
+                      Student List (CSV)
                     </Button>
                   </CardContent>
                 </Card>

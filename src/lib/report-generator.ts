@@ -1,4 +1,5 @@
 
+
 import * as XLSX from 'xlsx';
 import type { SeatPlan, InvigilatorAssignment, Student, Classroom, Invigilator, ExamSlot } from './types';
 
@@ -188,4 +189,83 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
 
     const sessionDate = new Date().toISOString().split('T')[0];
     XLSX.writeFile(wb, `Master_Invigilation_Allotment_Report_${sessionDate}.xlsx`);
+}
+
+export function generateInvigilatorDutyRoster(fullAllotment: FullAllotment, allInvigilators: Invigilator[]) {
+    // 1. Get all unique, sorted session keys (e.g., "2025-09-18 Morning")
+    const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    
+    const formattedSessionHeaders = sessionKeys.map(key => {
+        const date = key.split(' ')[0];
+        const time = key.split(' ')[1];
+        const shift = new Date(`${date}T${time}`).getHours() < 12 ? 'Morning' : 'Afternoon';
+        return `${date} ${shift}`;
+    });
+
+    // 2. Create a map of invigilator duties
+    // Map<invigilatorId, Map<sessionHeader, classroomNo>>
+    const dutyMap = new Map<string, Map<string, string>>();
+    sessionKeys.forEach((sessionKey, index) => {
+        const { invigilatorAssignments } = fullAllotment[sessionKey];
+        const header = formattedSessionHeaders[index];
+        
+        invigilatorAssignments.forEach(assignment => {
+            const { invigilator, classroom } = assignment;
+            if (!dutyMap.has(invigilator.id)) {
+                dutyMap.set(invigilator.id, new Map());
+            }
+            const invigilatorDuties = dutyMap.get(invigilator.id)!;
+            
+            // In case an invigilator is in multiple rooms in the same slot (unlikely but possible), append rooms
+            const existingDuty = invigilatorDuties.get(header);
+            invigilatorDuties.set(header, existingDuty ? `${existingDuty}, ${classroom.roomNo}` : classroom.roomNo);
+        });
+    });
+
+    // 3. Build the final JSON for the sheet
+    const rosterData = allInvigilators.map(invigilator => {
+        const row: Record<string, string | number> = {
+            'Invigilator Name': invigilator.name,
+            'Department': invigilator.department,
+        };
+        
+        let totalDuties = 0;
+        const invigilatorDuties = dutyMap.get(invigilator.id);
+        
+        formattedSessionHeaders.forEach(header => {
+            const dutyRoom = invigilatorDuties?.get(header);
+            row[header] = dutyRoom || '-';
+            if (dutyRoom) {
+                totalDuties++;
+            }
+        });
+        
+        row['Total Duties'] = totalDuties;
+
+        return row;
+    });
+
+    // Filter out invigilators with no duties for a cleaner report
+    const finalRosterData = rosterData.filter(row => row['Total Duties'] > 0);
+
+    // --- Create Excel File ---
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(finalRosterData);
+
+    // Auto-fit columns for better readability
+    const colWidths = finalRosterData.length > 0
+        ? Object.keys(finalRosterData[0]).map(key => ({
+            wch: Math.max(
+                key.length,
+                ...finalRosterData.map(row => String(row[key] ?? '').length)
+            )
+        }))
+        : [];
+        
+    ws['!cols'] = colWidths;
+    
+    XLSX.utils.book_append_sheet(wb, ws, "Invigilator Duty Roster");
+
+    const sessionDate = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `Invigilator_Duty_Roster_${sessionDate}.xlsx`);
 }
