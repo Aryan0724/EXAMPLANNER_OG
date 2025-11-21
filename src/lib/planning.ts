@@ -49,7 +49,7 @@ export function generateSeatPlan(
             department: exam.department,
             students: getEligibleStudentsForExam(studentMasterList, exam)
                 .map(s => ({ ...s, exam })) // Tag student with their exam
-                .sort((a, b) => a.rollNo.localeCompare(b.rollNo)) // Strict roll-no sorting
+                .sort((a, b) => a.rollNo.localeCompare(b.rollNo))
         }))
         .filter(q => q.students.length > 0)
         .sort((a, b) => b.students.length - a.students.length);
@@ -59,78 +59,52 @@ export function generateSeatPlan(
         .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
         .sort((a, b) => b.capacity - a.capacity);
     
-    let globalSeatNumber = 1;
-
-    // 3. Process classrooms one by one, filling them completely
+    // 3. Iterate through classrooms and fill them completely one by one
     for (const room of availableClassrooms) {
         if (studentQueues.every(q => q.students.length === 0)) break; // All students seated
 
-        // Pick the two largest queues that are from different departments
         studentQueues.sort((a, b) => b.students.length - a.students.length);
+
+        const assignmentsForThisRoom: Seat[] = [];
+        let totalSeatsInRoom = room.benchCapacities.reduce((a, b) => a + b, 0);
+
+        // This creates an array representing all seats in the room, e.g., [1, 2, 3, ...]
+        const seatNumbersInRoom = Array.from({ length: totalSeatsInRoom }, (_, i) => i + 1);
         
-        let queueA = studentQueues[0];
-        let queueB = studentQueues.find(q => q.department !== queueA?.department);
+        for (const seatNumber of seatNumbersInRoom) {
+            // Re-sort queues every time to pick the current largest
+            studentQueues.sort((a, b) => b.students.length - a.students.length);
 
-        // If no different department queue is available, just take the next one
-        if (!queueB && studentQueues.length > 1) {
-            queueB = studentQueues[1];
-        }
+            let queueA = studentQueues[0];
+            let queueB = studentQueues.find(q => q.department !== queueA?.department) ?? studentQueues[1];
 
-        if (!queueA) continue; // No more students left to seat
-
-        const benchesInRoom = room.benchCapacities;
-
-        // 4. Bench-based allotment
-        for (let i = 0; i < benchesInRoom.length; i++) {
-             const benchCapacity = benchesInRoom[i];
-             if (benchCapacity < 2) {
-                // For single-seater benches, just take from the largest queue
-                if (queueA && queueA.students.length > 0) {
-                     const student = queueA.students.shift()!;
-                     finalAssignments.push({ student: student, classroom: room, seatNumber: globalSeatNumber++ });
+            // Alternate between Course A and Course B for each seat
+            // Odd seat numbers try to pull from queue A, Even from queue B
+            let studentToAssign: (Student & { exam: ExamSlot }) | undefined;
+            if (seatNumber % 2 !== 0) { // Odd seats -> try Course A first
+                studentToAssign = queueA?.students.shift();
+                if (!studentToAssign) { // If A is empty, try B
+                    studentToAssign = queueB?.students.shift();
                 }
-             } else {
-                 // Left side of the bench
-                if (queueA && queueA.students.length > 0) {
-                    const student = queueA.students.shift()!;
-                    finalAssignments.push({ student: student, classroom: room, seatNumber: globalSeatNumber++ });
-                } else {
-                     finalAssignments.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
-                }
-
-                // Right side of the bench
-                if (queueB && queueB.students.length > 0) {
-                    const student = queueB.students.shift()!;
-                    finalAssignments.push({ student: student, classroom: room, seatNumber: globalSeatNumber++ });
-                } else {
-                    finalAssignments.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
-                }
-
-                // For 3-seaters, fill the middle seat from the larger queue
-                if (benchCapacity === 3) {
-                     if (queueA && queueA.students.length > 0) {
-                        const student = queueA.students.shift()!;
-                        finalAssignments.push({ student: student, classroom: room, seatNumber: globalSeatNumber++ });
-                    } else {
-                         finalAssignments.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
-                    }
-                }
-             }
-             
-             // After assigning for a bench, check if queues are empty and re-evaluate
-             if (queueA && queueA.students.length === 0) {
-                studentQueues = studentQueues.filter(q => q.exam.id !== queueA.exam.id);
-                queueA = studentQueues[0];
-                queueB = studentQueues.find(q => q?.department !== queueA?.department) || studentQueues[1];
-             }
-             if (queueB && queueB.students.length === 0) {
-                studentQueues = studentQueues.filter(q => q.exam.id !== queueB.exam.id);
-                queueB = studentQueues.find(q => q?.department !== queueA?.department) || studentQueues[1];
-             }
+            } else { // Even seats -> try Course B first
+                 studentToAssign = queueB?.students.shift();
+                 if (!studentToAssign) { // If B is empty, try A
+                    studentToAssign = queueA?.students.shift();
+                 }
+            }
+            
+            if (studentToAssign) {
+                assignmentsForThisRoom.push({ student: studentToAssign, classroom: room, seatNumber });
+            } else {
+                // If no student can be assigned, the seat is empty
+                assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber });
+            }
+            
+            // Clean up empty queues
+            studentQueues = studentQueues.filter(q => q.students.length > 0);
         }
         
-        // Remove empty queues from the list
-        studentQueues = studentQueues.filter(q => q.students.length > 0);
+        finalAssignments.push(...assignmentsForThisRoom);
     }
     
     // Update master list with seat assignments
@@ -177,7 +151,6 @@ export function assignInvigilators(
     });
 
     const assignments: InvigilatorAssignment[] = [];
-    const assignedInThisSession = new Set<string>();
     let poolIndex = 0;
 
     for (const room of classroomsInUse) {
@@ -185,8 +158,13 @@ export function assignInvigilators(
 
         for (let i = 0; i < requiredInvigilators; i++) {
             if (poolIndex >= availablePool.length) {
-                console.warn(`Not enough invigilators for all rooms. Room ${room.id} may be unstaffed.`);
-                break; // Break from the inner loop if we run out of invigilators
+                // If we run out, reset and reuse invigilators to ensure all rooms are staffed
+                poolIndex = 0; 
+                console.warn(`Re-using invigilators as pool was exhausted. Room ${room.id} may have unbalanced duties.`);
+                 if (availablePool.length === 0) {
+                    console.error("No available invigilators to assign.");
+                    break;
+                 }
             }
             
             const invigilatorToAssign = availablePool[poolIndex];
@@ -197,7 +175,7 @@ export function assignInvigilators(
                 invigilator: invigilatorToAssign,
             });
             
-            // Update the duty count for the assigned invigilator in the master list AND the pool
+            // Update the duty count for the assigned invigilator in the master list
             const invigilatorInMaster = invigilatorMasterList.find((inv: Invigilator) => inv.id === invigilatorToAssign.id);
             if (invigilatorInMaster) {
                 let dutyRecord = invigilatorInMaster.assignedDuties.find((d: { date: string; }) => d.date === exam.date);
@@ -207,28 +185,17 @@ export function assignInvigilators(
                     invigilatorInMaster.assignedDuties.push({ date: exam.date, count: 1 });
                 }
             }
-            // Also update the pool object to ensure correct sorting for the next round
-            let poolDutyRecord = invigilatorToAssign.assignedDuties.find((d: { date: string; }) => d.date === exam.date);
-            if(poolDutyRecord) {
-                poolDutyRecord.count++;
-            } else {
-                invigilatorToAssign.assignedDuties.push({ date: exam.date, count: 1 });
-            }
-
-
-            poolIndex++; // Move to the next invigilator in the sorted pool
+          
+            poolIndex++;
         }
 
-        // After assigning for a room, re-sort the remaining pool to maintain fairness
-        if (poolIndex < availablePool.length) {
-             const remainingPool = availablePool.slice(poolIndex);
-             remainingPool.sort((a: Invigilator, b: Invigilator) => {
-                const aTotalDuties = a.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
-                const bTotalDuties = b.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
-                return aTotalDuties - bTotalDuties;
-            });
-            availablePool = [...availablePool.slice(0, poolIndex), ...remainingPool];
-        }
+        // Re-sort the entire pool after each room assignment to always pick the one with least duties
+         availablePool.sort((a: Invigilator, b: Invigilator) => {
+            const aTotalDuties = a.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
+            const bTotalDuties = b.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
+            return aTotalDuties - bTotalDuties;
+        });
+        poolIndex = 0; // Reset index to start from the new "least-dutied" invigilator for the next room
     }
     return { assignments, updatedInvigilators: invigilatorMasterList };
 }

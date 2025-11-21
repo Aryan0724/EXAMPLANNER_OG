@@ -48,7 +48,28 @@ const StudentTooltip = ({ student, seatNumber, isDebarredSeat }: { student: Stud
 
 export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisualizerProps) {
   const benches: Seat[][] = [];
-  let seatIndex = 0;
+  let seatCounter = 0;
+
+  // Reconstruct benches based on row/column structure
+  for (let r = 0; r < classroom.rows; r++) {
+    for (let c = 0; c < classroom.columns; c++) {
+      const benchIndexInGrid = r * classroom.columns + c;
+      const benchCapacity = classroom.benchCapacities[benchIndexInGrid];
+      const bench: Seat[] = [];
+      for (let i = 0; i < benchCapacity; i++) {
+        const seatIndexOverall = seatCounter;
+        const assignment = assignments.find(a => a.classroom.id === classroom.id && a.seatNumber === seatIndexOverall + 1);
+        const seatObject = assignment || {
+          student: null,
+          classroom: classroom,
+          seatNumber: seatIndexOverall + 1,
+        };
+        bench.push(seatObject);
+        seatCounter++;
+      }
+      benches.push(bench);
+    }
+  }
   
   const courseColors = useMemo(() => {
     const courses = new Set(assignments.map(a => a.student?.exam.subjectCode).filter(Boolean));
@@ -59,35 +80,20 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
     return colorMap;
   }, [assignments]);
 
-  for (const benchCapacity of classroom.benchCapacities) {
-      const bench: Seat[] = [];
-      for(let i = 0; i < benchCapacity; i++) {
-          const assignment = assignments.find(a => a.seatNumber === seatIndex + 1);
-          const seatObject = assignment || {
-              student: null,
-              classroom: classroom,
-              seatNumber: seatIndex + 1,
-          };
-          bench.push(seatObject);
-          seatIndex++;
-      }
-      benches.push(bench);
-  }
-
 
   return (
     <TooltipProvider>
       <div
         className="grid gap-3 p-4 rounded-lg border bg-muted/20"
         style={{
-          gridTemplateColumns: `repeat(${classroom.columns}, minmax(0, auto))`,
+          gridTemplateColumns: `repeat(${classroom.columns}, minmax(0, 1fr))`,
           justifyContent: 'center',
         }}
       >
         {benches.map((bench, benchIndex) => (
           <div
             key={benchIndex}
-            className="flex items-center justify-center gap-2 p-2 rounded-md bg-background border shadow-sm flex-nowrap"
+            className="flex items-center justify-center gap-1 p-2 rounded-md bg-background border shadow-sm flex-wrap"
           >
             {bench.map((seat) => {
               const seatColor = seat.student?.exam.subjectCode ? courseColors.get(seat.student.exam.subjectCode) : undefined;
@@ -96,7 +102,7 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
                 <TooltipTrigger asChild>
                   <div
                     className={cn(
-                      "flex flex-col items-center justify-center w-24 h-16 rounded-md border-2 text-center p-1",
+                      "flex flex-col items-center justify-center w-24 h-16 rounded-md border-2 text-center p-1 shrink-0",
                       seat.student ? 'bg-primary/5' : 'border-dashed border-muted-foreground/50',
                       seat.isDebarredSeat && 'border-destructive bg-destructive/10'
                     )}
@@ -112,10 +118,10 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
                       )
                     )}
                     <span className="text-xs text-foreground font-medium truncate w-full">
-                      {seat.student ? seat.student.name : (seat.isDebarredSeat ? 'Debarred' : 'Empty')}
+                      {seat.student ? seat.student.name : (seat.isDebarredSeat ? 'Debarred' : `Seat ${seat.seatNumber}`)}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
-                        {seat.student ? seat.student.rollNo : `Seat ${seat.seatNumber}`}
+                        {seat.student ? seat.student.rollNo : ''}
                     </span>
                   </div>
                 </TooltipTrigger>
