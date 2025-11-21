@@ -39,29 +39,24 @@ export function generateSeatPlan(
     let finalAssignments: Seat[] = [];
     const studentMasterList = [...allStudents];
     
-    // Map to track which seats are taken in which rooms
-    // Key: "classroomId-seatNumber", Value: Seat
     const assignedSeatsByLocation: Map<string, Seat> = new Map();
 
-    // Queues of students who need seats, grouped by their specific exam subject and course.
-    // Key: "subjectCode-course", Value: Array of students
     const studentsNeedingSeats = new Map<string, (Student & { exam: ExamSlot })[]>();
     
-    // 1. Pre-process students to honor existing assignments and identify who needs a seat.
+    // 1. Pre-process students: handle permanent seats and queue up others
     for (const exam of exams) {
         const studentPoolForExam = getEligibleStudentsForExam(studentMasterList, exam)
             .map(s => ({ ...s, exam: exam }))
             .sort((a, b) => a.rollNo.localeCompare(b.rollNo));
 
         for (const student of studentPoolForExam) {
-            // If student has a permanent seat, reserve it.
+            // Handle permanent seat assignments first
             if (student.seatAssignment) {
                 const { classroomId, seatNumber } = student.seatAssignment;
                 const classroom = classrooms.find(c => c.id === classroomId);
                 if (classroom) {
                     const key = `${classroomId}-${seatNumber}`;
-                    // The seat is reserved for this student for this exam.
-                    // If the student is debarred, the seat is marked, but the student object is null.
+                    // The seat is reserved. If student is debarred, mark it but leave student null.
                     const seat: Seat = {
                         student: student.isDebarred ? null : student,
                         isDebarredSeat: student.isDebarred,
@@ -73,8 +68,14 @@ export function generateSeatPlan(
                         assignedSeatsByLocation.set(key, seat);
                     }
                 }
-            } else if (!student.isDebarred) {
-                // If student has no seat and is not debarred, add to the queue to be seated.
+            } else if (student.isDebarred) {
+                // This debarred student has no fixed seat, so they don't get one.
+                // We don't add them to the seating queue.
+                // Their status is known, but they don't occupy a seat in the plan.
+                continue;
+            }
+            else {
+                // If student has no fixed seat and is not debarred, add to queue.
                 const subjectKey = `${student.exam.subjectCode}-${student.exam.course}`;
                 if (!studentsNeedingSeats.has(subjectKey)) {
                     studentsNeedingSeats.set(subjectKey, []);
@@ -313,4 +314,3 @@ export function assignInvigilators(
     }
     return { assignments, updatedInvigilators: invigilatorMasterList };
 }
-

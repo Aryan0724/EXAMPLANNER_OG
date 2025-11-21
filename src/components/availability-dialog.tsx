@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -27,6 +27,11 @@ export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, on
   const [selectedSlot, setSelectedSlot] = useState('');
   const [reason, setReason] = useState('');
   const { examSchedule } = useContext(DataContext);
+  const [unavailableSlots, setUnavailableSlots] = useState(resource?.unavailableSlots || []);
+
+  useEffect(() => {
+    setUnavailableSlots(resource?.unavailableSlots || []);
+  }, [resource]);
 
   if (!resource) return null;
 
@@ -43,6 +48,10 @@ export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, on
     setSelectedSlot('');
     setReason('');
   };
+
+  const handleRemove = (slotId: string) => {
+    onRemove(slotId);
+  }
 
   const getSlotLabel = (slotId: string) => {
     const slot = examSchedule.find(s => s.id === slotId);
@@ -76,7 +85,7 @@ export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, on
                   </SelectTrigger>
                   <SelectContent>
                     {examSchedule.map(slot => (
-                      <SelectItem key={slot.id} value={slot.id}>
+                      <SelectItem key={slot.id} value={slot.id} disabled={unavailableSlots.some(us => us.slotId === slot.id)}>
                         {slot.date} @ {slot.time} ({slot.subjectCode} - {slot.subjectName})
                       </SelectItem>
                     ))}
@@ -99,7 +108,7 @@ export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, on
             </CardContent>
           </Card>
 
-          {resource.unavailableSlots.length > 0 && (
+          {unavailableSlots.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Current Unavailability</CardTitle>
@@ -108,13 +117,13 @@ export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, on
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {resource.unavailableSlots.map((slot: AvailabilitySlot) => (
+                {unavailableSlots.map((slot: AvailabilitySlot) => (
                   <div key={slot.slotId} className="flex items-center justify-between p-2 border rounded-md">
                     <div>
                       <p className="font-semibold">{getSlotLabel(slot.slotId)}</p>
                       <p className="text-sm text-muted-foreground">{slot.reason}</p>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => onRemove(slot.slotId)}>
+                    <Button variant="ghost" size="icon" onClick={() => handleRemove(slot.slotId)}>
                       <X className="h-4 w-4 text-destructive" />
                       <span className="sr-only">Remove Unavailability</span>
                     </Button>

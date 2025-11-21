@@ -34,7 +34,7 @@ const DebarmentStatusDialog = ({ isOpen, onClose, student, onSubmitDebarred, onR
     if (!student) return null;
 
     const handleSubmit = () => {
-        if (!reason.trim()) {
+        if (!student.isDebarred && !reason.trim()) {
             toast({
                 variant: 'destructive',
                 title: 'Reason is required',
@@ -66,19 +66,23 @@ const DebarmentStatusDialog = ({ isOpen, onClose, student, onSubmitDebarred, onR
                             <CardTitle>Global Debarment</CardTitle>
                             <CardDescription>
                                 {student.isDebarred 
-                                    ? "This student is currently debarred from all exams. You can make them eligible."
+                                    ? `This student is currently debarred. Reason: ${student.debarmentReason || 'Not specified'}. You can make them eligible again.`
                                     : "This student is currently eligible. You can debar them from all exams."
                                 }
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                             <Label htmlFor="reason">Reason for Change</Label>
-                            <Textarea 
-                                id="reason" 
-                                placeholder="e.g., Disciplinary action, Fee overdue, etc."
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)} 
-                            />
+                             {!student.isDebarred && (
+                                <>
+                                 <Label htmlFor="reason">Reason for Debarment</Label>
+                                 <Textarea 
+                                     id="reason" 
+                                     placeholder="e.g., Disciplinary action, Fee overdue, etc."
+                                     value={reason}
+                                     onChange={(e) => setReason(e.target.value)} 
+                                 />
+                                </>
+                             )}
                         </CardContent>
                         <CardFooter>
                             <Button onClick={handleSubmit} variant={student.isDebarred ? 'default' : 'destructive'}>
@@ -185,7 +189,7 @@ export default function StudentsPage() {
 
     toast({
         title: `Status Updated for ${studentName}`,
-        description: `${studentName} is now ${isDebarred ? 'debarred' : 'eligible'}. Reason: ${reason}`,
+        description: `${studentName} is now ${isDebarred ? 'debarred' : 'eligible'}. ${isDebarred ? `Reason: ${reason}` : ''}`,
     });
     
     // Also update the student in the dialog state
