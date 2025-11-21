@@ -36,101 +36,92 @@ export function generateSeatPlan(
     let studentMasterList: Student[] = JSON.parse(JSON.stringify(allStudents));
     const finalAssignments: Seat[] = [];
 
-    // 1. Create sorted student queues for each exam
     let studentQueues = exams
         .map(exam => ({
             exam,
             department: exam.department,
             students: getEligibleStudentsForExam(studentMasterList, exam)
-                .map(s => ({ ...s, exam })) // Tag student with their exam
+                .map(s => ({ ...s, exam }))
                 .sort((a, b) => a.rollNo.localeCompare(b.rollNo))
         }))
         .filter(q => q.students.length > 0)
         .sort((a, b) => b.students.length - a.students.length);
 
-    // 2. Filter and sort available classrooms
     const availableClassrooms = classrooms
         .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
-        .sort((a, b) => a.capacity - b.capacity); // Start with smaller rooms to fill them up
+        .sort((a, b) => b.capacity - a.capacity); // Start with largest rooms
 
-    // 3. Fill classrooms one by one
+    let seatNumberOffset = 0;
+
     for (const room of availableClassrooms) {
         if (studentQueues.every(q => q.students.length === 0)) break;
 
+        // Find the best pair of queues for this room
+        studentQueues.sort((a, b) => b.students.length - a.students.length);
+        let queueA = studentQueues[0];
+        let queueB = studentQueues.find(q => q.department !== queueA.department);
+
+        if (!queueA) break; // No students left
+
         const assignmentsForThisRoom: Seat[] = [];
-        const roomGrid: ((Student & { exam: ExamSlot }) | null)[] = Array(room.capacity).fill(null);
+        const benches = Math.floor(room.capacity / 2); // Assuming 2-seater benches for simplicity here
 
-        // Keep track of which queues are being used in this room
-        const queuesInRoom = [];
+        for (let i = 0; i < benches; i++) {
+            const studentA = queueA.students.shift();
+            const studentB = queueB ? queueB.students.shift() : undefined;
 
-        // Fill the room column by column
-        for (let c = 0; c < room.columns; c++) {
-            // Find a queue for this column
-            let currentQueue;
-            // Try to find a new queue not already in this room, from a different department than the previous column
-            const lastDept = queuesInRoom[queuesInRoom.length - 1]?.department;
+            const seatIndexA = i * 2;
+            const seatIndexB = i * 2 + 1;
             
-            studentQueues.sort((a, b) => b.students.length - a.students.length); // Keep queues sorted by remaining size
-
-            currentQueue = studentQueues.find(q => q.department !== lastDept);
-
-            if (!currentQueue || currentQueue.students.length === 0) {
-                 // If no suitable different-department queue, or all queues are empty, try any available queue
-                 currentQueue = studentQueues.find(q => q.students.length > 0);
+            // Seat from Course A
+            if (studentA) {
+                assignmentsForThisRoom[seatIndexA] = {
+                    student: studentA,
+                    classroom: room,
+                    seatNumber: seatNumberOffset + seatIndexA + 1,
+                };
             }
 
-            if (!currentQueue) continue; // No more students to seat
-
-            // Add to room's queue list if it's new
-            if (!queuesInRoom.find(q => q.exam.id === currentQueue.exam.id)) {
-                queuesInRoom.push(currentQueue);
+            // Seat from Course B
+            if (studentB) {
+                 assignmentsForThisRoom[seatIndexB] = {
+                    student: studentB,
+                    classroom: room,
+                    seatNumber: seatNumberOffset + seatIndexB + 1,
+                };
             }
-
-            // Fill the current column `c`
-            for (let r = 0; r < room.rows; r++) {
-                const benchIndex = r * room.columns + c;
-                const benchCapacity = room.benchCapacities[benchIndex];
-
-                for (let seatInBench = 0; seatInBench < benchCapacity; seatInBench++) {
-                     // This calculation needs to be column-major
-                    let seatIndex = 0;
-                    for (let i = 0; i < c; i++) {
-                        for(let j = 0; j < room.rows; j++){
-                           seatIndex += room.benchCapacities[j * room.columns + i];
-                        }
-                    }
-                    for(let j = 0; j < r; j++) {
-                        seatIndex += room.benchCapacities[j * room.columns + c];
-                    }
-                    seatIndex += seatInBench;
-
-                    if (seatIndex < room.capacity && roomGrid[seatIndex] === null) {
-                        const studentToSeat = currentQueue.students.shift();
-                        if (studentToSeat) {
-                            roomGrid[seatIndex] = studentToSeat;
-                        } else {
-                            // Current queue is empty, break from inner loops for this column
-                            r = room.rows;
-                            break;
-                        }
-                    }
-                }
+        }
+        
+        // Fill up any remaining single seats if total capacity is odd
+        if(room.capacity % 2 !== 0 && queueA.students.length > 0) {
+            const studentA = queueA.students.shift();
+            const seatIndex = room.capacity - 1;
+            if(studentA){
+                 assignmentsForThisRoom[seatIndex] = {
+                    student: studentA,
+                    classroom: room,
+                    seatNumber: seatNumberOffset + seatIndex + 1,
+                };
             }
-            // After filling a column, re-filter the main queues
-            studentQueues = studentQueues.filter(q => q.students.length > 0);
         }
 
-        // Convert the grid into final assignment objects
+
+        // Fill placeholders for empty seats in this room
         for (let i = 0; i < room.capacity; i++) {
-            const student = roomGrid[i];
-            assignmentsForThisRoom.push({
-                student: student || null,
-                classroom: room,
-                seatNumber: i + 1,
-            });
+            if (!assignmentsForThisRoom[i]) {
+                assignmentsForThisRoom[i] = {
+                    student: null,
+                    classroom: room,
+                    seatNumber: seatNumberOffset + i + 1,
+                };
+            }
         }
         
         finalAssignments.push(...assignmentsForThisRoom);
+        seatNumberOffset += room.capacity;
+
+        // Remove empty queues
+        studentQueues = studentQueues.filter(q => q.students.length > 0);
     }
     
     finalAssignments.forEach(assignment => {

@@ -38,8 +38,8 @@ const StudentTooltip = ({ student, seatNumber, isDebarredSeat }: { student: Stud
       <div className="text-sm">
         <p className="font-bold">{student ? student.name : (isDebarredSeat ? 'Seat Reserved (Debarred)' : 'Empty')}</p>
         <p>Seat: {seatNumber}</p>
-        {student && <p>ID: {student.id}</p>}
-        {student && <p>Course: {student.course}</p>}
+        {student && <p>Roll No: {student.rollNo}</p>}
+        {student && <p>Subject: {student.exam.subjectCode}</p>}
         {student?.isDebarred && <p className="text-destructive font-bold">Status: Debarred</p>}
       </div>
     </TooltipContent>
@@ -57,43 +57,51 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
     return colorMap;
   }, [assignments]);
   
-  // This function now correctly finds the assignment for a given row and column.
   const getAssignmentsForBench = (r: number, c: number): Seat[] => {
-    // Calculate the starting seat number for this column
-    let startingSeatNumberInColumn = 1;
-    for (let col = 0; col < c; col++) {
-        for (let row = 0; row < classroom.rows; row++) {
-            startingSeatNumberInColumn += classroom.benchCapacities[row * classroom.columns + col];
-        }
-    }
-    
-    // Add seats from rows above in the current column
-    for (let row = 0; row < r; row++) {
-        startingSeatNumberInColumn += classroom.benchCapacities[row * classroom.columns + c];
-    }
-    
     const benchIndexInGrid = r * classroom.columns + c;
     const seatsInBench = classroom.benchCapacities[benchIndexInGrid];
-    const benchAssignments: Seat[] = [];
     
+    // Calculate the start seat number for this bench
+    let startingSeatNumberInGrid = 1;
+    for (let i = 0; i < benchIndexInGrid; i++) {
+        startingSeatNumberInGrid += classroom.benchCapacities[i];
+    }
+
+    const benchAssignments: Seat[] = [];
     for (let i = 0; i < seatsInBench; i++) {
-        const seatNumber = startingSeatNumberInColumn + i;
-        const assignment = assignments.find(a => a.seatNumber === seatNumber);
-        if (assignment) {
+        const seatNumberToFind = startingSeatNumberInGrid + i;
+        // Find the assignment that belongs to this specific classroom and has this seat number
+        const assignment = assignments.find(a => {
+            const assignmentInThisRoom = a.classroom.id === classroom.id;
+            if(!assignmentInThisRoom) return false;
+
+            const globalSeatNumber = a.seatNumber;
+            // This is tricky, we need to map global seat number to a room-local seat number
+            // For now, let's assume `assignments` prop is pre-filtered for the current room
+            return a.seatNumber === seatNumberToFind;
+
+        });
+         if (assignment) {
             benchAssignments.push(assignment);
         } else {
              // Create a placeholder for empty seats to maintain layout
-             benchAssignments.push({ student: null, classroom, seatNumber });
+             benchAssignments.push({ student: null, classroom, seatNumber: seatNumberToFind });
         }
     }
     return benchAssignments;
   };
 
+  const seatsForThisRoom = useMemo(() => {
+    return assignments
+      .filter(a => a.classroom.id === classroom.id)
+      .sort((a, b) => a.seatNumber - b.seatNumber);
+  }, [assignments, classroom.id]);
+
 
   return (
     <TooltipProvider>
       <div
-        className="grid gap-2 p-2 rounded-lg border bg-muted/20"
+        className="grid gap-2 p-2 rounded-lg border bg-muted/20 overflow-x-auto"
         style={{
           gridTemplateColumns: `repeat(${classroom.columns}, minmax(0, 1fr))`,
         }}
@@ -101,40 +109,53 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
         {Array.from({ length: classroom.columns }).map((_, c) => (
           <div key={`col-${c}`} className="flex flex-col gap-2">
             {Array.from({ length: classroom.rows }).map((_, r) => {
-              const benchAssignments = getAssignmentsForBench(r, c);
+              const benchIndexInGrid = r * classroom.columns + c;
+              const seatsOnBench = classroom.benchCapacities[benchIndexInGrid];
+
+              let startingSeatIndexForBench = 0;
+              for(let i=0; i < benchIndexInGrid; i++) {
+                startingSeatIndexForBench += classroom.benchCapacities[i];
+              }
+              
+              const benchAssignments = seatsForThisRoom.slice(startingSeatIndexForBench, startingSeatIndexForBench + seatsOnBench);
+              
+              // If there are fewer assignments than bench capacity, fill with empty seats
+              while(benchAssignments.length < seatsOnBench) {
+                benchAssignments.push({ student: null, classroom, seatNumber: 0 });
+              }
 
               return (
                 <div
                   key={`bench-${r}-${c}`}
-                  className="flex items-center justify-center gap-1 p-1 rounded-md bg-background border shadow-sm"
+                  className="flex items-center justify-center gap-1 p-1 rounded-md bg-background border shadow-sm flex-nowrap"
                 >
-                  {benchAssignments.map((seat) => {
+                  {benchAssignments.map((seat, seatIdx) => {
                     const seatColor = seat.student?.exam.subjectCode ? courseColors.get(seat.student.exam.subjectCode) : undefined;
                     return (
-                      <Tooltip key={seat.seatNumber}>
+                      <Tooltip key={seat.student?.id || `empty-${r}-${c}-${seatIdx}`}>
                         <TooltipTrigger asChild>
                           <div
                             className={cn(
-                              "flex flex-col items-center justify-center w-24 h-16 rounded-md border text-center p-1 shrink-0",
+                              "flex flex-col items-center justify-center w-20 h-14 rounded-md border text-center p-1 shrink-0",
                               seat.student ? 'bg-primary/5' : 'bg-muted/30 border-dashed',
                               seat.isDebarredSeat && 'border-destructive bg-destructive/10'
                             )}
                             style={{ borderColor: seat.student && seatColor ? seatColor : undefined }}
                           >
                             {seat.student ? (
-                                <User className="w-4 h-4 text-primary" />
+                                <User className="w-3.5 h-3.5 text-primary" />
                             ) : (
                               seat.isDebarredSeat ? (
-                                <Ban className="w-4 h-4 text-destructive" />
+                                <Ban className="w-3.5 h-3.5 text-destructive" />
                               ) : (
-                                <div className="w-4 h-4" />
+                                <div className="w-3.5 h-3.5" />
                               )
                             )}
-                            <span className="text-[11px] text-foreground font-medium truncate w-full">
-                              {seat.student ? seat.student.name : (seat.isDebarredSeat ? 'Debarred' : `Seat ${seat.seatNumber}`)}
+                            <span className="text-[10px] text-foreground font-medium truncate w-full">
+                              {seat.student ? seat.student.name : (seat.isDebarredSeat ? 'Debarred' : `Empty`)}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
-                                {seat.student ? seat.student.rollNo : 'Empty'}
+                            <span className="text-[9px] text-muted-foreground">
+                                {seat.student ? seat.student.rollNo : ''}
                             </span>
                           </div>
                         </TooltipTrigger>
