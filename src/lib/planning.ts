@@ -37,69 +37,87 @@ export function generateSeatPlan(
     exams: ExamSlot[]
 ): { plan: SeatPlan; updatedStudents: Student[] } {
     const finalAssignments: Seat[] = [];
-    const studentMasterList = [...allStudents];
+    let studentMasterList = JSON.parse(JSON.stringify(allStudents));
 
     // 1. Create sorted queues of students for each exam, largest first
-    const studentQueues = exams.map(exam => 
-        getEligibleStudentsForExam(studentMasterList, exam)
-            .filter(s => !s.isDebarred) // Debarred students don't get a seat
+    let studentQueues = exams.map(exam => ({
+        exam,
+        department: exam.department,
+        students: getEligibleStudentsForExam(studentMasterList, exam)
+            .filter(s => !s.isDebarred)
             .map(s => ({ ...s, exam })) // Tag student with their exam
             .sort((a, b) => a.rollNo.localeCompare(b.rollNo))
-    ).sort((a, b) => b.length - a.length); // Sort queues by size, descending
+    })).sort((a, b) => b.students.length - a.students.length);
 
-    // 2. Filter and sort available classrooms (largest first is more efficient)
+    // 2. Filter and sort available classrooms (largest first)
     const availableClassrooms = classrooms
         .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
         .sort((a, b) => b.capacity - a.capacity);
 
-    // 3. Fill classrooms one by one, efficiently mixing students
-    let currentQueueIndex = 0;
+    // 3. Process classrooms one by one
     for (const room of availableClassrooms) {
-        if (studentQueues.every(q => q.length === 0)) {
+        if (studentQueues.every(q => q.students.length === 0)) {
             break; // All students seated
         }
 
+        // 4. Pair courses for the current room
+        const primaryQueue = studentQueues.find(q => q.students.length > 0);
+        if (!primaryQueue) continue; // No more students to seat
+
+        const secondaryQueue = studentQueues.find(q => q.students.length > 0 && q.department !== primaryQueue.department);
+        
         let seatIndex = 0;
-        // Iterate through each bench in the classroom
+        
+        // Iterate through benches
         for (const benchCapacity of room.benchCapacities) {
-            for (let seatOnBench = 0; seatOnBench < benchCapacity; seatOnBench++) {
-                 if (studentQueues.every(q => q.length === 0)) break;
+            if (benchCapacity >= 2 && primaryQueue.students.length > 0 && secondaryQueue && secondaryQueue.students.length > 0) {
+                // --- PAIRING LOGIC ---
+                // Left Side
+                const studentA = primaryQueue.students.shift();
+                if (studentA) {
+                    finalAssignments.push({ student: studentA, classroom: room, seatNumber: seatIndex + 1 });
+                }
                 
-                // Find the next non-empty queue to pull a student from
-                let studentToSeat = null;
-                let attempts = 0;
-                while (!studentToSeat && attempts < studentQueues.length) {
-                    const queue = studentQueues[currentQueueIndex];
-                    if (queue && queue.length > 0) {
-                        studentToSeat = queue.shift()!; // Take student from the front of the queue
-                    }
-                    // Cycle to the next queue for the next seat
-                    currentQueueIndex = (currentQueueIndex + 1) % studentQueues.length;
-                    attempts++;
+                // Right Side
+                const studentB = secondaryQueue.students.shift();
+                if (studentB) {
+                    finalAssignments.push({ student: studentB, classroom: room, seatNumber: seatIndex + 2 });
                 }
+                seatIndex += benchCapacity;
 
-                if (studentToSeat) {
-                    const seatNumber = seatIndex + 1;
-                    const newAssignment = { classroomId: room.id, seatNumber };
-
-                    // Update master list
-                    const masterListIndex = studentMasterList.findIndex(s => s.id === studentToSeat!.id);
-                    if (masterListIndex !== -1) {
-                        studentMasterList[masterListIndex].seatAssignment = newAssignment;
+            } else {
+                 // --- SINGLE FILE LOGIC ---
+                 // If no secondary queue or bench capacity is 1, fill with primary queue
+                 for(let i=0; i < benchCapacity; i++){
+                    const student = primaryQueue.students.shift();
+                    if(student) {
+                        finalAssignments.push({ student: student, classroom: room, seatNumber: seatIndex + 1 });
                     }
-
-                    // Add to final plan
-                    finalAssignments.push({
-                        student: studentToSeat,
-                        classroom: room,
-                        seatNumber,
-                    });
-                }
-                seatIndex++;
+                    seatIndex++;
+                 }
             }
+
+            if (primaryQueue.students.length === 0 && (!secondaryQueue || secondaryQueue.students.length === 0)) {
+                 break; // Both queues are empty
+            }
+             // Filter out empty queues for the next room
+            studentQueues = studentQueues.filter(q => q.students.length > 0);
         }
     }
     
+    // Update master list with seat assignments
+    finalAssignments.forEach(assignment => {
+        if (assignment.student) {
+            const masterListIndex = studentMasterList.findIndex((s: Student) => s.id === assignment.student!.id);
+            if (masterListIndex !== -1) {
+                studentMasterList[masterListIndex].seatAssignment = {
+                    classroomId: assignment.classroom.id,
+                    seatNumber: assignment.seatNumber,
+                };
+            }
+        }
+    });
+
     const plan: SeatPlan = {
         exam: exams.length > 1 ? exams : exams[0],
         assignments: finalAssignments.sort((a, b) => {
@@ -174,3 +192,4 @@ export function assignInvigilators(
     }
     return { assignments, updatedInvigilators: invigilatorMasterList };
 }
+
