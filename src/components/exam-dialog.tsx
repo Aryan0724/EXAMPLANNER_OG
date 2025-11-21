@@ -34,18 +34,20 @@ interface ExamDialogProps {
   exam: ExamSlot | null;
   departments: string[];
   coursesByDept: Record<string, string[]>;
+  defaultDepartment?: string;
+  defaultCourse?: string;
 }
 
-export function ExamDialog({ isOpen, onClose, onSave, exam, departments, coursesByDept }: ExamDialogProps) {
-  const { register, handleSubmit, control, watch, reset, formState: { errors } } = useForm<ExamFormValues>({
+export function ExamDialog({ isOpen, onClose, onSave, exam, departments, coursesByDept, defaultDepartment, defaultCourse }: ExamDialogProps) {
+  const { register, handleSubmit, control, watch, reset, setValue, formState: { errors } } = useForm<ExamFormValues>({
     resolver: zodResolver(examSchema),
     defaultValues: {
       date: '',
       time: '',
       subjectName: '',
       subjectCode: '',
-      department: '',
-      course: '',
+      department: defaultDepartment || '',
+      course: defaultCourse || '',
       semester: 1,
       duration: 90,
       group: '',
@@ -55,25 +57,34 @@ export function ExamDialog({ isOpen, onClose, onSave, exam, departments, courses
   const selectedDepartment = watch('department');
 
   useEffect(() => {
-    if (exam) {
-      reset({
-        ...exam,
-        group: exam.group || '',
-      });
-    } else {
-      reset({
-        date: '',
-        time: '',
-        subjectName: '',
-        subjectCode: '',
-        department: '',
-        course: '',
-        semester: 1,
-        duration: 90,
-        group: '',
-      });
+    if (isOpen) {
+      if (exam) {
+        reset({
+          ...exam,
+          group: exam.group || '',
+        });
+      } else {
+        reset({
+          date: '',
+          time: '',
+          subjectName: '',
+          subjectCode: '',
+          department: defaultDepartment || '',
+          course: defaultCourse || '',
+          semester: 1,
+          duration: 90,
+          group: '',
+        });
+      }
     }
-  }, [exam, reset, isOpen]);
+  }, [exam, reset, isOpen, defaultDepartment, defaultCourse]);
+  
+  useEffect(() => {
+      // When the department changes, reset the course if it's not valid for the new dept
+      if (selectedDepartment && !coursesByDept[selectedDepartment]?.includes(watch('course'))) {
+          setValue('course', '');
+      }
+  }, [selectedDepartment, coursesByDept, watch, setValue]);
 
   const onSubmit = (data: ExamFormValues) => {
     const examData: ExamSlot = {
@@ -88,9 +99,9 @@ export function ExamDialog({ isOpen, onClose, onSave, exam, departments, courses
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{exam ? 'Edit Exam' : 'Add New Exam'}</DialogTitle>
+          <DialogTitle>{exam ? 'Edit Subject' : 'Add New Subject'}</DialogTitle>
           <DialogDescription>
-            {exam ? 'Update the details for this exam slot.' : 'Fill in the details for the new exam slot.'}
+            {exam ? 'Update the details for this subject and exam slot.' : 'Fill in the details for the new subject and exam slot.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-4">
@@ -172,7 +183,7 @@ export function ExamDialog({ isOpen, onClose, onSave, exam, departments, courses
                     control={control}
                     name="group"
                     render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
                         <SelectTrigger><SelectValue placeholder="Select Group" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="All">All</SelectItem>
@@ -187,7 +198,7 @@ export function ExamDialog({ isOpen, onClose, onSave, exam, departments, courses
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit">Save Exam</Button>
+          <Button type="submit">Save Subject</Button>
         </DialogFooter>
         </form>
       </DialogContent>
