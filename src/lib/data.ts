@@ -553,10 +553,19 @@ export const generateMockInvigilators = (count = 100): Invigilator[] => {
     return invigilators;
 };
 
+// Function to shuffle an array
+const shuffle = <T>(array: T[]): T[] => {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+};
+
+
 export const generateMockExamSchedule = (): ExamSlot[] => {
-    const schedule: ExamSlot[] = [];
+    let allSubjects: Omit<ExamSlot, 'id' | 'date' | 'time'>[] = [];
     let examIdCounter = 1;
-    let dayOffset = 0;
 
     const courseToDeptMap: Record<string, string> = {};
     Object.entries(COURSES).forEach(([dept, courseList]) => {
@@ -570,22 +579,13 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
         
         const courseSemesters = SUBJECTS_BY_COURSE[courseName as keyof typeof SUBJECTS_BY_COURSE];
         const department = courseToDeptMap[courseName] || 'Allied Sciences';
-        if (!department) continue;
 
         for (const semester in courseSemesters) {
              if (!Object.prototype.hasOwnProperty.call(courseSemesters, semester)) continue;
             const subjects = courseSemesters[semester as keyof typeof courseSemesters];
             
             for (const subject of subjects) {
-                const date = new Date();
-                date.setDate(date.getDate() + dayOffset);
-                const dateString = date.toISOString().split('T')[0];
-                const time = (examIdCounter % 2 === 0) ? '14:00' : '09:30';
-
-                schedule.push({
-                    id: `E${String(examIdCounter).padStart(4, '0')}`,
-                    date: dateString,
-                    time: time,
+                allSubjects.push({
                     course: courseName,
                     department: department,
                     semester: parseInt(semester, 10),
@@ -594,11 +594,6 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
                     duration: 180,
                     group: Math.random() > 0.8 ? (Math.random() > 0.5 ? 'A' : 'B') : undefined,
                 });
-
-                examIdCounter++;
-                if (examIdCounter % 15 === 0) { // Spread exams more
-                    dayOffset++;
-                }
             }
         }
     }
@@ -612,34 +607,56 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
         if (!department) continue;
         
         for (const subject of commonSubjects) {
-             const date = new Date();
-             date.setDate(date.getDate() + dayOffset);
-             const dateString = date.toISOString().split('T')[0];
-             const time = (examIdCounter % 2 === 0) ? '14:00' : '09:30';
-
-             // Check if this common subject is already in the schedule for this course's semester 1
-             const alreadyExists = schedule.some(s => s.course === courseName && s.semester === 1 && s.subjectCode === subject.subject_code);
-
+             const alreadyExists = allSubjects.some(s => s.course === courseName && s.semester === 1 && s.subjectCode === subject.subject_code);
              if (!alreadyExists) {
-                 schedule.push({
-                        id: `E${String(examIdCounter).padStart(4, '0')}`,
-                        date: dateString,
-                        time: time,
-                        course: courseName,
-                        department: department,
-                        semester: 1,
-                        subjectName: subject.subject_name,
-                        subjectCode: subject.subject_code,
-                        duration: 120,
-                    });
-                examIdCounter++;
+                 allSubjects.push({
+                    course: courseName,
+                    department: department,
+                    semester: 1,
+                    subjectName: subject.subject_name,
+                    subjectCode: subject.subject_code,
+                    duration: 120,
+                });
              }
         }
-         dayOffset++;
+    }
+
+    // Shuffle all subjects to create realistic concurrent exams
+    const shuffledSubjects = shuffle(allSubjects);
+    
+    const schedule: ExamSlot[] = [];
+    let dayOffset = 0;
+    let examsToday = 0;
+    const examsPerSession = 5; 
+    const maxExamsPerDay = 10; 
+
+    for(let i = 0; i < shuffledSubjects.length; i++) {
+        const subject = shuffledSubjects[i];
+        
+        if (examsToday >= maxExamsPerDay) {
+            dayOffset++;
+            examsToday = 0;
+        }
+
+        const date = new Date();
+        date.setDate(date.getDate() + dayOffset);
+        const dateString = date.toISOString().split('T')[0];
+        
+        // Alternate between morning and afternoon
+        const time = (examsToday < examsPerSession) ? '09:30' : '14:00';
+        
+        schedule.push({
+            id: `E${String(examIdCounter++).padStart(4, '0')}`,
+            date: dateString,
+            time: time,
+            ...subject,
+        });
+
+        examsToday++;
     }
 
 
-    return schedule;
+    return schedule.sort((a,b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
 };
 
 
