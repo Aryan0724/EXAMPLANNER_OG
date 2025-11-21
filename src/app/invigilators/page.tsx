@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCheck, Search, CalendarOff, History, MoreHorizontal } from 'lucide-react';
+import { UserCheck, Search, CalendarOff, History } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,6 @@ import { Invigilator } from '@/lib/types';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { toast } from '@/hooks/use-toast';
 import { DataContext } from '@/context/DataContext';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function InvigilatorsPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,25 +162,15 @@ export default function InvigilatorsPage() {
                                   inv.isAvailable ? <Badge variant="secondary">Available</Badge> : <Badge variant="outline">Generally Unavailable</Badge>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="h-8 w-8 p-0">
-                                      <span className="sr-only">Open menu</span>
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleViewHistory(inv.id)}>
-                                      <History className="mr-2 h-4 w-4" />
-                                      View History
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => openDialog(inv)}>
-                                      <CalendarOff className="mr-2 h-4 w-4" />
-                                      Manage Availability
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                              <TableCell className="text-right space-x-2">
+                                <Button variant="outline" size="sm" onClick={() => handleViewHistory(inv.id)}>
+                                  <History className="mr-2 h-3 w-3" />
+                                  History
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => openDialog(inv)}>
+                                  <CalendarOff className="mr-2 h-3 w-3" />
+                                  Availability
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))}
