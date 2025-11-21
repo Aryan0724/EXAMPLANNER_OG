@@ -62,44 +62,39 @@ export function generateSeatPlan(
     for (const room of availableClassrooms) {
         if (studentQueues.every(q => q.students.length === 0)) break; // All students seated
 
-        const assignmentsForThisRoom: Seat[] = [];
-        let seatCounter = 0;
-        
-        // Find the best pair of departments for this room
-        studentQueues.sort((a, b) => b.students.length - a.students.length);
-        const queueA = studentQueues[0];
-        const queueB = studentQueues.find(q => q.department !== queueA?.department);
+        // Identify the top 2 departments with the most students remaining
+        const sortedQueues = studentQueues.sort((a, b) => b.students.length - a.students.length);
+        const queueA = sortedQueues[0];
+        const queueB = sortedQueues.find(q => q.department !== queueA?.department);
 
         const queuesForRoom = [queueA, queueB].filter(Boolean);
+        if (queuesForRoom.length === 0) continue;
+
+        const assignmentsForThisRoom: Seat[] = [];
         
         // Create an empty seating grid for the classroom
         const roomGrid: ((Student & { exam: ExamSlot }) | null)[] = Array(room.capacity).fill(null);
+        let seatCounter = 0;
 
         // Assign students column by column
         for (let c = 0; c < room.columns; c++) {
-            // Alternate which queue is assigned to the column
-            const currentQueue = c % 2 === 0 ? queuesForRoom[0] : (queuesForRoom[1] || queuesForRoom[0]);
-            if (!currentQueue) continue;
-            
             for (let r = 0; r < room.rows; r++) {
                  const benchIndexInGrid = r * room.columns + c;
-                 const benchCapacityForThisCol = room.benchCapacities.filter((_, idx) => idx % room.columns === c).length > r ? 1 : 0;
-                 if (benchCapacityForThisCol === 0) continue;
+                 const seatsInBench = room.benchCapacities[benchIndexInGrid];
 
+                 for (let s = 0; s < seatsInBench; s++) {
+                     if (seatCounter >= room.capacity) continue;
 
-                 const seatIndex = getSeatIndex(r, c, room.rows);
-                 
-                 // If the target seat is already filled, find the next available one in this column
-                 let actualSeatIndex = seatIndex;
-                 while(roomGrid[actualSeatIndex] && actualSeatIndex < room.capacity) {
-                     actualSeatIndex++;
-                 }
-
-                 if (actualSeatIndex < room.capacity && !roomGrid[actualSeatIndex] && currentQueue.students.length > 0) {
-                     const student = currentQueue.students.shift();
-                     if (student) {
-                         roomGrid[actualSeatIndex] = student;
+                     // Alternate which queue is assigned based on the column
+                     const currentQueue = c % 2 === 0 ? queuesForRoom[0] : (queuesForRoom[1] || queuesForRoom[0]);
+                     
+                     if (currentQueue && currentQueue.students.length > 0) {
+                         const student = currentQueue.students.shift();
+                         if (student) {
+                             roomGrid[seatCounter] = student;
+                         }
                      }
+                     seatCounter++;
                  }
             }
         }

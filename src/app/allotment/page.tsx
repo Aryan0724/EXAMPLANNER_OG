@@ -1,14 +1,14 @@
 
 'use client';
 
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useMemo } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
@@ -222,6 +222,24 @@ export default function AllotmentPage() {
   const currentExams = seatPlan?.exam ? (Array.isArray(seatPlan.exam) ? seatPlan.exam : [seatPlan.exam]) : (examSlotsByTime[selectedSlotKey!] || []);
   const representativeExam = currentExams[0];
 
+  const rollNumberRanges = useMemo(() => {
+    if (!selectedClassroom || !seatPlan) return {};
+    
+    const studentsInRoom = seatPlan.assignments
+        .filter(a => a.classroom.id === selectedClassroom.id && a.student)
+        .map(a => a.student!);
+        
+    return studentsInRoom.reduce((acc, student) => {
+        const subjectCode = student.exam.subjectCode;
+        if (!acc[subjectCode]) {
+            acc[subjectCode] = { min: student.rollNo, max: student.rollNo, count: 0 };
+        }
+        acc[subjectCode].max = student.rollNo;
+        acc[subjectCode].count += 1;
+        return acc;
+    }, {} as Record<string, {min: string, max: string, count: number}>);
+  }, [selectedClassroom, seatPlan]);
+
   return (
     <>
       <SidebarProvider>
@@ -310,6 +328,20 @@ export default function AllotmentPage() {
                                     <UserCheck className="w-4 h-4" /> Invigilator(s): <span className="font-semibold text-foreground">{invigilatorsForClassroom.map(i => i.name).join(', ')}</span>
                                   </p>
                                 </div>
+                                {Object.keys(rollNumberRanges).length > 0 && (
+                                  <Card className="mb-4 bg-muted/50">
+                                    <CardHeader className="p-4">
+                                      <CardTitle className="text-base flex items-center gap-2"><Info className="w-4 h-4" />Student Summary</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-4 pt-0 text-sm">
+                                      {Object.entries(rollNumberRanges).map(([subjectCode, range]) => (
+                                        <div key={subjectCode}>
+                                          <span className="font-semibold">{subjectCode}:</span> {range.count} student(s) from <span className="font-mono">{range.min}</span> to <span className="font-mono">{range.max}</span>
+                                        </div>
+                                      ))}
+                                    </CardContent>
+                                  </Card>
+                                )}
                                 <ClassroomVisualizer
                                     classroom={selectedClassroom}
                                     assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}

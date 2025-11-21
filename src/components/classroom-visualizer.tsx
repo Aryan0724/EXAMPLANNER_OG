@@ -74,7 +74,7 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
   return (
     <TooltipProvider>
       <div
-        className="grid gap-3 p-4 rounded-lg border bg-muted/20"
+        className="grid gap-2 p-2 rounded-lg border bg-muted/20"
         style={{
           gridTemplateColumns: `repeat(${classroom.columns}, minmax(0, 1fr))`,
           justifyContent: 'center',
@@ -89,24 +89,22 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
               return (
                 <div
                   key={`bench-${benchIndex}`}
-                  className="flex items-center justify-center gap-1 p-2 rounded-md bg-background border shadow-sm"
+                  className="flex flex-wrap items-center justify-center gap-1 p-1 rounded-md bg-background border shadow-sm"
                 >
                   {Array.from({ length: benchCapacity }).map((__, seatInBench) => {
                      // This part needs to find the right student from the assignments list
-                     const seat = assignments.find(a => {
-                       // This mapping logic needs to be perfect and match the planning logic
-                       // For column-wise filling:
-                       const targetSeatNumber = c * classroom.rows * (benchCapacity / classroom.columns) + r * benchCapacity + seatInBench + 1; // Simplified example
-                       // The real logic is more complex and must mirror planning.ts
-                       // For now, let's find the Nth student in this column.
-                       const studentForThisSeat = assignments.filter(a => (Math.floor((a.seatNumber -1) / classroom.rows)) % classroom.columns === c)[r];
-                       return a.seatNumber === studentForThisSeat?.seatNumber
-                     });
+                     // The real logic is more complex and must mirror planning.ts
+                     // For now, let's find the Nth student in this column.
+                     const seatIndexInColumn = assignments
+                        .filter(a => a.classroom.id === classroom.id)
+                        .findIndex(a => {
+                           const studentIndexInColumn = r; // simplified
+                           return true; // placeholder
+                        });
+                     
                      // TEMPORARY LOGIC: Find Nth seat in the assignments for this room
                      const seatsInThisRoom = assignments.filter(a => a.classroom.id === classroom.id);
-                     const seatIndexInColumn = r;
-                     // This is still not quite right. A better way is to construct the grid here.
-                      const seatToShow = seatsInThisRoom[c * classroom.rows + r + seatInBench];
+                     const seatToShow = seatsInThisRoom[c * classroom.rows + r + seatInBench];
                      if (!seatToShow) return null;
 
 
@@ -116,25 +114,25 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
                         <TooltipTrigger asChild>
                           <div
                             className={cn(
-                              "flex flex-col items-center justify-center w-24 h-16 rounded-md border-2 text-center p-1 shrink-0",
+                              "flex flex-col items-center justify-center w-20 h-14 rounded-md border text-center p-1 shrink-0",
                               seatToShow.student ? 'bg-primary/5' : 'border-dashed border-muted-foreground/50',
                               seatToShow.isDebarredSeat && 'border-destructive bg-destructive/10'
                             )}
                             style={{ borderColor: seatToShow.student && seatColor ? seatColor : undefined }}
                           >
                             {seatToShow.student ? (
-                                <User className="w-5 h-5 text-primary" />
+                                <User className="w-4 h-4 text-primary" />
                             ) : (
                               seatToShow.isDebarredSeat ? (
-                                <Ban className="w-5 h-5 text-destructive" />
+                                <Ban className="w-4 h-4 text-destructive" />
                               ) : (
-                                <div className="w-5 h-5" />
+                                <div className="w-4 h-4" />
                               )
                             )}
-                            <span className="text-xs text-foreground font-medium truncate w-full">
+                            <span className="text-[10px] text-foreground font-medium truncate w-full">
                               {seatToShow.student ? seatToShow.student.name : (seatToShow.isDebarredSeat ? 'Debarred' : `Seat ${seatToShow.seatNumber}`)}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[9px] text-muted-foreground">
                                 {seatToShow.student ? seatToShow.student.rollNo : ''}
                             </span>
                           </div>
