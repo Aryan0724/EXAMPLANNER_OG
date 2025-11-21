@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { DataContext } from '@/context/DataContext';
+import { AllotmentContext } from '@/context/AllotmentContext';
 import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { generateMasterReport } from '@/lib/report-generator';
 
 
 const ImportItem = ({ title, format }: { title: string, format: string[] }) => {
@@ -51,14 +53,9 @@ const ImportItem = ({ title, format }: { title: string, format: string[] }) => {
 
 export default function ImportExportPage() {
   const { toast } = useToast();
-  const { setStudents, setClassrooms, setInvigilators, setExamSchedule } = useContext(DataContext);
+  const { setStudents, setClassrooms, setInvigilators, setExamSchedule, students, classrooms, invigilators } = useContext(DataContext);
+  const { fullAllotment } = useContext(AllotmentContext);
 
-  const handleExport = (reportName: string) => {
-    toast({
-      title: `Generating ${reportName} Report...`,
-      description: "This is a mock-up. In a real app, a file would be downloaded.",
-    });
-  };
 
   const handlePopulateMockData = () => {
     setStudents(generateMockStudents());
@@ -81,6 +78,32 @@ export default function ImportExportPage() {
       description: 'All master data has been removed from the application.',
       variant: 'destructive',
     });
+  };
+
+  const handleExportMasterReport = () => {
+    if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'No Allotment Data',
+            description: 'Please generate a full allotment from the Schedule page before exporting a report.',
+        });
+        return;
+    }
+    
+    try {
+        generateMasterReport(fullAllotment, students, classrooms, invigilators);
+        toast({
+            title: 'Report Generated',
+            description: 'The master invigilation report has been downloaded.',
+        });
+    } catch (error) {
+        console.error("Failed to generate report:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Export Failed',
+            description: 'There was an error generating the report. Check the console for details.',
+        });
+    }
   };
 
   return (
@@ -168,25 +191,17 @@ export default function ImportExportPage() {
                     <CardDescription>Export detailed reports and logs from the generated allotment data in various formats.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <Button variant="secondary" onClick={() => handleExport('Seat Plan (Excel)')}>
+                    <Button onClick={handleExportMasterReport}>
                       <FileDown className="mr-2 h-4 w-4" />
-                      Seat Plan (Excel)
+                      Generate Master Report (Excel)
                     </Button>
-                    <Button variant="secondary" onClick={() => handleExport('Student List (CSV)')}>
+                    <Button variant="secondary" disabled>
                       <FileDown className="mr-2 h-4 w-4" />
                       Student List (CSV)
                     </Button>
-                    <Button variant="secondary" onClick={() => handleExport('Invigilator Duty (Excel)')}>
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Invigilator Duty (Excel)
-                    </Button>
-                     <Button variant="secondary" onClick={() => handleExport('Admit Cards (PDF)')}>
+                    <Button variant="secondary" disabled>
                       <FileDown className="mr-2 h-4 w-4" />
                       Admit Cards (PDF)
-                    </Button>
-                     <Button variant="secondary" className="text-destructive-foreground bg-destructive/90 hover:bg-destructive" onClick={() => handleExport('Conflict Log (Excel)')}>
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Conflict Log (Excel)
                     </Button>
                   </CardContent>
                 </Card>
