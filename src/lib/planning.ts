@@ -39,181 +39,57 @@ export function generateSeatPlan(
     let finalAssignments: Seat[] = [];
     const studentMasterList = [...allStudents];
     
-    const assignedSeatsByLocation: Map<string, Seat> = new Map();
-
-    const studentsNeedingSeats = new Map<string, (Student & { exam: ExamSlot })[]>();
-    
-    // 1. Pre-process students: handle permanent seats and queue up others
+    // 1. Get all students needing a seat for this session, sorted by roll number
+    const studentsNeedingSeats: (Student & { exam: ExamSlot })[] = [];
     for (const exam of exams) {
         const studentPoolForExam = getEligibleStudentsForExam(studentMasterList, exam)
-            .map(s => ({ ...s, exam: exam }))
-            .sort((a, b) => a.rollNo.localeCompare(b.rollNo));
+            .map(s => ({ ...s, exam })) // Tag each student with their exam
+            .filter(s => !s.isDebarred); // Debarred students don't get a seat
 
-        for (const student of studentPoolForExam) {
-            // Handle permanent seat assignments first
-            if (student.seatAssignment) {
-                const { classroomId, seatNumber } = student.seatAssignment;
-                const classroom = classrooms.find(c => c.id === classroomId);
-                if (classroom) {
-                    const key = `${classroomId}-${seatNumber}`;
-                    // The seat is reserved. If student is debarred, mark it but leave student null.
-                    const seat: Seat = {
-                        student: student.isDebarred ? null : student,
-                        isDebarredSeat: student.isDebarred,
-                        classroom,
-                        seatNumber
-                    };
-                    if (!assignedSeatsByLocation.has(key)) {
-                        finalAssignments.push(seat);
-                        assignedSeatsByLocation.set(key, seat);
-                    }
-                }
-            } else if (student.isDebarred) {
-                // This debarred student has no fixed seat, so they don't get one.
-                // We don't add them to the seating queue.
-                // Their status is known, but they don't occupy a seat in the plan.
-                continue;
-            }
-            else {
-                // If student has no fixed seat and is not debarred, add to queue.
-                const subjectKey = `${student.exam.subjectCode}-${student.exam.course}`;
-                if (!studentsNeedingSeats.has(subjectKey)) {
-                    studentsNeedingSeats.set(subjectKey, []);
-                }
-                studentsNeedingSeats.get(subjectKey)?.push(student);
-            }
-        }
+        studentsNeedingSeats.push(...studentPoolForExam);
     }
+    // Sort all students for this session by roll number
+    studentsNeedingSeats.sort((a, b) => a.rollNo.localeCompare(b.rollNo));
 
-    // 2. Group the queues of students by department for strategic pairing.
-    const queuesByDept = new Map<string, (Student & { exam: ExamSlot })[][]>();
-    for (const queue of studentsNeedingSeats.values()) {
-        if (queue.length > 0) {
-            const dept = queue[0].department;
-            if (!queuesByDept.has(dept)) {
-                queuesByDept.set(dept, []);
-            }
-            queuesByDept.get(dept)?.push(queue);
-        }
-    }
-    
-    // Convert map to array and sort departments to have a consistent order
-    const departmentGroups = Array.from(queuesByDept.values()).sort((a,b) => b.flat().length - a.flat().length);
-
-    const pairedQueues: ((Student & { exam: ExamSlot })[])[][] = [];
-    
-    // 3. Create pairs of course queues from DIFFERENT departments.
-    while (departmentGroups.length > 1) {
-        const group1 = departmentGroups[0];
-        const group2 = departmentGroups[departmentGroups.length - 1]; // Pair first with last
-        
-        const courseQueue1 = group1.shift();
-        const courseQueue2 = group2.shift();
-
-        if (courseQueue1 && courseQueue2) {
-             pairedQueues.push([courseQueue1, courseQueue2]);
-        } else if (courseQueue1) {
-             group1.unshift(courseQueue1); // Put it back if its partner is missing
-        } else if (courseQueue2) {
-             group2.unshift(courseQueue2); // Put it back
-        }
-
-        // Clean up empty department groups
-        if (group1.length === 0) departmentGroups.shift();
-        if (group2.length === 0) departmentGroups.pop();
-    }
-
-    // Add any remaining single-department course queues
-    if (departmentGroups.length > 0) {
-        for(const queue of departmentGroups[0]) {
-            pairedQueues.push([queue]);
-        }
-    }
-
-
-    // 4. Filter available classrooms
-    const availableClassrooms = [...classrooms]
+    // 2. Filter and sort available classrooms (largest first is more efficient)
+    const availableClassrooms = classrooms
         .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
-        .sort((a, b) => a.capacity - b.capacity); // Start with smaller rooms
+        .sort((a, b) => b.capacity - a.capacity);
 
-    // 5. Assign paired students to classrooms
-    let currentClassroomIndex = 0;
-    
-    for (const pair of pairedQueues) {
-        const queue1 = pair[0] || [];
-        const queue2 = pair[1] || [];
-        
-        while (queue1.length > 0 || (queue2 && queue2.length > 0)) {
-            if (currentClassroomIndex >= availableClassrooms.length) break; 
-            const room = availableClassrooms[currentClassroomIndex];
+    // 3. Fill classrooms one by one
+    let studentIndex = 0;
+    for (const room of availableClassrooms) {
+        if (studentIndex >= studentsNeedingSeats.length) {
+            break; // All students have been seated
+        }
+
+        const seatsInRoom = room.capacity;
+        let seatsFilled = 0;
+
+        // Iterate through each seat in the current classroom
+        for (let i = 0; i < seatsInRoom && studentIndex < studentsNeedingSeats.length; i++) {
+            const student = studentsNeedingSeats[studentIndex];
+            const seatNumber = i + 1;
+
+            const newAssignment = { classroomId: room.id, seatNumber };
             
-            let filledSeatsInRoom = false;
-
-            // Iterate column by column, then row by row to fill seats
-            for (let col = 0; col < room.columns; col++) {
-                for (let row = 0; row < room.rows; row++) {
-                    const benchIndex = row * room.columns + col;
-                    const benchCapacity = room.benchCapacities[benchIndex] || 2; // Assuming 2-seaters mainly
-
-                    // Seat on the left side of the bench
-                    const seatNumberA = benchIndex * 2 + 1;
-                    const keyA = `${room.id}-${seatNumberA}`;
-                    
-                    if (!assignedSeatsByLocation.has(keyA)) {
-                        const studentToPlace = queue1.shift();
-                        if (studentToPlace) {
-                             const newAssignment = { classroomId: room.id, seatNumber: seatNumberA };
-                            studentToPlace.seatAssignment = newAssignment;
-                            
-                            const studentIndexInMaster = studentMasterList.findIndex(s => s.id === studentToPlace.id);
-                            if(studentIndexInMaster !== -1) {
-                                studentMasterList[studentIndexInMaster].seatAssignment = newAssignment;
-                            }
-
-                            const newSeat: Seat = { student: studentToPlace, classroom: room, seatNumber: seatNumberA };
-                            finalAssignments.push(newSeat);
-                            assignedSeatsByLocation.set(keyA, newSeat);
-                            filledSeatsInRoom = true;
-                        }
-                    }
-
-                    // Seat on the right side of the bench
-                    if (benchCapacity > 1) {
-                        const seatNumberB = benchIndex * 2 + 2;
-                        const keyB = `${room.id}-${seatNumberB}`;
-                        if (!assignedSeatsByLocation.has(keyB)) {
-                             const studentToPlace = queue2 ? queue2.shift() : undefined;
-                             if (studentToPlace) {
-                                const newAssignment = { classroomId: room.id, seatNumber: seatNumberB };
-                                studentToPlace.seatAssignment = newAssignment;
-
-                                 const studentIndexInMaster = studentMasterList.findIndex(s => s.id === studentToPlace.id);
-                                if(studentIndexInMaster !== -1) {
-                                    studentMasterList[studentIndexInMaster].seatAssignment = newAssignment;
-                                }
-
-                                const newSeat: Seat = { student: studentToPlace, classroom: room, seatNumber: seatNumberB };
-                                finalAssignments.push(newSeat);
-                                assignedSeatsByLocation.set(keyB, newSeat);
-                                filledSeatsInRoom = true;
-                            }
-                        }
-                    }
-                }
+            // Update the master list of students with their new assignment
+            const masterListIndex = studentMasterList.findIndex(s => s.id === student.id);
+            if (masterListIndex !== -1) {
+                studentMasterList[masterListIndex].seatAssignment = newAssignment;
             }
 
-            if (filledSeatsInRoom) {
-                currentClassroomIndex++;
-            } else if (queue1.length > 0 || (queue2 && queue2.length > 0)) {
-                // If we didn't fill seats but students remain, it means the current room is full.
-                currentClassroomIndex++;
-            } else {
-                 break;
-            }
+            finalAssignments.push({
+                student,
+                classroom: room,
+                seatNumber,
+            });
+
+            studentIndex++;
+            seatsFilled++;
         }
     }
-
-
+    
     const plan: SeatPlan = {
         exam: exams.length > 1 ? exams : exams[0],
         assignments: finalAssignments.sort((a, b) => {
@@ -234,56 +110,42 @@ export function assignInvigilators(
 ): { assignments: InvigilatorAssignment[], updatedInvigilators: Invigilator[] } {
     const invigilatorMasterList = [...invigilators];
 
-    const examDate = new Date(exam.date);
-    const prevDate = new Date(examDate);
-    prevDate.setDate(examDate.getDate() - 1);
-    const prevDateString = prevDate.toISOString().split('T')[0];
-
+    // Filter invigilators who are generally available and not specifically unavailable for this slot
     let availablePool = invigilatorMasterList.filter(i => 
         i.isAvailable && 
         !i.unavailableSlots.some(slot => slot.slotId === exam.id)
     );
 
-    // Prioritize those who didn't work yesterday
-    const primaryPool = availablePool.filter(i => !i.assignedDuties.some(d => d.date === prevDateString));
-    const secondaryPool = availablePool.filter(i => i.assignedDuties.some(d => d.date === prevDateString));
-    
-    // Sort each pool by fewest duties today
-    const sortByDuties = (a: Invigilator, b: Invigilator) => {
-        const aDutiesToday = a.assignedDuties.find(d => d.date === exam.date)?.count || 0;
-        const bDutiesToday = b.assignedDuties.find(d => d.date === exam.date)?.count || 0;
-        return aDutiesToday - bDutiesToday;
-    };
-    
-    primaryPool.sort(sortByDuties);
-    secondaryPool.sort(sortByDuties);
-
-    const finalPool = [...primaryPool, ...secondaryPool];
+    // Sort the pool to prioritize those with the fewest total duties
+    // This is the key change for balanced duty allocation over the whole schedule
+    availablePool.sort((a, b) => {
+        const aTotalDuties = a.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
+        const bTotalDuties = b.assignedDuties.reduce((sum, duty) => sum + duty.count, 0);
+        return aTotalDuties - bTotalDuties;
+    });
 
     const assignments: InvigilatorAssignment[] = [];
-    let invigilatorIndex = 0;
+    const assignedInThisSession = new Set<string>();
 
     for (const room of classroomsInUse) {
-        const requiredInvigilators = room.capacity > 30 ? 2 : 1;
+        const requiredInvigilators = room.capacity > 40 ? 2 : 1; // e.g. 2 invigilators for rooms with >40 capacity
 
         for (let i = 0; i < requiredInvigilators; i++) {
-            if (finalPool.length > 0) {
-                // Ensure we don't assign the same invigilator twice to the same room in one go
-                let invigilator = finalPool[invigilatorIndex % finalPool.length];
-                let loopGuard = 0;
-                while(assignments.some(a => a.classroom.id === room.id && a.invigilator.id === invigilator.id) && loopGuard < finalPool.length) {
-                    invigilatorIndex++;
-                    invigilator = finalPool[invigilatorIndex % finalPool.length];
-                    loopGuard++;
-                }
+            // Find the next available invigilator who hasn't been assigned in this session yet
+            const invigilatorToAssign = availablePool.find(inv => !assignedInThisSession.has(inv.id));
 
+            if (invigilatorToAssign) {
                 assignments.push({
                     exam,
                     classroom: room,
-                    invigilator,
+                    invigilator: invigilatorToAssign,
                 });
                 
-                const invigilatorInMaster = invigilatorMasterList.find(inv => inv.id === invigilator.id);
+                // Mark as assigned for this session to avoid re-assignment to another room
+                assignedInThisSession.add(invigilatorToAssign.id);
+
+                // Update the duty count in the master list
+                const invigilatorInMaster = invigilatorMasterList.find(inv => inv.id === invigilatorToAssign.id);
                 if (invigilatorInMaster) {
                     let dutyRecord = invigilatorInMaster.assignedDuties.find(d => d.date === exam.date);
                     if (dutyRecord) {
@@ -292,13 +154,11 @@ export function assignInvigilators(
                         invigilatorInMaster.assignedDuties.push({ date: exam.date, count: 1 });
                     }
                 }
-                
-                invigilatorIndex++;
-                 // Re-sort the pool if we have rotated through everyone, to re-evaluate duty counts
-                if (invigilatorIndex >= finalPool.length) {
-                    finalPool.sort(sortByDuties);
-                    invigilatorIndex = 0;
-                }
+            } else {
+                // If we run out of invigilators, we might have to re-use them.
+                // For simplicity now, we stop. A more complex system could re-assign.
+                console.warn(`Not enough invigilators for room ${room.id}.`);
+                break;
             }
         }
     }
