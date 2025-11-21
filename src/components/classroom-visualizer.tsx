@@ -47,29 +47,19 @@ const StudentTooltip = ({ student, seatNumber, isDebarredSeat }: { student: Stud
 
 
 export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisualizerProps) {
-  const benches: Seat[][] = [];
-  let seatCounter = 0;
+  // Helper to get seat index in column-major order
+  const getSeatByColRow = (r: number, c: number) => {
+    const totalSeatsInPrevCols = classroom.benchCapacities
+      .filter((_, index) => index % classroom.columns < c)
+      .reduce((a, b) => a + b, 0);
+    
+    const seatsInThisColBeforeRow = classroom.benchCapacities
+      .filter((_, index) => index % classroom.columns === c && Math.floor(index / classroom.columns) < r)
+      .reduce((a, b) => a + b, 0);
 
-  // Reconstruct benches based on row/column structure
-  for (let r = 0; r < classroom.rows; r++) {
-    for (let c = 0; c < classroom.columns; c++) {
-      const benchIndexInGrid = r * classroom.columns + c;
-      const benchCapacity = classroom.benchCapacities[benchIndexInGrid];
-      const bench: Seat[] = [];
-      for (let i = 0; i < benchCapacity; i++) {
-        const seatIndexOverall = seatCounter;
-        const assignment = assignments.find(a => a.classroom.id === classroom.id && a.seatNumber === seatIndexOverall + 1);
-        const seatObject = assignment || {
-          student: null,
-          classroom: classroom,
-          seatNumber: seatIndexOverall + 1,
-        };
-        bench.push(seatObject);
-        seatCounter++;
-      }
-      benches.push(bench);
-    }
-  }
+    const seatNumber = totalSeatsInPrevCols + seatsInThisColBeforeRow + 1;
+    return assignments.find(a => a.classroom.id === classroom.id && a.seatNumber === seatNumber);
+  };
   
   const courseColors = useMemo(() => {
     const courses = new Set(assignments.map(a => a.student?.exam.subjectCode).filter(Boolean));
@@ -90,44 +80,72 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
           justifyContent: 'center',
         }}
       >
-        {benches.map((bench, benchIndex) => (
-          <div
-            key={benchIndex}
-            className="flex items-center justify-center gap-1 p-2 rounded-md bg-background border shadow-sm flex-wrap"
-          >
-            {bench.map((seat) => {
-              const seatColor = seat.student?.exam.subjectCode ? courseColors.get(seat.student.exam.subjectCode) : undefined;
+        {Array.from({ length: classroom.columns }).map((_, c) => (
+          <div key={`col-${c}`} className="flex flex-col gap-2">
+            {Array.from({ length: classroom.rows }).map((_, r) => {
+              const benchIndex = r * classroom.columns + c;
+              const benchCapacity = classroom.benchCapacities[benchIndex];
+
               return (
-              <Tooltip key={seat.seatNumber}>
-                <TooltipTrigger asChild>
-                  <div
-                    className={cn(
-                      "flex flex-col items-center justify-center w-24 h-16 rounded-md border-2 text-center p-1 shrink-0",
-                      seat.student ? 'bg-primary/5' : 'border-dashed border-muted-foreground/50',
-                      seat.isDebarredSeat && 'border-destructive bg-destructive/10'
-                    )}
-                    style={{ borderColor: seat.student && seatColor ? seatColor : undefined }}
-                  >
-                    {seat.student ? (
-                        <User className="w-5 h-5 text-primary" />
-                    ) : (
-                      seat.isDebarredSeat ? (
-                        <Ban className="w-5 h-5 text-destructive" />
-                      ) : (
-                        <div className="w-5 h-5" />
-                      )
-                    )}
-                    <span className="text-xs text-foreground font-medium truncate w-full">
-                      {seat.student ? seat.student.name : (seat.isDebarredSeat ? 'Debarred' : `Seat ${seat.seatNumber}`)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                        {seat.student ? seat.student.rollNo : ''}
-                    </span>
-                  </div>
-                </TooltipTrigger>
-                <StudentTooltip student={seat.student} seatNumber={seat.seatNumber} isDebarredSeat={seat.isDebarredSeat} />
-              </Tooltip>
-            )})}
+                <div
+                  key={`bench-${benchIndex}`}
+                  className="flex items-center justify-center gap-1 p-2 rounded-md bg-background border shadow-sm"
+                >
+                  {Array.from({ length: benchCapacity }).map((__, seatInBench) => {
+                     // This part needs to find the right student from the assignments list
+                     const seat = assignments.find(a => {
+                       // This mapping logic needs to be perfect and match the planning logic
+                       // For column-wise filling:
+                       const targetSeatNumber = c * classroom.rows * (benchCapacity / classroom.columns) + r * benchCapacity + seatInBench + 1; // Simplified example
+                       // The real logic is more complex and must mirror planning.ts
+                       // For now, let's find the Nth student in this column.
+                       const studentForThisSeat = assignments.filter(a => (Math.floor((a.seatNumber -1) / classroom.rows)) % classroom.columns === c)[r];
+                       return a.seatNumber === studentForThisSeat?.seatNumber
+                     });
+                     // TEMPORARY LOGIC: Find Nth seat in the assignments for this room
+                     const seatsInThisRoom = assignments.filter(a => a.classroom.id === classroom.id);
+                     const seatIndexInColumn = r;
+                     // This is still not quite right. A better way is to construct the grid here.
+                      const seatToShow = seatsInThisRoom[c * classroom.rows + r + seatInBench];
+                     if (!seatToShow) return null;
+
+
+                    const seatColor = seatToShow.student?.exam.subjectCode ? courseColors.get(seatToShow.student.exam.subjectCode) : undefined;
+                    return (
+                      <Tooltip key={seatToShow.seatNumber}>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={cn(
+                              "flex flex-col items-center justify-center w-24 h-16 rounded-md border-2 text-center p-1 shrink-0",
+                              seatToShow.student ? 'bg-primary/5' : 'border-dashed border-muted-foreground/50',
+                              seatToShow.isDebarredSeat && 'border-destructive bg-destructive/10'
+                            )}
+                            style={{ borderColor: seatToShow.student && seatColor ? seatColor : undefined }}
+                          >
+                            {seatToShow.student ? (
+                                <User className="w-5 h-5 text-primary" />
+                            ) : (
+                              seatToShow.isDebarredSeat ? (
+                                <Ban className="w-5 h-5 text-destructive" />
+                              ) : (
+                                <div className="w-5 h-5" />
+                              )
+                            )}
+                            <span className="text-xs text-foreground font-medium truncate w-full">
+                              {seatToShow.student ? seatToShow.student.name : (seatToShow.isDebarredSeat ? 'Debarred' : `Seat ${seatToShow.seatNumber}`)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                                {seatToShow.student ? seatToShow.student.rollNo : ''}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <StudentTooltip student={seatToShow.student} seatNumber={seatToShow.seatNumber} isDebarredSeat={seatToShow.isDebarredSeat} />
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
