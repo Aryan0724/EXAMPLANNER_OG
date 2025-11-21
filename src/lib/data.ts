@@ -566,11 +566,14 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
     });
     
     for (const courseName in SUBJECTS_BY_COURSE) {
+        if (!Object.prototype.hasOwnProperty.call(SUBJECTS_BY_COURSE, courseName)) continue;
+        
         const courseSemesters = SUBJECTS_BY_COURSE[courseName as keyof typeof SUBJECTS_BY_COURSE];
-        const department = courseToDeptMap[courseName];
+        const department = courseToDeptMap[courseName] || 'Allied Sciences';
         if (!department) continue;
 
         for (const semester in courseSemesters) {
+             if (!Object.prototype.hasOwnProperty.call(courseSemesters, semester)) continue;
             const subjects = courseSemesters[semester as keyof typeof courseSemesters];
             
             for (const subject of subjects) {
