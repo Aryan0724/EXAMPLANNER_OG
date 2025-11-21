@@ -8,7 +8,7 @@ import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sparkles, Loader2, Printer, Building, UserCheck } from 'lucide-react';
+import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
@@ -65,6 +65,7 @@ export default function AllotmentPage() {
       unavailableClassrooms: (Classroom & { reason: string })[];
       unavailableInvigilators: (Invigilator & { reason: string })[];
     } | null>(null);
+  const [showExclusionReport, setShowExclusionReport] = useState(false);
 
   useEffect(() => {
     const newSlotOptions = getSlotOptions(fullAllotment, examSchedule);
@@ -100,7 +101,8 @@ export default function AllotmentPage() {
       setInvigilatorAssignments(newInvigilatorAssignments);
       const firstClassroomId = newSeatPlan.assignments.length > 0 ? newSeatPlan.assignments[0].classroom.id : null;
       setSelectedClassroomId(firstClassroomId);
-      setExcludedData(null); // Data is part of a final plan, no need to show exclusions
+      setExcludedData(null); 
+      setShowExclusionReport(false);
     } else {
        setSeatPlan(null);
        setInvigilatorAssignments(null);
@@ -151,6 +153,7 @@ export default function AllotmentPage() {
 
   const handleSlotChange = (slotKey: string) => {
       setSelectedSlotKey(slotKey);
+      setShowExclusionReport(false); // Hide report on slot change
   };
 
   const handleGeneration = () => {
@@ -244,6 +247,14 @@ export default function AllotmentPage() {
                           </SelectContent>
                         </Select>
                       </div>
+                       <Button 
+                          onClick={() => setShowExclusionReport(!showExclusionReport)} 
+                          variant="outline" 
+                          disabled={!excludedData || fullAllotment || seatPlan}
+                        >
+                          {showExclusionReport ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                          Exclusion Report
+                        </Button>
                       <Button onClick={handleGeneration} disabled={isGenerating || fullAllotment || !selectedSlotKey} className="w-full sm:w-auto">
                         {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                         Generate Plan
@@ -251,7 +262,7 @@ export default function AllotmentPage() {
                     </CardContent>
                   </Card>
 
-                  {excludedData && <ExclusionReport data={excludedData} />}
+                  {showExclusionReport && excludedData && <ExclusionReport data={excludedData} />}
 
                   {seatPlan && (
                     <Card>
