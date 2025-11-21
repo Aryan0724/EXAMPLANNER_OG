@@ -148,29 +148,21 @@ export function generateSeatPlan(
             const room = availableClassrooms[currentClassroomIndex];
             
             let filledSeatsInRoom = false;
-            let roomIsFull = false;
 
-            // Iterate through bench columns in the classroom
+            // Iterate column by column, then row by row to fill seats
             for (let col = 0; col < room.columns; col++) {
-                if (roomIsFull) break;
-
-                // Iterate row by row for this column
                 for (let row = 0; row < room.rows; row++) {
                     const benchIndex = row * room.columns + col;
-                    const benchCapacity = room.benchCapacities[benchIndex] || 2;
+                    const benchCapacity = room.benchCapacities[benchIndex] || 2; // Assuming 2-seaters mainly
 
-                    // This logic is for 2-seater benches as per the core requirement
-                    const seatNumberA = (benchIndex * 2) + 1; // Left seat
-                    const seatNumberB = (benchIndex * 2) + 2; // Right seat
-                    
+                    // Seat on the left side of the bench
+                    const seatNumberA = benchIndex * 2 + 1;
                     const keyA = `${room.id}-${seatNumberA}`;
-                    const keyB = `${room.id}-${seatNumberB}`;
-
-                    // Place student from queue 1 on the left if seat is free
+                    
                     if (!assignedSeatsByLocation.has(keyA)) {
                         const studentToPlace = queue1.shift();
                         if (studentToPlace) {
-                            const newAssignment = { classroomId: room.id, seatNumber: seatNumberA };
+                             const newAssignment = { classroomId: room.id, seatNumber: seatNumberA };
                             studentToPlace.seatAssignment = newAssignment;
                             
                             const studentIndexInMaster = studentMasterList.findIndex(s => s.id === studentToPlace.id);
@@ -185,31 +177,29 @@ export function generateSeatPlan(
                         }
                     }
 
-                    // Place student from queue 2 on the right if seat is free
-                    if (!assignedSeatsByLocation.has(keyB)) {
-                        const studentToPlace = queue2 ? queue2.shift() : undefined;
-                        if (studentToPlace) {
-                            const newAssignment = { classroomId: room.id, seatNumber: seatNumberB };
-                            studentToPlace.seatAssignment = newAssignment;
+                    // Seat on the right side of the bench
+                    if (benchCapacity > 1) {
+                        const seatNumberB = benchIndex * 2 + 2;
+                        const keyB = `${room.id}-${seatNumberB}`;
+                        if (!assignedSeatsByLocation.has(keyB)) {
+                             const studentToPlace = queue2 ? queue2.shift() : undefined;
+                             if (studentToPlace) {
+                                const newAssignment = { classroomId: room.id, seatNumber: seatNumberB };
+                                studentToPlace.seatAssignment = newAssignment;
 
-                             const studentIndexInMaster = studentMasterList.findIndex(s => s.id === studentToPlace.id);
-                            if(studentIndexInMaster !== -1) {
-                                studentMasterList[studentIndexInMaster].seatAssignment = newAssignment;
+                                 const studentIndexInMaster = studentMasterList.findIndex(s => s.id === studentToPlace.id);
+                                if(studentIndexInMaster !== -1) {
+                                    studentMasterList[studentIndexInMaster].seatAssignment = newAssignment;
+                                }
+
+                                const newSeat: Seat = { student: studentToPlace, classroom: room, seatNumber: seatNumberB };
+                                finalAssignments.push(newSeat);
+                                assignedSeatsByLocation.set(keyB, newSeat);
+                                filledSeatsInRoom = true;
                             }
-
-                            const newSeat: Seat = { student: studentToPlace, classroom: room, seatNumber: seatNumberB };
-                            finalAssignments.push(newSeat);
-                            assignedSeatsByLocation.set(keyB, newSeat);
-                            filledSeatsInRoom = true;
                         }
                     }
-
-                    if (finalAssignments.length >= allStudents.length) {
-                       roomIsFull = true;
-                       break;
-                    }
                 }
-                if (roomIsFull) break;
             }
 
             if (filledSeatsInRoom) {
@@ -314,3 +304,4 @@ export function assignInvigilators(
     }
     return { assignments, updatedInvigilators: invigilatorMasterList };
 }
+
