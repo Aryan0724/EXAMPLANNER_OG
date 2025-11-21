@@ -63,41 +63,47 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
       .sort((a, b) => a.seatNumber - b.seatNumber);
   }, [assignments, classroom.id]);
 
-  // Create a grid representation of the classroom
   const grid: (Seat | null)[][] = Array.from({ length: classroom.rows }, () => Array(classroom.columns * 2).fill(null));
 
   let seatIndex = 0;
-  for (let c = 0; c < classroom.columns * 2; c++) {
-      for (let r = 0; r < classroom.rows; r++) {
-          if (seatIndex < seatsForThisRoom.length) {
-              grid[r][c] = seatsForThisRoom[seatIndex];
-              seatIndex++;
-          }
+  for (let r = 0; r < classroom.rows; r++) {
+    for (let c = 0; c < classroom.columns * 2; c++) {
+      if (seatIndex < seatsForThisRoom.length) {
+          const benchIndex = Math.floor(c / 2);
+          const seatInBench = c % 2;
+          const gridR = r;
+          const gridC = benchIndex * 2 + seatInBench;
+
+          if(!grid[gridR]) grid[gridR] = [];
+          
+          grid[gridR][gridC] = seatsForThisRoom[seatIndex];
+          seatIndex++;
       }
+    }
   }
 
 
   return (
     <TooltipProvider>
       <div
-        className="grid gap-2 p-2 rounded-lg border bg-muted/20 overflow-x-auto"
+        className="grid gap-1 p-2 rounded-lg border bg-muted/20 overflow-x-auto"
         style={{
           gridTemplateColumns: `repeat(${classroom.columns}, minmax(0, 1fr))`,
         }}
       >
         {Array.from({ length: classroom.columns }).map((_, c) => (
-          <div key={`col-${c}`} className="flex flex-col gap-2">
+          <div key={`col-${c}`} className="flex flex-col gap-1">
             {Array.from({ length: classroom.rows }).map((_, r) => {
-              const leftSeat = grid[r][c * 2];
-              const rightSeat = grid[r][c * 2 + 1];
+              const leftSeat = grid[r]?.[c * 2];
+              const rightSeat = grid[r]?.[c * 2 + 1];
 
               return (
                 <div
                   key={`bench-${r}-${c}`}
-                  className="flex items-center justify-center gap-1 p-1 rounded-md bg-background border shadow-sm flex-nowrap"
+                  className="flex items-center justify-center gap-0.5 p-0.5 rounded-md bg-background border shadow-sm flex-nowrap"
                 >
                   {[leftSeat, rightSeat].map((seat, seatIdx) => {
-                    if (!seat) return <div key={seatIdx} className="w-16 h-12 shrink-0" />; // Placeholder for empty part of bench
+                    if (!seat) return <div key={seatIdx} className="w-14 h-10 shrink-0" />;
                     
                     const seatColor = seat.student?.exam.subjectCode ? courseColors.get(seat.student.exam.subjectCode) : undefined;
                     return (
@@ -105,7 +111,7 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
                         <TooltipTrigger asChild>
                           <div
                             className={cn(
-                              "flex flex-col items-center justify-center w-16 h-12 rounded-md border text-center p-1 shrink-0",
+                              "flex flex-col items-center justify-center w-14 h-10 rounded-sm border text-center p-0.5 shrink-0",
                               seat.student ? 'bg-primary/5' : 'bg-muted/30 border-dashed',
                               seat.isDebarredSeat && 'border-destructive bg-destructive/10'
                             )}
@@ -120,10 +126,10 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
                                 <div className="w-3 h-3" />
                               )
                             )}
-                            <span className="text-[9px] text-foreground font-medium truncate w-full">
+                            <span className="text-[8px] text-foreground font-medium truncate w-full">
                               {seat.student ? seat.student.rollNo : (seat.isDebarredSeat ? 'Debarred' : `Empty`)}
                             </span>
-                            <span className="text-[8px] text-muted-foreground truncate w-full">
+                            <span className="text-[7px] text-muted-foreground truncate w-full">
                                 {seat.student ? seat.student.name : ''}
                             </span>
                           </div>
@@ -141,3 +147,4 @@ export function ClassroomVisualizer({ assignments, classroom }: ClassroomVisuali
     </TooltipProvider>
   );
 }
+

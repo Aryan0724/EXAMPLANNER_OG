@@ -49,72 +49,76 @@ export function generateSeatPlan(
 
     const availableClassrooms = classrooms
         .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
-        .sort((a, b) => a.capacity - b.capacity); // Start with smallest rooms to fill them up completely
+        .sort((a, b) => b.capacity - a.capacity); // Start with largest rooms
 
     let globalSeatNumber = 1;
 
-    while (studentQueues.some(q => q.students.length > 0) && availableClassrooms.length > 0) {
-        const room = availableClassrooms.shift()!;
+    for (const room of availableClassrooms) {
+        if (studentQueues.length === 0) break;
+        
         const assignmentsForThisRoom: Seat[] = [];
-        
-        // Find the best pair of queues for this room
-        studentQueues.sort((a, b) => b.students.length - a.students.length);
-        
-        let queueA = studentQueues.find(q => q.students.length > 0);
-        let queueB = studentQueues.find(q => q.students.length > 0 && q.department !== queueA?.department);
 
-        if (!queueA) break;
+        // Determine the number of benches based on 2-seater benches
+        const benchesInRoom = Math.floor(room.capacity / 2);
+        if (benchesInRoom === 0) continue;
 
-        const benches = Math.floor(room.capacity / 2);
-        
-        for (let i = 0; i < benches; i++) {
-            const studentA = queueA?.students.shift();
-            const studentB = queueB?.students.shift();
+        // Find a valid pair of queues (different departments)
+        let queueA = studentQueues[0];
+        let queueB = null;
 
-            // Seat from Course A (Left Side)
-            if (studentA) {
-                assignmentsForThisRoom.push({
-                    student: studentA,
-                    classroom: room,
-                    seatNumber: globalSeatNumber++,
-                });
-            } else {
-                 assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
-            }
-
-            // Seat from Course B (Right Side)
-            if (studentB) {
-                assignmentsForThisRoom.push({
-                    student: studentB,
-                    classroom: room,
-                    seatNumber: globalSeatNumber++,
-                });
-            } else {
-                 assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
+        for (let i = 1; i < studentQueues.length; i++) {
+            if (studentQueues[i].department !== queueA.department) {
+                queueB = studentQueues[i];
+                break;
             }
         }
         
-        // Handle odd capacity room
-        if (room.capacity % 2 !== 0 && queueA?.students.length > 0) {
-            const studentA = queueA.students.shift();
-            if(studentA) {
-                assignmentsForThisRoom.push({
-                    student: studentA,
+        // If no valid pair can be found, we can't use the A | B logic. 
+        // We'll fill with a single course if that's all that's left.
+        if (!queueB) {
+            const studentsToSeat = queueA.students.splice(0, room.capacity);
+            for(let i=0; i<studentsToSeat.length; i++) {
+                 assignmentsForThisRoom.push({
+                    student: studentsToSeat[i],
                     classroom: room,
                     seatNumber: globalSeatNumber++,
                 });
-            } else {
-                 assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
             }
-        } else if (room.capacity % 2 !== 0) {
-            assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
+        } else {
+            // Valid A | B pairing
+            for (let i = 0; i < benchesInRoom; i++) {
+                const studentA = queueA.students.shift();
+                const studentB = queueB.students.shift();
+
+                // Left seat
+                if (studentA) {
+                    assignmentsForThisRoom.push({ student: studentA, classroom: room, seatNumber: globalSeatNumber++ });
+                } else {
+                     assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
+                }
+
+                // Right seat
+                if (studentB) {
+                     assignmentsForThisRoom.push({ student: studentB, classroom: room, seatNumber: globalSeatNumber++ });
+                } else {
+                     assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
+                }
+            }
+             // Handle odd capacity if exists
+            if (room.capacity % 2 !== 0) {
+                 const studentA = queueA.students.shift();
+                 if (studentA) {
+                     assignmentsForThisRoom.push({ student: studentA, classroom: room, seatNumber: globalSeatNumber++ });
+                 } else {
+                      assignmentsForThisRoom.push({ student: null, classroom: room, seatNumber: globalSeatNumber++ });
+                 }
+            }
         }
-
-
+        
         finalAssignments.push(...assignmentsForThisRoom);
         
-        // Remove empty queues
-        studentQueues = studentQueues.filter(q => q.students.length > 0);
+        // Clean up empty queues and re-sort for the next room
+        studentQueues = studentQueues.filter(q => q.students.length > 0).sort((a, b) => b.students.length - a.students.length);
     }
     
     // Update master list with seat assignments
