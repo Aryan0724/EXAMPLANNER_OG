@@ -78,7 +78,7 @@ export interface ExamSlot {
 }
 
 export interface Seat {
-  student: Student | null; // Null if empty
+  student: (Student & { exam: ExamSlot }) | null; // Null if empty
   isDebarredSeat?: boolean; // True if the seat is reserved for a debarred student
   classroom: Classroom;
   seatNumber: number; // 1-based index in the classroom
