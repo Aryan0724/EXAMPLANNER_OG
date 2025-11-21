@@ -23,7 +23,7 @@ export interface Student {
   course: string;
   semester: number;
   section: string;
-  group: 'A' | 'B'; // For subject cycles like Physics/Chemistry
+  group?: 'A' | 'B'; // For subject cycles like Physics/Chemistry
   ineligibilityRecords: IneligibilityRecord[];
   unavailableSlots: AvailabilitySlot[];
   seatAssignment: SeatAssignment | null; // Persisted seat

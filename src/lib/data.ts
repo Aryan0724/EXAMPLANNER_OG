@@ -30,31 +30,31 @@ export const COURSES: Record<string, string[]> = {
         'B.Tech in Civil Engineering',
     ],
     'Electronics and Communication Engineering': [
-        'B Tech Electronics Communication Engg hons with Specialization in Drone Technology',
+        'B.Tech Electronics & Communication Engg (Hons.) with Specialization in Drone Technology',
         'B.Tech Electronics & Communication Engineering (Hons.) with specialization in VLSI',
         'B.Tech in Electronics and Communication Engineering',
     ],
     'Mechanical Engineering': [
-        'B Tech Mechanical Engineering Hons with Specialization in Electric Vehicle',
+        'B.Tech Mechanical Engineering (Hons.) with Specialization in Electric Vehicle',
         'B.Tech Mechanical Engineering (Hons.) with specialization in Mechatronics',
         'B.Tech Mechanical Engineering',
     ],
     'Computer Application': [
         'BCA (Hons.) with AI and DS',
-        'BSc IT',
+        'B.Sc. IT',
         'BCA',
         'MCA',
         'MCA in AI and DS',
     ],
     'Management': [
         'Master of Business Administration',
-        'BBA International Finance And Accounting With ACCA',
+        'BBA (International Finance & Accounting with ACCA)',
         'BBA',
     ],
     'Commerce': [
         'B.Com. (Hons)',
-        'B.Com. (Hons) International Finance and Accounting with ACCA, UK',
-        'B.Com. International Finance and Accounting with ACCA, UK',
+        'B.Com (Hons.) International Finance and Accounting with ACCA, UK',
+        'B.Com International Finance and Accounting with ACCA, UK',
     ],
     'Nursing': [
         'B.Sc. Nursing',
@@ -68,47 +68,86 @@ export const COURSES: Record<string, string[]> = {
         'Diploma In Mechanical Engineering',
     ],
     'Allied Sciences': [
-        'Mathematics',
-        'Physics',
-        'Chemistry',
-        'Statistics', 
-        'Environmental Science'
+        'Allied Sciences (General)'
     ],
     'Department of Personality Development': [
-        'Skills development'
+        'Personality Development Certificate Program'
     ]
 };
 
+const COURSE_CODE_MAPPING = [
+    { code: '01', dept: 'Computer Science and Engineering', name: 'B.Tech CSE (Hons.) with specialization in Cyber Security' },
+    { code: '02', dept: 'Computer Science and Engineering', name: 'B.Tech Computer Science Engineering' },
+    { code: '03', dept: 'Computer Science and Engineering', name: 'Diploma In Computer Science Engineering' },
+    { code: '04', dept: 'Computer Science and Engineering', name: 'B.Tech CSE (Hons.) with specialization in Cyber Security' }, // Duplicate
+    { code: '05', dept: 'Computer Science and Engineering', name: 'B.Tech Computer Science Engineering' }, // Duplicate
+    { code: '06', dept: 'Computer Science and Engineering', name: 'B.Tech CSE (Hons.) with specialization in Artificial Intelligence and Machine Learning' },
+    { code: '11', dept: 'Civil Engineering', name: 'B.Tech Civil Engineering (Hons.) with specialization in Environmental Engineering' },
+    { code: '12', dept: 'Civil Engineering', name: 'B.Tech Civil Engineering (Hons.) with specialization in Geoinformatics' },
+    { code: '13', dept: 'Civil Engineering', name: 'B.Tech in Civil Engineering' },
+    { code: '21', dept: 'Electronics and Communication Engineering', name: 'B.Tech Electronics & Communication Engg (Hons.) with Specialization in Drone Technology' },
+    { code: '22', dept: 'Electronics and Communication Engineering', name: 'B.Tech Electronics & Communication Engineering (Hons.) with specialization in VLSI' },
+    { code: '23', dept: 'Electronics and Communication Engineering', name: 'B.Tech in Electronics and Communication Engineering' },
+    { code: '31', dept: 'Mechanical Engineering', name: 'B.Tech Mechanical Engineering (Hons.) with Specialization in Electric Vehicle' },
+    { code: '32', dept: 'Mechanical Engineering', name: 'B.Tech Mechanical Engineering (Hons.) with specialization in Mechatronics' },
+    { code: '33', dept: 'Mechanical Engineering', name: 'B.Tech Mechanical Engineering' },
+    { code: '41', dept: 'Computer Application', name: 'BCA (Hons.) with AI and DS' },
+    { code: '42', dept: 'Computer Application', name: 'B.Sc. IT' },
+    { code: '43', dept: 'Computer Application', name: 'BCA' },
+    { code: '44', dept: 'Computer Application', name: 'B.Sc. IT' }, // Duplicate
+    { code: '45', dept: 'Computer Application', name: 'MCA' },
+    { code: '46', dept: 'Computer Application', name: 'BCA (Hons.) with AI and DS' }, // Duplicate
+    { code: '47', dept: 'Computer Application', name: 'MCA in AI and DS' },
+    { code: '51', dept: 'Management', name: 'Master of Business Administration' },
+    { code: '52', dept: 'Management', name: 'BBA (International Finance & Accounting with ACCA)' },
+    { code: '53', dept: 'Management', name: 'BBA' },
+    { code: '54', dept: 'Management', name: 'BBA' }, // Duplicate
+    { code: '55', dept: 'Management', name: 'BBA (International Finance & Accounting with ACCA)' }, // Duplicate
+    { code: '56', dept: 'Management', name: 'Master of Business Administration' }, // Duplicate
+    { code: '61', dept: 'Commerce', name: 'B.Com. (Hons)' },
+    { code: '62', dept: 'Commerce', name: 'B.Com (Hons.) International Finance and Accounting with ACCA, UK' },
+    { code: '63', dept: 'Commerce', name: 'B.Com International Finance and Accounting with ACCA, UK' },
+    { code: '71', dept: 'Nursing', name: 'B.Sc. Nursing' },
+    { code: '81', dept: 'Pharmacy', name: 'B.Pharm' },
+    { code: '91', dept: 'Polytechnic', name: 'Diploma In Civil Engineering' },
+    { code: '92', dept: 'Polytechnic', name: 'Diploma In Computer Science Engineering' },
+    { code: '93', dept: 'Polytechnic', name: 'Diploma In Mechanical Engineering' },
+    { code: '97', dept: 'Allied Sciences', name: 'Allied Sciences (General)' },
+    { code: '98', dept: 'Department of Personality Development', name: 'Personality Development Certificate Program' }
+];
+
 // Functions to generate mock data
-export const generateMockStudents = (count = 1000): Student[] => {
+export const generateMockStudents = (studentsPerCourse = 10): Student[] => {
     const students: Student[] = [];
-    const departmentKeys = Object.keys(COURSES);
+    const year = '25'; // For 2025 batch
+    let globalStudentCounter = 0;
 
-    for (let i = 0; i < count; i++) {
-        const department = departmentKeys[i % departmentKeys.length];
-        const coursesInDept = COURSES[department];
-        const course = coursesInDept[i % coursesInDept.length];
-        const semester = (i % 8) + 1;
-        const section = ['A', 'B', 'C'][i % 3];
-        const studentId = `S${String(i + 1).padStart(5, '0')}`;
-        const rollNo = `R${String(20000 + i)}`;
+    COURSE_CODE_MAPPING.forEach(courseInfo => {
+        const courseShortName = courseInfo.name.split(' ')[0].replace('.', '');
+        for (let i = 1; i <= studentsPerCourse; i++) {
+            const personalId = String(i).padStart(3, '0');
+            const rollNo = `${year}${courseInfo.code}${personalId}`;
+            const studentName = `${courseShortName}_Student_${personalId}`;
 
-        students.push({
-            id: studentId,
-            name: `Student ${i + 1}`,
-            rollNo: rollNo,
-            department,
-            course,
-            semester,
-            section,
-            group: Math.random() > 0.7 ? (Math.random() > 0.5 ? 'A' : 'B') : undefined,
-            ineligibilityRecords: [],
-            unavailableSlots: [],
-            seatAssignment: null,
-            isDebarred: Math.random() > 0.98,
-            debarmentReason: 'Disciplinary Action'
-        });
-    }
+            students.push({
+                id: `S${rollNo}`,
+                name: studentName,
+                rollNo: rollNo,
+                department: courseInfo.dept,
+                course: courseInfo.name,
+                semester: (globalStudentCounter % 8) + 1,
+                section: ['A', 'B', 'C'][globalStudentCounter % 3],
+                group: Math.random() > 0.7 ? (Math.random() > 0.5 ? 'A' : 'B') : undefined,
+                ineligibilityRecords: [],
+                unavailableSlots: [],
+                seatAssignment: null,
+                isDebarred: Math.random() > 0.98,
+                debarmentReason: 'Disciplinary Action'
+            });
+            globalStudentCounter++;
+        }
+    });
+
     return students;
 };
 
