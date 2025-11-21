@@ -19,6 +19,7 @@ import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
 import { ExamDialog } from '@/components/exam-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
 export default function SchedulePage() {
