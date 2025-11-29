@@ -475,7 +475,7 @@ const SUBJECTS_BY_COURSE: Record<string, Record<string, { subject_code: string; 
 };
   
 // Functions to generate mock data
-export const generateMockStudents = (studentsPerCourse = 10): Student[] => {
+export const generateMockStudents = (studentsPerCourse = 90): Student[] => {
     const students: Student[] = [];
     const year = '25'; // For 2025 batch
     let globalStudentCounter = 0;
