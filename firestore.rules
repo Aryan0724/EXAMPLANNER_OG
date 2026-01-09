@@ -1,0 +1,138 @@
+/**
+ * Core Philosophy: This ruleset establishes a secure environment for an administrative application (Examplanner).
+ * The primary security principle is that all data is considered global administrative data. There is no concept
+ * of user-owned documents. Access to read or write any data is granted exclusively to authenticated users,
+ * effectively treating any signed-in user as an administrator for the purpose of this prototype.
+ * Unauthenticated access is completely denied.
+ *
+ * Data Structure: The data is organized into five top-level collections: /students, /classrooms,
+ * /invigilators, /exams, and /seatAssignments. This flat hierarchy segregates data by its entity type,
+ * simplifying rules and queries. There are no user-specific subcollections.
+ *
+ * Key Security Decisions:
+ * - Admin-Only Access: All operations (read, write, delete) on all collections are restricted to authenticated
+ *   users. This provides a secure-by-default posture suitable for a backend-managed or admin-facing tool.
+ * - No Public Access: No data is readable by unauthenticated users or the general public.
+ * - Path/Data Integrity: For all collections, rules enforce that the document's internal `id` field must
+ *   match the document's ID in the path upon creation, and that this `id` field is immutable during updates.
+ *   This maintains crucial relational integrity.
+ * - Flexible Schema: In line with the prototyping model, these rules do not validate the shape or data types
+ *   of documents beyond the critical `id` field used for authorization and integrity checks.
+ *
+ * Denormalization for Authorization: This ruleset does not require authorization-specific denormalization.
+ * The security model is based on global authentication status (is the user signed in?) rather than on
+ * per-document ownership or roles, eliminating the need to copy ownership or role data onto documents.
+ *
+ * Structural Segregation: The use of distinct top-level collections for each data entity (e.g., /students, /exams)
+ * is a form of structural segregation that ensures queries for one type of data cannot inadvertently access another.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------
+    // Helper Functions
+    // --------------------------------
+
+    /**
+     * Checks if the user is authenticated. This is the foundation of all security in this ruleset.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Validates that the document's internal `id` field matches its path ID upon creation.
+     * This enforces data consistency from the start.
+     */
+    function hasMatchingIdOnCreate(wildcardId) {
+      return request.resource.data.id == wildcardId;
+    }
+
+    /**
+     * Ensures that the document's internal `id` field cannot be changed after creation.
+     * This protects the relational integrity of the data.
+     */
+    function isIdImmutableOnUpdate() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Verifies that a document exists before allowing an update or delete operation.
+     * This prevents operations on non-existent documents.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * @description Rules for the /students collection.
+     * @path /students/{studentId}
+     * @allow (get) An authenticated user reads a student's profile. `auth.uid: "some_user_id"`
+     * @deny (get) An unauthenticated user tries to read a student's profile. `auth: null`
+     * @principle Secures global data by requiring user authentication for all access.
+     */
+    match /students/{studentId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasMatchingIdOnCreate(studentId);
+      allow update: if isSignedIn() && isExistingDoc() && isIdImmutableOnUpdate();
+      allow delete: if isSignedIn() && isExistingDoc();
+    }
+
+    /**
+     * @description Rules for the /classrooms collection.
+     * @path /classrooms/{classroomId}
+     * @allow (create) An authenticated user adds a new classroom. `auth.uid: "some_user_id"`
+     * @deny (create) An unauthenticated user tries to add a new classroom. `auth: null`
+     * @principle Secures global data by requiring user authentication for all access.
+     */
+    match /classrooms/{classroomId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasMatchingIdOnCreate(classroomId);
+      allow update: if isSignedIn() && isExistingDoc() && isIdImmutableOnUpdate();
+      allow delete: if isSignedIn() && isExistingDoc();
+    }
+
+    /**
+     * @description Rules for the /invigilators collection.
+     * @path /invigilators/{invigilatorId}
+     * @allow (update) An authenticated user updates an invigilator's availability. `auth.uid: "some_user_id"`
+     * @deny (update) An unauthenticated user tries to update an invigilator. `auth: null`
+     * @principle Secures global data by requiring user authentication for all access.
+     */
+    match /invigilators/{invigilatorId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasMatchingIdOnCreate(invigilatorId);
+      allow update: if isSignedIn() && isExistingDoc() && isIdImmutableOnUpdate();
+      allow delete: if isSignedIn() && isExistingDoc();
+    }
+
+    /**
+     * @description Rules for the /exams collection.
+     * @path /exams/{examId}
+     * @allow (list) An authenticated user lists all exams. `auth.uid: "some_user_id"`
+     * @deny (list) An unauthenticated user tries to list exams. `auth: null`
+     * @principle Secures global data by requiring user authentication for all access.
+     */
+    match /exams/{examId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasMatchingIdOnCreate(examId);
+      allow update: if isSignedIn() && isExistingDoc() && isIdImmutableOnUpdate();
+      allow delete: if isSignedIn() && isExistingDoc();
+    }
+
+    /**
+     * @description Rules for the /seatAssignments collection.
+     * @path /seatAssignments/{seatAssignmentId}
+     * @allow (delete) An authenticated user removes a seat assignment. `auth.uid: "some_user_id"`
+     * @deny (delete) An unauthenticated user tries to remove a seat assignment. `auth: null`
+     * @principle Secures global data by requiring user authentication for all access.
+     */
+    match /seatAssignments/{seatAssignmentId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasMatchingIdOnCreate(seatAssignmentId);
+      allow update: if isSignedIn() && isExistingDoc() && isIdImmutableOnUpdate();
+      allow delete: if isSignedIn() && isExistingDoc();
+    }
+  }
+}
