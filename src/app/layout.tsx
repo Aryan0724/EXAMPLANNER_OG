@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/toaster"
 import './globals.css';
 import { AllotmentProvider } from '@/context/AllotmentContext';
 import { DataProvider } from '@/context/DataContext';
+import { ChatBubble } from '@/components/chat-bubble';
 
 export const metadata: Metadata = {
   title: 'Examplanner',
@@ -28,6 +29,7 @@ export default function RootLayout({
               {children}
           </AllotmentProvider>
         </DataProvider>
+        <ChatBubble />
         <Toaster />
       </body>
     </html>
