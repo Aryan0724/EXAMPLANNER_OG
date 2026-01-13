@@ -68,6 +68,7 @@ const verifyAllotmentFlow = ai.defineFlow(
     name: 'verifyAllotmentFlow',
     inputSchema: VerifyAllotmentInputSchema,
     outputSchema: VerifyAllotmentOutputSchema,
+    retries: 3,
   },
   async input => {
     const {output} = await prompt(input);
