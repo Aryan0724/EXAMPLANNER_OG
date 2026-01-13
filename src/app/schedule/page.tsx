@@ -101,10 +101,29 @@ export default function SchedulePage() {
 
                 // AI Verification Step - now inside the loop for each session
                 toast({ title: `Verifying Session: ${key}`, description: 'Asking AI to review the session plan...' });
+
+                // Create a lightweight, simplified model for verification
+                const roomsForVerification = [...new Set(sessionPlan.seatPlan.assignments.map(a => a.classroom.id))].map(roomId => {
+                    const room = classrooms.find(c => c.id === roomId)!;
+                    const seats = sessionPlan.seatPlan.assignments
+                        .filter(a => a.classroom.id === roomId)
+                        .map(s => ({
+                            seat: s.seatNumber,
+                            rollNo: s.student?.rollNo,
+                            subject: s.student?.exam.subjectCode
+                        }));
+                    return {
+                        room: room.roomNo,
+                        layout: `${room.rows}x${room.columns}`,
+                        seats
+                    };
+                });
+                
                 const verificationResult = await verifyAllotmentPlan({
-                    allotmentPlan: JSON.stringify(sessionPlan, null, 2),
+                    allotmentPlan: JSON.stringify(roomsForVerification, null, 2),
                     rules: '' // The flow will populate the rules
                 });
+
 
                 if (verificationResult.isVerified) {
                     toast({ title: `Session ${key} Verified!`, description: 'AI confirms the plan is valid.', duration: 3000 });

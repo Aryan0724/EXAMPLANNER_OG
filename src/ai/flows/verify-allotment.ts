@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to verify a generated exam allotment plan using an AI model.
@@ -19,7 +20,7 @@ const SEATING_RULES = `
 `;
 
 const VerifyAllotmentInputSchema = z.object({
-  allotmentPlan: z.string().describe('A JSON string representing the entire generated allotment plan. This includes seat plans for every session and invigilator assignments.'),
+  allotmentPlan: z.string().describe('A JSON string representing a simplified allotment plan for a single exam session. This JSON contains an array of rooms, each with a layout and a list of assigned seats (seat number, roll number, and subject code).'),
   rules: z.string().describe('A string containing the set of rules the plan must adhere to.'),
 });
 export type VerifyAllotmentInput = z.infer<typeof VerifyAllotmentInputSchema>;
@@ -45,20 +46,20 @@ const prompt = ai.definePrompt({
   output: {schema: VerifyAllotmentOutputSchema},
   prompt: `You are an expert university exam coordinator responsible for verifying seating arrangements. Your primary goal is to ensure the plan is efficient, fair, and cheat-proof.
 
-You will be given a generated allotment plan in JSON format and a set of strict rules.
+You will be given a generated allotment plan in a simplified JSON format and a set of strict rules.
 
 Your task is to analyze the provided JSON plan against the rules. Determine if the plan is valid. You MUST provide a clear "isVerified" status (true or false) and a detailed "reasoning".
 
 RULES:
 {{{rules}}}
 
-ALLOTMENT PLAN (JSON):
+ALLOTMENT PLAN (Simplified JSON for one session):
 \`\`\`json
 {{{allotmentPlan}}}
 \`\`\`
 
 Analyze the plan and respond with your verification result.
-If the plan fails verification, you MUST point out specific examples from the JSON data. For example, if two students from the same course are on the same bench, mention their roll numbers and the classroom. If a room is inefficiently filled, mention the room number and how many seats are wasted.
+If the plan fails verification, you MUST point out specific examples from the JSON data. For example, if two students from the same course are on the same bench, mention their roll numbers, subjects, and the classroom. If a room is inefficiently filled, mention the room and how many seats are wasted.
 `,
 });
 
