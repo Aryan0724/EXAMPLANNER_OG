@@ -13,13 +13,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { COURSES, DEPARTMENTS } from '@/lib/data';
-import { ExamSlot } from '@/lib/types';
+import type { ExamSlot, InvigilatorAssignment, SeatPlan } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
 import { ExamDialog } from '@/components/exam-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { verifyAllotmentPlan } from '@/ai/flows/verify-allotment';
 
 
 export default function SchedulePage() {
@@ -47,7 +48,7 @@ export default function SchedulePage() {
         );
     }, [searchQuery, examSchedule]);
 
-    const handleGenerateAll = () => {
+    const handleGenerateAll = async () => {
         if (students.length === 0 || classrooms.length === 0 || invigilators.length === 0 || examSchedule.length === 0) {
             toast({
                 variant: 'destructive',
@@ -58,13 +59,16 @@ export default function SchedulePage() {
         }
 
         setIsGenerating(true);
+        toast({ title: 'Generating Allotment...', description: 'The algorithm is creating the initial plan. This may take a moment.' });
         
-        setTimeout(() => {
+        // Use a timeout to allow the UI to update before the heavy computation starts
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        try {
             let studentMasterList = JSON.parse(JSON.stringify(students));
             let invigilatorMasterList = JSON.parse(JSON.stringify(invigilators));
             let classroomMasterList = JSON.parse(JSON.stringify(classrooms));
 
-            // Group exams by date and time
             const examSlotsByTime = examSchedule.reduce((acc, exam) => {
               const key = `${exam.date} ${exam.time}`;
               if (!acc[key]) {
@@ -75,8 +79,6 @@ export default function SchedulePage() {
             }, {} as Record<string, ExamSlot[]>);
 
             const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
-
-            // Sort session keys chronologically
             const sortedSessionKeys = Object.keys(examSlotsByTime).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
             for (const key of sortedSessionKeys) {
@@ -93,11 +95,26 @@ export default function SchedulePage() {
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
             
+            toast({ title: 'Algorithm Complete. Verifying with AI...', description: 'Asking Gemini to review the generated plan for efficiency and correctness.' });
+            
+            // AI Verification Step
+            const verificationResult = await verifyAllotmentPlan({
+                allotmentPlan: JSON.stringify(generatedPlans, null, 2),
+                rules: '' // The flow will populate the rules
+            });
+
+            toast({
+                title: verificationResult.isVerified ? 'AI Verification Successful!' : 'AI Verification Failed!',
+                description: verificationResult.reasoning,
+                duration: verificationResult.isVerified ? 5000 : 15000,
+                variant: verificationResult.isVerified ? 'default' : 'destructive',
+            });
+            
+            // Set the final state regardless of verification for now
             setStudents(studentMasterList); 
             setInvigilators(invigilatorMasterList);
             setFullAllotment(generatedPlans);
 
-            setIsGenerating(false);
             toast({
                 title: 'Generation Complete',
                 description: `Full allotment generated for all ${examSchedule.length} exam slots.`,
@@ -105,7 +122,17 @@ export default function SchedulePage() {
                     <Button onClick={() => router.push('/allotment')}>View Allotment</Button>
                 ),
             });
-        }, 3000);
+
+        } catch (error) {
+            console.error('An error occurred during allotment generation:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Generation Failed',
+                description: 'An unexpected error occurred. Please check the console for details.',
+            });
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const handleSaveExam = (exam: ExamSlot) => {
