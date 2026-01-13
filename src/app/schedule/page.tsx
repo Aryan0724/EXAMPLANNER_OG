@@ -59,9 +59,8 @@ export default function SchedulePage() {
         }
 
         setIsGenerating(true);
-        toast({ title: 'Generating Allotment...', description: 'The algorithm is creating the initial plan. This may take a moment.' });
+        toast({ title: 'Generating Full Allotment...', description: 'The algorithm is creating plans session by session. This may take some time.' });
         
-        // Use a timeout to allow the UI to update before the heavy computation starts
         await new Promise(resolve => setTimeout(resolve, 100));
 
         try {
@@ -80,10 +79,15 @@ export default function SchedulePage() {
 
             const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
             const sortedSessionKeys = Object.keys(examSlotsByTime).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+            
+            let allSessionsVerified = true;
+            let failedVerificationReasons: string[] = [];
 
             for (const key of sortedSessionKeys) {
                 const concurrentExams = examSlotsByTime[key];
                 
+                toast({ title: `Processing Session: ${key}`, description: 'Generating seat plan and invigilator duties...' });
+
                 const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams);
                 studentMasterList = updatedStudents; 
                 
@@ -92,43 +96,59 @@ export default function SchedulePage() {
                 const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, classroomsInUse, concurrentExams[0]);
                 invigilatorMasterList = updatedInvigilators;
 
-                generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
+                const sessionPlan = { seatPlan: plan, invigilatorAssignments };
+                generatedPlans[key] = sessionPlan;
+
+                // AI Verification Step - now inside the loop for each session
+                toast({ title: `Verifying Session: ${key}`, description: 'Asking AI to review the session plan...' });
+                const verificationResult = await verifyAllotmentPlan({
+                    allotmentPlan: JSON.stringify(sessionPlan, null, 2),
+                    rules: '' // The flow will populate the rules
+                });
+
+                if (verificationResult.isVerified) {
+                    toast({ title: `Session ${key} Verified!`, description: 'AI confirms the plan is valid.', duration: 3000 });
+                } else {
+                    allSessionsVerified = false;
+                    const reason = `Session ${key}: ${verificationResult.reasoning}`;
+                    failedVerificationReasons.push(reason);
+                    toast({
+                        variant: 'destructive',
+                        title: `Verification Failed for Session: ${key}`,
+                        description: verificationResult.reasoning,
+                        duration: 10000
+                    });
+                }
             }
             
-            toast({ title: 'Algorithm Complete. Verifying with AI...', description: 'Asking Gemini to review the generated plan for efficiency and correctness.' });
-            
-            // AI Verification Step
-            const verificationResult = await verifyAllotmentPlan({
-                allotmentPlan: JSON.stringify(generatedPlans, null, 2),
-                rules: '' // The flow will populate the rules
-            });
-
-            toast({
-                title: verificationResult.isVerified ? 'AI Verification Successful!' : 'AI Verification Failed!',
-                description: verificationResult.reasoning,
-                duration: verificationResult.isVerified ? 5000 : 15000,
-                variant: verificationResult.isVerified ? 'default' : 'destructive',
-            });
-            
-            // Set the final state regardless of verification for now
+            // Set the final state
             setStudents(studentMasterList); 
             setInvigilators(invigilatorMasterList);
             setFullAllotment(generatedPlans);
 
-            toast({
-                title: 'Generation Complete',
-                description: `Full allotment generated for all ${examSchedule.length} exam slots.`,
-                action: (
-                    <Button onClick={() => router.push('/allotment')}>View Allotment</Button>
-                ),
-            });
+            if (allSessionsVerified) {
+                toast({
+                    title: 'Generation & Verification Complete!',
+                    description: 'Full allotment generated and all sessions have been successfully verified by the AI.',
+                    action: <Button onClick={() => router.push('/allotment')}>View Allotment</Button>,
+                    duration: 10000
+                });
+            } else {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Generation Complete, but Verification Failed',
+                    description: `The allotment has been generated, but one or more sessions failed AI verification. Check previous toasts for details. Failed sessions: ${failedVerificationReasons.length}.`,
+                    action: <Button onClick={() => router.push('/allotment')}>View Allotment</Button>,
+                    duration: 15000
+                });
+            }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('An error occurred during allotment generation:', error);
             toast({
                 variant: 'destructive',
                 title: 'Generation Failed',
-                description: 'An unexpected error occurred. Please check the console for details.',
+                description: error.message || 'An unexpected error occurred. Please check the console for details.',
             });
         } finally {
             setIsGenerating(false);
