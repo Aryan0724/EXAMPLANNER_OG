@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useContext, useMemo } from 'react';
+import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -49,11 +49,10 @@ export default function AllotmentPage() {
   const { fullAllotment } = useContext(AllotmentContext);
   const { students, classrooms, invigilators, examSchedule } = useContext(DataContext);
 
-  const examSlotsByTime = getExamSlotsByTime(examSchedule);
-
+  const examSlotsByTime = useMemo(() => getExamSlotsByTime(examSchedule), [examSchedule]);
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [slotOptions, setSlotOptions] = useState(getSlotOptions(fullAllotment, examSchedule));
+  const [slotOptions, setSlotOptions] = useState(() => getSlotOptions(fullAllotment, examSchedule));
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | undefined>(slotOptions[0]?.id);
   
   const [seatPlan, setSeatPlan] = useState<SeatPlan | null>(null);
@@ -68,53 +67,7 @@ export default function AllotmentPage() {
     } | null>(null);
   const [showExclusionReport, setShowExclusionReport] = useState(false);
 
-  useEffect(() => {
-    const newSlotOptions = getSlotOptions(fullAllotment, examSchedule);
-    setSlotOptions(newSlotOptions);
-    if(fullAllotment && newSlotOptions.length > 0) {
-      const newSelectedSlotKey = newSlotOptions.find(opt => opt.id === selectedSlotKey) ? selectedSlotKey : newSlotOptions[0].id;
-      setSelectedSlotKey(newSelectedSlotKey);
-      if(newSelectedSlotKey) updateStateForSlot(newSelectedSlotKey);
-    } else if (newSlotOptions.length > 0 && !selectedSlotKey) {
-      setSelectedSlotKey(newSlotOptions[0].id);
-      updateStateForSlot(newSlotOptions[0].id);
-    } else if (newSlotOptions.length === 0) {
-      setSelectedSlotKey(undefined);
-      setSeatPlan(null);
-      setInvigilatorAssignments(null);
-      setSelectedClassroomId(null);
-      setExcludedData(null);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fullAllotment, examSchedule]);
-
-  useEffect(() => {
-     if (selectedSlotKey) {
-        updateStateForSlot(selectedSlotKey);
-     } else {
-        setExcludedData(null);
-        setSeatPlan(null);
-        setInvigilatorAssignments(null);
-     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSlotKey, students, classrooms, invigilators]);
-
-  const updateStateForSlot = (slotKey: string) => {
-    calculateExclusions(slotKey);
-    if (fullAllotment && fullAllotment[slotKey]) {
-      const { seatPlan: newSeatPlan, invigilatorAssignments: newInvigilatorAssignments } = fullAllotment[slotKey];
-      setSeatPlan(newSeatPlan);
-      setInvigilatorAssignments(newInvigilatorAssignments);
-      const firstClassroomId = newSeatPlan.assignments.length > 0 ? [...new Set(newSeatPlan.assignments.map(a => a.classroom.id))][0] : null;
-      setSelectedClassroomId(firstClassroomId);
-    } else {
-       setSeatPlan(null);
-       setInvigilatorAssignments(null);
-       setSelectedClassroomId(null);
-    }
-  };
-
-  const calculateExclusions = (slotKey: string) => {
+   const calculateExclusions = useCallback((slotKey: string) => {
     const examsInSlot = examSlotsByTime[slotKey] || [];
     if (examsInSlot.length === 0) {
         setExcludedData(null);
@@ -152,7 +105,47 @@ export default function AllotmentPage() {
         unavailableClassrooms,
         unavailableInvigilators
     });
-  };
+  }, [students, classrooms, invigilators, examSlotsByTime]);
+
+  const updateStateForSlot = useCallback((slotKey: string) => {
+    calculateExclusions(slotKey);
+    if (fullAllotment && fullAllotment[slotKey]) {
+      const { seatPlan: newSeatPlan, invigilatorAssignments: newInvigilatorAssignments } = fullAllotment[slotKey];
+      setSeatPlan(newSeatPlan);
+      setInvigilatorAssignments(newInvigilatorAssignments);
+      const firstClassroomId = newSeatPlan.assignments.length > 0 ? [...new Set(newSeatPlan.assignments.map(a => a.classroom.id))][0] : null;
+      setSelectedClassroomId(firstClassroomId);
+    } else {
+       setSeatPlan(null);
+       setInvigilatorAssignments(null);
+       setSelectedClassroomId(null);
+    }
+  }, [fullAllotment, calculateExclusions]);
+
+  useEffect(() => {
+    const newSlotOptions = getSlotOptions(fullAllotment, examSchedule);
+    setSlotOptions(newSlotOptions);
+    
+    const isCurrentSlotValid = newSlotOptions.some(opt => opt.id === selectedSlotKey);
+
+    if (!isCurrentSlotValid && newSlotOptions.length > 0) {
+        setSelectedSlotKey(newSlotOptions[0].id);
+    } else if (newSlotOptions.length === 0) {
+        setSelectedSlotKey(undefined);
+    }
+  }, [fullAllotment, examSchedule, selectedSlotKey]);
+
+  useEffect(() => {
+     if (selectedSlotKey) {
+        updateStateForSlot(selectedSlotKey);
+     } else {
+        setExcludedData(null);
+        setSeatPlan(null);
+        setInvigilatorAssignments(null);
+        setSelectedClassroomId(null);
+     }
+  }, [selectedSlotKey, students, classrooms, invigilators, updateStateForSlot]);
+
 
   const handleSlotChange = (slotKey: string) => {
       setSelectedSlotKey(slotKey);
