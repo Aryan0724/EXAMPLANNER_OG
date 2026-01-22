@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCheck, Search, CalendarOff, History, Sparkles, Loader2 } from 'lucide-react';
+import { UserCheck, Search, CalendarOff, History } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -16,13 +16,11 @@ import { Invigilator } from '@/lib/types';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { toast } from '@/hooks/use-toast';
 import { DataContext } from '@/context/DataContext';
-import { suggestAvailability } from '@/ai/flows/suggest-availability';
 
 export default function InvigilatorsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { invigilators, setInvigilators, examSchedule } = useContext(DataContext);
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Invigilator | null }>({ isOpen: false, resource: null });
-  const [isSuggesting, setIsSuggesting] = useState(false);
   const router = useRouter();
 
   const filteredInvigilators = useMemo(() => {
@@ -102,32 +100,6 @@ export default function InvigilatorsPage() {
     router.push(`/invigilators/${invigilatorId}`);
   }
 
-  const handleSuggestion = async () => {
-    setIsSuggesting(true);
-    try {
-        const historicalData = JSON.stringify(examSchedule.map(e => ({ date: e.date, time: e.time })), null, 2);
-        const result = await suggestAvailability({
-            resourceType: 'invigilator',
-            dateTime: new Date().toISOString(),
-            durationMinutes: 180,
-            historicalData
-        });
-        toast({
-            title: 'AI Suggestion',
-            description: result.reasoning,
-        });
-    } catch (error) {
-        console.error("AI Suggestion failed:", error);
-        toast({
-            variant: 'destructive',
-            title: 'AI Suggestion Error',
-            description: 'Could not get a suggestion at this time.',
-        });
-    } finally {
-        setIsSuggesting(false);
-    }
-  };
-
   return (
     <SidebarProvider>
       <AvailabilityDialog
@@ -155,10 +127,6 @@ export default function InvigilatorsPage() {
                       <CardDescription>List of all invigilators available for duty.</CardDescription>
                     </div>
                      <div className="flex items-center gap-2">
-                        <Button onClick={handleSuggestion} disabled={isSuggesting} variant="outline">
-                            {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                            Suggest
-                        </Button>
                         <div className="w-full max-w-sm">
                         <Input
                             placeholder="Search by ID, Name, Department..."

@@ -20,7 +20,6 @@ import { DataContext } from '@/context/DataContext';
 import { ExamDialog } from '@/components/exam-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { verifyAllotmentPlan } from '@/ai/flows/verify-allotment';
 
 
 export default function SchedulePage() {
@@ -80,9 +79,6 @@ export default function SchedulePage() {
             const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
             const sortedSessionKeys = Object.keys(examSlotsByTime).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
             
-            let allSessionsVerified = true;
-            let failedVerificationReasons: string[] = [];
-
             for (const key of sortedSessionKeys) {
                 const concurrentExams = examSlotsByTime[key];
                 
@@ -96,70 +92,19 @@ export default function SchedulePage() {
                 const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, classroomsInUse, concurrentExams[0]);
                 invigilatorMasterList = updatedInvigilators;
 
-                const sessionPlan = { seatPlan: plan, invigilatorAssignments };
-                generatedPlans[key] = sessionPlan;
-
-                // AI Verification Step - now inside the loop for each session
-                toast({ title: `Verifying Session: ${key}`, description: 'Asking AI to review the session plan...' });
-
-                // Create a lightweight, simplified model for verification
-                const roomsForVerification = [...new Set(sessionPlan.seatPlan.assignments.map(a => a.classroom.id))].map(roomId => {
-                    const room = classrooms.find(c => c.id === roomId)!;
-                    const seats = sessionPlan.seatPlan.assignments
-                        .filter(a => a.classroom.id === roomId)
-                        .map(s => ({
-                            seat: s.seatNumber,
-                            rollNo: s.student?.rollNo,
-                            subject: s.student?.exam.subjectCode
-                        }));
-                    return {
-                        room: room.roomNo,
-                        layout: `${room.rows}x${room.columns}`,
-                        seats
-                    };
-                });
-                
-                const verificationResult = await verifyAllotmentPlan({
-                    allotmentPlan: JSON.stringify(roomsForVerification, null, 2),
-                });
-
-
-                if (verificationResult.isVerified) {
-                    toast({ title: `Session ${key} Verified!`, description: 'AI confirms the plan is valid.', duration: 3000 });
-                } else {
-                    allSessionsVerified = false;
-                    const reason = `Session ${key}: ${verificationResult.reasoning}`;
-                    failedVerificationReasons.push(reason);
-                    toast({
-                        variant: 'destructive',
-                        title: `Verification Failed for Session: ${key}`,
-                        description: verificationResult.reasoning,
-                        duration: 10000
-                    });
-                }
+                generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
             
-            // Set the final state
             setStudents(studentMasterList); 
             setInvigilators(invigilatorMasterList);
             setFullAllotment(generatedPlans);
 
-            if (allSessionsVerified) {
-                toast({
-                    title: 'Generation & Verification Complete!',
-                    description: 'Full allotment generated and all sessions have been successfully verified by the AI.',
-                    action: <Button onClick={() => router.push('/allotment')}>View Allotment</Button>,
-                    duration: 10000
-                });
-            } else {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Generation Complete, but Verification Failed',
-                    description: `The allotment has been generated, but one or more sessions failed AI verification. Check previous toasts for details. Failed sessions: ${failedVerificationReasons.length}.`,
-                    action: <Button onClick={() => router.push('/allotment')}>View Allotment</Button>,
-                    duration: 15000
-                });
-            }
+            toast({
+                title: 'Generation Complete!',
+                description: 'Full allotment has been generated for all exam sessions.',
+                action: <Button onClick={() => router.push('/allotment')}>View Allotment</Button>,
+                duration: 10000
+            });
 
         } catch (error: any) {
             console.error('An error occurred during allotment generation:', error);
