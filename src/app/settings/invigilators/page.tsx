@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -13,17 +13,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { Invigilator } from '@/lib/types';
-import { collection } from 'firebase/firestore';
+import { DataContext } from '@/context/DataContext';
 
 export default function InvigilatorExplorerPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
-  const firestore = useFirestore();
-
-  const { data: invigilatorsData } = useCollection<Invigilator>(useMemoFirebase(() => firestore ? collection(firestore, 'invigilators') : null, [firestore]));
-  const invigilators = invigilatorsData || [];
+  const { invigilators } = useContext(DataContext);
 
   const filteredInvigilators = useMemo(() => {
     let invigilatorsToFilter = invigilators;

@@ -2,7 +2,8 @@
 "use client";
 
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useContext } from 'react';
+import { DataContext } from '@/context/DataContext';
 import {
   Card,
   CardContent,
@@ -12,14 +13,11 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { UploadCloud } from 'lucide-react';
-import { collection } from 'firebase/firestore';
 import { Skeleton } from './ui/skeleton';
 
 export function DashboardClient() {
-  const firestore = useFirestore();
-  const studentsCol = useMemoFirebase(() => firestore ? collection(firestore, 'students') : null, [firestore]);
-  const { data: students, isLoading } = useCollection(studentsCol);
-
+  const { students } = useContext(DataContext);
+  const isLoading = !students;
   const hasData = !isLoading && students && students.length > 0;
 
   return (

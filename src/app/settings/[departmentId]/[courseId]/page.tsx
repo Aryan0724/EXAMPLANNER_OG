@@ -16,16 +16,12 @@ import { ExamDialog } from '@/components/exam-dialog';
 import { ExamSlot } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { DataContext } from '@/context/DataContext';
 
 
 export default function CourseSubjectsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string } }) {
   const params = use(paramsProp);
-  const firestore = useFirestore();
-
-  const { data: examScheduleData } = useCollection<ExamSlot>(useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]));
-  const examSchedule = examScheduleData || [];
+  const { examSchedule, setExamSchedule } = useContext(DataContext);
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<ExamSlot | null>(null);
@@ -48,13 +44,11 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
   };
 
   const handleSaveExam = (exam: ExamSlot) => {
-    if (!firestore) return;
-    const examRef = doc(firestore, 'examSchedule', exam.id);
-    setDocumentNonBlocking(examRef, exam, { merge: true });
-
     if (selectedExam) {
+      setExamSchedule(prev => prev.map(e => e.id === exam.id ? exam : e));
       toast({ title: "Subject Updated", description: `Subject ${exam.subjectCode} has been updated.` });
     } else {
+      setExamSchedule(prev => [...prev, exam]);
       toast({ title: "Subject Added", description: `Subject ${exam.subjectCode} has been added to this course.` });
     }
     setIsDialogOpen(false);
@@ -67,10 +61,9 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
   };
   
   const handleDeleteExam = () => {
-    if (examToDelete && firestore) {
+    if (examToDelete) {
         const exam = examSchedule.find(e => e.id === examToDelete);
-        const examRef = doc(firestore, 'examSchedule', examToDelete);
-        deleteDocumentNonBlocking(examRef);
+        setExamSchedule(prev => prev.filter(e => e.id !== examToDelete));
         toast({ title: "Subject Deleted", description: `Subject ${exam?.subjectCode} has been removed.` });
         setExamToDelete(null);
         setIsAlertOpen(false);

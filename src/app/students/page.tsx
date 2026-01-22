@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -16,9 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataContext } from '@/context/DataContext';
 
 const STUDENTS_PER_PAGE = 20;
 
@@ -127,10 +125,8 @@ const DebarmentStatusDialog = ({ isOpen, onClose, student, onSubmitDebarred, onR
 
 
 export default function StudentsPage() {
-  const firestore = useFirestore();
-  const studentsCol = useMemoFirebase(() => firestore ? collection(firestore, 'students') : null, [firestore]);
-  const { data: studentsData, isLoading } = useCollection<Student>(studentsCol);
-  const students = studentsData || [];
+  const { students, setStudents } = useContext(DataContext);
+  const isLoading = !students;
   
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'debarred' | 'ineligible'>('all');
@@ -139,7 +135,7 @@ export default function StudentsPage() {
 
 
   const filteredStudents = useMemo(() => {
-    let studentsToFilter = students;
+    let studentsToFilter = students || [];
 
     if (filter === 'debarred') {
       studentsToFilter = studentsToFilter.filter(s => s.isDebarred);
@@ -181,13 +177,16 @@ export default function StudentsPage() {
   }
 
   const handleSubmitDebarred = (reason: string, isDebarred: boolean) => {
-    if (!dialogState.student || !firestore) return;
+    if (!dialogState.student) return;
     
     const studentName = dialogState.student.name;
-    const studentRef = doc(firestore, 'students', dialogState.student.id);
-    const updateData = { isDebarred: isDebarred, debarmentReason: isDebarred ? reason : "" };
-    
-    updateDocumentNonBlocking(studentRef, updateData);
+    const updatedStudents = students.map(s => {
+      if (s.id === dialogState.student!.id) {
+        return { ...s, isDebarred, debarmentReason: isDebarred ? reason : "" };
+      }
+      return s;
+    });
+    setStudents(updatedStudents);
 
     toast({
         title: `Status Updated for ${studentName}`,
@@ -198,22 +197,26 @@ export default function StudentsPage() {
   };
 
   const handleRemoveIneligibility = (subjectCode: string) => {
-    if (!dialogState.student || !firestore) return;
+    if (!dialogState.student) return;
 
     const studentName = dialogState.student.name;
-    const studentRef = doc(firestore, 'students', dialogState.student.id);
-    const newRecords = dialogState.student.ineligibilityRecords.filter(r => r.subjectCode !== subjectCode);
-
-    updateDocumentNonBlocking(studentRef, { ineligibilityRecords: newRecords });
+    let updatedStudent: Student | null = null;
+    const updatedStudents = students.map(s => {
+      if (s.id === dialogState.student!.id) {
+        const newRecords = s.ineligibilityRecords.filter(r => r.subjectCode !== subjectCode);
+        updatedStudent = { ...s, ineligibilityRecords: newRecords };
+        return updatedStudent;
+      }
+      return s;
+    });
+    setStudents(updatedStudents);
 
     toast({
         title: `Eligibility Updated for ${studentName}`,
         description: `${studentName} is now eligible for ${subjectCode}.`,
     });
     
-    // The dialog will re-render with the new student data from the listener, but it's better to close it.
-    const updatedStudent = { ...dialogState.student, ineligibilityRecords: newRecords };
-    if(newRecords.length === 0 && !updatedStudent.isDebarred) {
+    if (updatedStudent && updatedStudent.ineligibilityRecords.length === 0 && !updatedStudent.isDebarred) {
         closeStatusDialog();
     } else {
         setDialogState({ isOpen: true, student: updatedStudent });
@@ -278,17 +281,11 @@ export default function StudentsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {isLoading && Array.from({ length: 10 }).map((_, i) => (
-                           <TableRow key={`skel-${i}`}>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                              <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
+                        {isLoading && (
+                           <TableRow>
+                             <TableCell colSpan={7} className="p-8 text-center">Loading students...</TableCell>
                            </TableRow>
-                        ))}
+                        )}
                         {!isLoading && currentStudents.map((student) => (
                           <TableRow key={student.id}>
                             <TableCell className="font-medium">{student.id}</TableCell>

@@ -18,8 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Ban, Search } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { DataContext } from '@/context/DataContext';
 
 interface IneligibilityDialogProps { 
     isOpen: boolean; 
@@ -75,14 +74,8 @@ const IneligibilityDialog = ({ isOpen, onClose, onSubmit, studentName, subjectCo
 
 export default function SubjectStudentsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string, subjectCode: string } }) {
     const params = use(paramsProp);
-    const firestore = useFirestore();
+    const { students, setStudents, examSchedule } = useContext(DataContext);
     
-    const { data: studentsData } = useCollection<Student>(useMemoFirebase(() => firestore ? collection(firestore, 'students') : null, [firestore]));
-    const students = studentsData || [];
-
-    const { data: examScheduleData } = useCollection(useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]));
-    const examSchedule = examScheduleData || [];
-
     const [dialogState, setDialogState] = useState<{isOpen: boolean; student: Student | null}>({ isOpen: false, student: null });
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -107,13 +100,11 @@ export default function SubjectStudentsPage({ params: paramsProp }: { params: { 
 
 
     const handleToggleEligibility = (student: Student) => {
-        if (!firestore) return;
-        const studentRef = doc(firestore, 'students', student.id);
         const isCurrentlyIneligible = student.ineligibilityRecords.some(r => r.subjectCode === params.subjectCode);
 
         if (isCurrentlyIneligible) {
             const newRecords = student.ineligibilityRecords.filter(r => r.subjectCode !== params.subjectCode);
-            updateDocumentNonBlocking(studentRef, { ineligibilityRecords: newRecords });
+            setStudents(prev => prev.map(s => s.id === student.id ? { ...s, ineligibilityRecords: newRecords } : s));
             toast({
                 title: `Eligibility Updated for ${student.name}`,
                 description: `${student.name} is now ELIGIBLE for ${params.subjectCode}.`,
@@ -124,14 +115,13 @@ export default function SubjectStudentsPage({ params: paramsProp }: { params: { 
     };
 
     const handleConfirmIneligibility = (reason: string) => {
-        if (!dialogState.student || !firestore) return;
+        if (!dialogState.student) return;
         
         const student = dialogState.student;
-        const studentRef = doc(firestore, 'students', student.id);
         const newRecord = { subjectCode: params.subjectCode, reason };
         const newRecords = [...student.ineligibilityRecords, newRecord];
 
-        updateDocumentNonBlocking(studentRef, { ineligibilityRecords: newRecords });
+        setStudents(prev => prev.map(s => s.id === student.id ? { ...s, ineligibilityRecords: newRecords } : s));
         
         toast({
             title: `Eligibility Updated for ${student.name}`,

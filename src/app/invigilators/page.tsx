@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
@@ -15,20 +15,13 @@ import { Button } from '@/components/ui/button';
 import { Invigilator } from '@/lib/types';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { toast } from '@/hooks/use-toast';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataContext } from '@/context/DataContext';
 
 export default function InvigilatorsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const firestore = useFirestore();
+  const { invigilators, setInvigilators, examSchedule } = useContext(DataContext);
+  const isLoading = !invigilators;
 
-  const invigilatorsCol = useMemoFirebase(() => firestore ? collection(firestore, 'invigilators') : null, [firestore]);
-  const { data: invigilators, isLoading } = useCollection<Invigilator>(invigilatorsCol);
-
-  const examScheduleCol = useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]);
-  const { data: examSchedule } = useCollection(examScheduleCol);
-  
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Invigilator | null }>({ isOpen: false, resource: null });
   const router = useRouter();
 
@@ -54,7 +47,7 @@ export default function InvigilatorsPage() {
   }
 
   const handleAddUnavailability = (slotId: string, reason: string) => {
-    if (!dialogState.resource || !firestore) return;
+    if (!dialogState.resource) return;
     
     const resourceName = dialogState.resource.name;
     if (dialogState.resource.unavailableSlots.some(s => s.slotId === slotId)) {
@@ -66,34 +59,42 @@ export default function InvigilatorsPage() {
       return;
     }
     
-    const invigilatorRef = doc(firestore, 'invigilators', dialogState.resource.id);
-    const newSlots = [...dialogState.resource.unavailableSlots, { slotId, reason }];
-    updateDocumentNonBlocking(invigilatorRef, { unavailableSlots: newSlots });
+    const updatedInvigilators = invigilators.map(i => {
+      if (i.id === dialogState.resource!.id) {
+        return { ...i, unavailableSlots: [...i.unavailableSlots, { slotId, reason }] };
+      }
+      return i;
+    });
+    setInvigilators(updatedInvigilators);
 
     toast({
         title: 'Unavailability Added',
         description: `${resourceName} is now unavailable for the selected slot.`,
     });
 
-    const updatedResource = { ...dialogState.resource, unavailableSlots: newSlots };
-    setDialogState({ isOpen: true, resource: updatedResource });
+    const updatedResource = updatedInvigilators.find(i => i.id === dialogState.resource!.id);
+    setDialogState({ isOpen: true, resource: updatedResource || null });
   };
 
   const handleRemoveUnavailability = (slotId: string) => {
-    if (!dialogState.resource || !firestore) return;
+    if (!dialogState.resource) return;
 
     const resourceName = dialogState.resource.name;
-    const invigilatorRef = doc(firestore, 'invigilators', dialogState.resource.id);
-    const newSlots = dialogState.resource.unavailableSlots.filter(s => s.slotId !== slotId);
-    updateDocumentNonBlocking(invigilatorRef, { unavailableSlots: newSlots });
+    const updatedInvigilators = invigilators.map(i => {
+      if (i.id === dialogState.resource!.id) {
+        return { ...i, unavailableSlots: i.unavailableSlots.filter(s => s.slotId !== slotId) };
+      }
+      return i;
+    });
+    setInvigilators(updatedInvigilators);
     
     toast({
         title: 'Unavailability Removed',
         description: `${resourceName} is now available for the selected slot.`,
     });
     
-    const updatedResource = { ...dialogState.resource, unavailableSlots: newSlots };
-    setDialogState({ isOpen: true, resource: updatedResource });
+    const updatedResource = updatedInvigilators.find(i => i.id === dialogState.resource!.id);
+    setDialogState({ isOpen: true, resource: updatedResource || null });
   };
 
   const handleViewHistory = (invigilatorId: string) => {
@@ -153,18 +154,11 @@ export default function InvigilatorsPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                            <TableRow key={`skel-${i}`}>
-                                <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                                <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                                <TableCell><Skeleton className="h-6 w-28" /></TableCell>
-                                <TableCell className="text-right space-x-2">
-                                  <Skeleton className="h-8 w-24 inline-block" />
-                                  <Skeleton className="h-8 w-28 inline-block" />
-                                </TableCell>
+                          {isLoading && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center p-8">Loading invigilators...</TableCell>
                             </TableRow>
-                          ))}
+                          )}
                           {!isLoading && filteredInvigilators.map((inv) => (
                             <TableRow key={inv.id}>
                               <TableCell className="font-medium">{inv.id}</TableCell>

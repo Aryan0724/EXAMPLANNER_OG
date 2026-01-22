@@ -14,10 +14,8 @@ import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Inv
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
+import { DataContext } from '@/context/DataContext';
 import { ExclusionReport } from '@/components/exclusion-report';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import { createClassroom } from '@/lib/types';
 
 const getExamSlotsByTime = (examSchedule: ExamSlot[]) => {
   return examSchedule.reduce((acc, exam) => {
@@ -49,19 +47,7 @@ const getSlotOptions = (allotment: Record<string, any> | null, examSchedule: Exa
 export default function AllotmentPage() {
   const { toast } = useToast();
   const { fullAllotment } = useContext(AllotmentContext);
-  const firestore = useFirestore();
-
-  const { data: studentsData } = useCollection<Student>(useMemoFirebase(() => firestore ? collection(firestore, 'students') : null, [firestore]));
-  const students = studentsData || [];
-
-  const { data: classroomsData } = useCollection<Omit<Classroom, 'capacity'>>(useMemoFirebase(() => firestore ? collection(firestore, 'classrooms') : null, [firestore]));
-  const classrooms = useMemo(() => (classroomsData || []).map(c => createClassroom(c)), [classroomsData]);
-
-  const { data: invigilatorsData } = useCollection<Invigilator>(useMemoFirebase(() => firestore ? collection(firestore, 'invigilators') : null, [firestore]));
-  const invigilators = invigilatorsData || [];
-
-  const { data: examScheduleData } = useCollection<ExamSlot>(useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]));
-  const examSchedule = examScheduleData || [];
+  const { students, classrooms, invigilators, examSchedule } = useContext(DataContext);
 
   const examSlotsByTime = getExamSlotsByTime(examSchedule);
 

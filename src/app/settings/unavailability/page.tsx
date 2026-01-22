@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -9,23 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Building, UserCheck, ShieldOff } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { Classroom, Invigilator, ExamSlot, createClassroom } from '@/lib/types';
-import { collection } from 'firebase/firestore';
-
+import { DataContext } from '@/context/DataContext';
 
 export default function UnavailabilityReportPage() {
-  const firestore = useFirestore();
-
-  const { data: classroomsData } = useCollection<Omit<Classroom, 'capacity'>>(useMemoFirebase(() => firestore ? collection(firestore, 'classrooms') : null, [firestore]));
-  const classrooms = useMemo(() => (classroomsData || []).map(c => createClassroom(c)), [classroomsData]);
-
-  const { data: invigilatorsData } = useCollection<Invigilator>(useMemoFirebase(() => firestore ? collection(firestore, 'invigilators') : null, [firestore]));
-  const invigilators = invigilatorsData || [];
-
-  const { data: examScheduleData } = useCollection<ExamSlot>(useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]));
-  const examSchedule = examScheduleData || [];
-
+  const { classrooms, invigilators, examSchedule } = useContext(DataContext);
   
   const getSlotLabel = (slotId: string) => {
     const slot = examSchedule.find(s => s.id === slotId);

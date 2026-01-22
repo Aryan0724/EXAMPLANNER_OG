@@ -11,13 +11,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { AllotmentContext } from '@/context/AllotmentContext';
-import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
+import { DataContext } from '@/context/DataContext';
+import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents, createClassroom } from '@/lib/data';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { generateMasterReport, generateInvigilatorDutyRoster } from '@/lib/report-generator';
-import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
-import { collection, writeBatch, doc } from 'firebase/firestore';
-import type { Student, Classroom, Invigilator, ExamSlot } from '@/lib/types';
-
 
 const ImportItem = ({ title, format }: { title: string, format: string[] }) => {
   const { toast } = useToast();
@@ -55,67 +52,27 @@ const ImportItem = ({ title, format }: { title: string, format: string[] }) => {
 
 export default function ImportExportPage() {
   const { toast } = useToast();
-  const firestore = useFirestore();
   const { fullAllotment } = useContext(AllotmentContext);
-
-  const studentsCol = useMemoFirebase(() => firestore ? collection(firestore, 'students') : null, [firestore]);
-  const { data: students } = useCollection<Student>(studentsCol);
-
-  const classroomsCol = useMemoFirebase(() => firestore ? collection(firestore, 'classrooms') : null, [firestore]);
-  const { data: classrooms } = useCollection<Classroom>(classroomsCol);
-
-  const invigilatorsCol = useMemoFirebase(() => firestore ? collection(firestore, 'invigilators') : null, [firestore]);
-  const { data: invigilators } = useCollection<Invigilator>(invigilatorsCol);
+  const { 
+    students, classrooms, invigilators,
+    setStudents, setClassrooms, setInvigilators, setExamSchedule 
+  } = useContext(DataContext);
 
 
-  const handlePopulateMockData = async () => {
-    if (!firestore) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
-      return;
-    }
-    toast({ title: 'Populating Mock Data...', description: 'This may take a moment. The UI will update once data is available.' });
-    try {
-      const batch = writeBatch(firestore);
-
-      const mockStudents = generateMockStudents();
-      mockStudents.forEach(student => {
-        const ref = doc(firestore, 'students', student.id);
-        batch.set(ref, student);
-      });
-
-      const mockClassrooms = generateMockClassrooms();
-      mockClassrooms.forEach(classroom => {
-        const { capacity, ...rest } = classroom; // Don't store getter
-        const ref = doc(firestore, 'classrooms', classroom.id);
-        batch.set(ref, rest);
-      });
-
-      const mockInvigilators = generateMockInvigilators();
-      mockInvigilators.forEach(invigilator => {
-        const ref = doc(firestore, 'invigilators', invigilator.id);
-        batch.set(ref, invigilator);
-      });
-
-      const mockSchedule = generateMockExamSchedule();
-      mockSchedule.forEach(exam => {
-        const ref = doc(firestore, 'examSchedule', exam.id);
-        batch.set(ref, exam);
-      });
-
-      await batch.commit();
-      toast({ title: 'Mock Data Populated', description: 'Sample data has been written to Firestore.' });
-    } catch (error: any) {
-      console.error("Error populating mock data:", error);
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to populate mock data.' });
-    }
+  const handlePopulateMockData = () => {
+    toast({ title: 'Populating Mock Data...', description: 'Sample data has been loaded into the application state.' });
+    setStudents(generateMockStudents());
+    setClassrooms(generateMockClassrooms().map(c => createClassroom(c)));
+    setInvigilators(generateMockInvigilators());
+    setExamSchedule(generateMockExamSchedule());
   };
 
   const handleClearAllData = () => {
-     toast({
-        variant: 'destructive',
-        title: 'Action Disabled',
-        description: 'Clearing all data from the database is disabled for safety. This can be re-enabled by an administrator.',
-    });
+    toast({ title: 'Data Cleared', description: 'All local data has been cleared.' });
+    setStudents([]);
+    setClassrooms([]);
+    setInvigilators([]);
+    setExamSchedule([]);
   };
 
   const handleExportMasterReport = () => {
@@ -131,7 +88,7 @@ export default function ImportExportPage() {
         toast({
             variant: 'destructive',
             title: 'Data Not Loaded',
-            description: 'Please wait for all data to load from the database before exporting.',
+            description: 'Please wait for all data to load before exporting.',
         });
         return;
     }
@@ -219,7 +176,7 @@ export default function ImportExportPage() {
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete all student, classroom, invigilator, and schedule data from the application.
+                                        This action cannot be undone. This will permanently delete all student, classroom, invigilator, and schedule data from the application state.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

@@ -11,9 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { User, Calendar, Clock, Building, BookOpen } from 'lucide-react';
 import { AllotmentContext } from '@/context/AllotmentContext';
+import { DataContext } from '@/context/DataContext';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
 import { Invigilator } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -21,11 +20,14 @@ export default function InvigilatorHistoryPage() {
   const params = useParams();
   const { invigilatorId } = params;
   
-  const firestore = useFirestore();
-  const invigilatorRef = useMemoFirebase(() => firestore && invigilatorId ? doc(firestore, 'invigilators', invigilatorId as string) : null, [firestore, invigilatorId]);
-  const { data: invigilator, isLoading } = useDoc<Invigilator>(invigilatorRef);
-  
+  const { invigilators } = useContext(DataContext);
   const { fullAllotment } = useContext(AllotmentContext);
+
+  const invigilator = useMemo(() => {
+    return invigilators.find(i => i.id === invigilatorId);
+  }, [invigilators, invigilatorId]);
+
+  const isLoading = !invigilator && invigilators.length === 0;
 
   const dutyHistory = useMemo(() => {
     if (!fullAllotment || !invigilatorId) return [];

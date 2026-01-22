@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useContext } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -9,27 +9,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Building, Search, CalendarOff, Users2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Classroom, createClassroom } from '@/lib/types';
+import { Classroom } from '@/lib/types';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataContext } from '@/context/DataContext';
 
 export default function ClassroomsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const firestore = useFirestore();
-
-  const classroomsCol = useMemoFirebase(() => firestore ? collection(firestore, 'classrooms') : null, [firestore]);
-  const { data: classroomsData, isLoading } = useCollection<Omit<Classroom, 'capacity'>>(classroomsCol);
-  
-  // Re-create the full classroom objects with the capacity getter
-  const classrooms = useMemo(() => (classroomsData || []).map(c => createClassroom(c)), [classroomsData]);
-
-  const examScheduleCol = useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]);
-  const { data: examSchedule } = useCollection(examScheduleCol);
+  const { classrooms, setClassrooms, examSchedule } = useContext(DataContext);
+  const isLoading = !classrooms; // Simulate loading state
 
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Classroom | null }>({ isOpen: false, resource: null });
 
@@ -54,10 +44,12 @@ export default function ClassroomsPage() {
   }
 
   const handleAddUnavailability = (slotId: string, reason: string) => {
-    if (!dialogState.resource || !firestore) return;
+    if (!dialogState.resource) return;
 
     const resourceName = dialogState.resource.id;
-    if (dialogState.resource.unavailableSlots.some(s => s.slotId === slotId)) {
+    const isAlreadyUnavailable = dialogState.resource.unavailableSlots.some(s => s.slotId === slotId);
+
+    if (isAlreadyUnavailable) {
         toast({
             variant: 'destructive',
             title: 'Already Unavailable',
@@ -66,34 +58,45 @@ export default function ClassroomsPage() {
         return;
     }
 
-    const classroomRef = doc(firestore, 'classrooms', dialogState.resource.id);
-    const newSlots = [...dialogState.resource.unavailableSlots, { slotId, reason }];
-    updateDocumentNonBlocking(classroomRef, { unavailableSlots: newSlots });
+    const updatedClassrooms = classrooms.map(c => {
+      if (c.id === dialogState.resource!.id) {
+        const newSlots = [...c.unavailableSlots, { slotId, reason }];
+        return { ...c, unavailableSlots: newSlots };
+      }
+      return c;
+    });
+    setClassrooms(updatedClassrooms as Classroom[]);
 
     toast({
         title: 'Unavailability Added',
         description: `${resourceName} is now unavailable for the selected slot.`,
     });
-
-    const updatedResource = { ...dialogState.resource, unavailableSlots: newSlots };
-    setDialogState({ isOpen: true, resource: updatedResource });
+    
+    // The dialog needs to be updated with the new state
+    const updatedResource = updatedClassrooms.find(c => c.id === dialogState.resource!.id);
+    setDialogState({ isOpen: true, resource: updatedResource || null });
   };
 
   const handleRemoveUnavailability = (slotId: string) => {
-    if (!dialogState.resource || !firestore) return;
+    if (!dialogState.resource) return;
 
     const resourceName = dialogState.resource.id;
-    const classroomRef = doc(firestore, 'classrooms', dialogState.resource.id);
-    const newSlots = dialogState.resource.unavailableSlots.filter(s => s.slotId !== slotId);
-    updateDocumentNonBlocking(classroomRef, { unavailableSlots: newSlots });
+    const updatedClassrooms = classrooms.map(c => {
+      if (c.id === dialogState.resource!.id) {
+        const newSlots = c.unavailableSlots.filter(s => s.slotId !== slotId);
+        return { ...c, unavailableSlots: newSlots };
+      }
+      return c;
+    });
+    setClassrooms(updatedClassrooms as Classroom[]);
     
     toast({
         title: 'Unavailability Removed',
         description: `${resourceName} is now available for the selected slot.`,
     });
 
-    const updatedResource = { ...dialogState.resource, unavailableSlots: newSlots };
-    setDialogState({ isOpen: true, resource: updatedResource });
+    const updatedResource = updatedClassrooms.find(c => c.id === dialogState.resource!.id);
+    setDialogState({ isOpen: true, resource: updatedResource || null });
   };
 
   return (
@@ -151,17 +154,11 @@ export default function ClassroomsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                           <TableRow key={`skel-${i}`}>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                              <TableCell><Skeleton className="h-6 w-28" /></TableCell>
-                              <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                              <TableCell className="text-right"><Skeleton className="h-8 w-40 ml-auto" /></TableCell>
+                        {isLoading && (
+                           <TableRow>
+                              <TableCell colSpan={7} className="text-center p-8">Loading classroom data...</TableCell>
                            </TableRow>
-                        ))}
+                        )}
                         {!isLoading && filteredClassrooms.map((room) => (
                           <TableRow key={room.id}>
                             <TableCell className="font-medium">{room.id}</TableCell>
