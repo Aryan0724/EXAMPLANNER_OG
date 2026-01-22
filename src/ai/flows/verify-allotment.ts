@@ -28,7 +28,6 @@ const VerifyAllotmentOutputSchema = z.object({
   isVerified: z.boolean().describe('Whether the plan is verified and adheres to all rules.'),
   reasoning: z.string().describe('A detailed explanation of why the plan was or was not verified. If not verified, it should include specific examples of what is wrong and suggestions for improvement.'),
 });
-export type VerifyAllotmentOutput = z.infer<typeof VerifyAllotmentOutputSchema>;
 
 export async function verifyAllotmentPlan(input: VerifyAllotmentInput): Promise<VerifyAllotmentOutput> {
   return verifyAllotmentFlow(input);
@@ -42,7 +41,7 @@ const prompt = ai.definePrompt({
 
 You will be given a generated allotment plan in a simplified JSON format and a set of strict rules.
 
-Your task is to analyze the provided JSON plan against the rules. Determine if the plan is valid. You MUST provide a clear "isVerified" status (true or false) and a detailed "reasoning".
+Your task is to analyze the provided JSON plan against the rules and determine if the plan is valid.
 
 RULES:
 ${SEATING_RULES}
@@ -52,8 +51,7 @@ ALLOTMENT PLAN (Simplified JSON for one session):
 {{{allotmentPlan}}}
 \`\`\`
 
-Analyze the plan and respond with your verification result.
-If the plan fails verification, you MUST point out specific examples from the JSON data. For example, if two students from the same course are on the same bench, mention their roll numbers, subjects, and the classroom. If a room is inefficiently filled, mention the room and how many seats are wasted.
+If the plan fails verification, your reasoning MUST point out specific examples from the JSON data. For example, if two students from the same course are on the same bench, mention their roll numbers, subjects, and the classroom. If a room is inefficiently filled, mention the room and how many seats are wasted.
 `,
 });
 
