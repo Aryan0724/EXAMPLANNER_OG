@@ -21,7 +21,6 @@ const SEATING_RULES = `
 
 const VerifyAllotmentInputSchema = z.object({
   allotmentPlan: z.string().describe('A JSON string representing a simplified allotment plan for a single exam session. This JSON contains an array of rooms, each with a layout and a list of assigned seats (seat number, roll number, and subject code).'),
-  rules: z.string().describe('A string containing the set of rules the plan must adhere to.'),
 });
 export type VerifyAllotmentInput = z.infer<typeof VerifyAllotmentInputSchema>;
 
@@ -32,12 +31,7 @@ const VerifyAllotmentOutputSchema = z.object({
 export type VerifyAllotmentOutput = z.infer<typeof VerifyAllotmentOutputSchema>;
 
 export async function verifyAllotmentPlan(input: VerifyAllotmentInput): Promise<VerifyAllotmentOutput> {
-  // Pre-fill the rules in the input
-  const fullInput = {
-    ...input,
-    rules: SEATING_RULES,
-  };
-  return verifyAllotmentFlow(fullInput);
+  return verifyAllotmentFlow(input);
 }
 
 const prompt = ai.definePrompt({
@@ -51,7 +45,7 @@ You will be given a generated allotment plan in a simplified JSON format and a s
 Your task is to analyze the provided JSON plan against the rules. Determine if the plan is valid. You MUST provide a clear "isVerified" status (true or false) and a detailed "reasoning".
 
 RULES:
-{{{rules}}}
+${SEATING_RULES}
 
 ALLOTMENT PLAN (Simplified JSON for one session):
 \`\`\`json

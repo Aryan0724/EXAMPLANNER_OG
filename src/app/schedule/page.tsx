@@ -121,7 +121,6 @@ export default function SchedulePage() {
                 
                 const verificationResult = await verifyAllotmentPlan({
                     allotmentPlan: JSON.stringify(roomsForVerification, null, 2),
-                    rules: '' // The flow will populate the rules
                 });
 
 
