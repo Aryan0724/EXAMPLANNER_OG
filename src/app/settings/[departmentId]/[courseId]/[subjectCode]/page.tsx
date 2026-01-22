@@ -18,7 +18,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Ban, Search } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Input } from '@/components/ui/input';
-import { DataContext } from '@/context/DataContext';
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 
 interface IneligibilityDialogProps { 
     isOpen: boolean; 
@@ -74,8 +75,15 @@ const IneligibilityDialog = ({ isOpen, onClose, onSubmit, studentName, subjectCo
 
 export default function SubjectStudentsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string, subjectCode: string } }) {
     const params = use(paramsProp);
-    const { students, setStudents, examSchedule } = useContext(DataContext);
-    const [dialogState, setDialogState] = useState<{isOpen: boolean; studentId: string | null; studentName: string | null}>({ isOpen: false, studentId: null, studentName: null });
+    const firestore = useFirestore();
+    
+    const { data: studentsData } = useCollection<Student>(useMemoFirebase(() => firestore ? collection(firestore, 'students') : null, [firestore]));
+    const students = studentsData || [];
+
+    const { data: examScheduleData } = useCollection(useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]));
+    const examSchedule = examScheduleData || [];
+
+    const [dialogState, setDialogState] = useState<{isOpen: boolean; student: Student | null}>({ isOpen: false, student: null });
     const [searchQuery, setSearchQuery] = useState('');
 
     const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
@@ -98,66 +106,48 @@ export default function SubjectStudentsPage({ params: paramsProp }: { params: { 
     }, [students, courseName, departmentName, searchQuery]);
 
 
-    const handleToggleEligibility = (studentId: string) => {
-        const student = students.find(s => s.id === studentId);
-        if (!student) return;
-
+    const handleToggleEligibility = (student: Student) => {
+        if (!firestore) return;
+        const studentRef = doc(firestore, 'students', student.id);
         const isCurrentlyIneligible = student.ineligibilityRecords.some(r => r.subjectCode === params.subjectCode);
 
         if (isCurrentlyIneligible) {
-            let studentName = '';
-            setStudents(prevStudents => {
-                const newStudents = prevStudents.map(s => {
-                    if (s.id === studentId) {
-                        studentName = s.name;
-                        return { ...s, ineligibilityRecords: s.ineligibilityRecords.filter(r => r.subjectCode !== params.subjectCode) };
-                    }
-                    return s;
-                });
-                return newStudents;
+            const newRecords = student.ineligibilityRecords.filter(r => r.subjectCode !== params.subjectCode);
+            updateDocumentNonBlocking(studentRef, { ineligibilityRecords: newRecords });
+            toast({
+                title: `Eligibility Updated for ${student.name}`,
+                description: `${student.name} is now ELIGIBLE for ${params.subjectCode}.`,
             });
-             if (studentName) {
-                toast({
-                    title: `Eligibility Updated for ${studentName}`,
-                    description: `${studentName} is now ELIGIBLE for ${params.subjectCode}.`,
-                });
-            }
         } else {
-            setDialogState({ isOpen: true, studentId, studentName: student.name });
+            setDialogState({ isOpen: true, student });
         }
     };
 
     const handleConfirmIneligibility = (reason: string) => {
-        if (!dialogState.studentId) return;
-        let studentName = '';
-        setStudents(prevStudents => {
-            return prevStudents.map(student => {
-                if (student.id === dialogState.studentId) {
-                    studentName = student.name;
-                    const newRecord = { subjectCode: params.subjectCode, reason };
-                    return { ...student, ineligibilityRecords: [...student.ineligibilityRecords, newRecord] };
-                }
-                return student;
-            });
-        });
-
-        if (studentName) {
-            toast({
-                title: `Eligibility Updated for ${studentName}`,
-                description: `${studentName} is now INELIGIBLE for ${params.subjectCode}. Reason: ${reason}`,
-            });
-        }
+        if (!dialogState.student || !firestore) return;
         
-        setDialogState({ isOpen: false, studentId: null, studentName: null });
+        const student = dialogState.student;
+        const studentRef = doc(firestore, 'students', student.id);
+        const newRecord = { subjectCode: params.subjectCode, reason };
+        const newRecords = [...student.ineligibilityRecords, newRecord];
+
+        updateDocumentNonBlocking(studentRef, { ineligibilityRecords: newRecords });
+        
+        toast({
+            title: `Eligibility Updated for ${student.name}`,
+            description: `${student.name} is now INELIGIBLE for ${params.subjectCode}. Reason: ${reason}`,
+        });
+        
+        setDialogState({ isOpen: false, student: null });
     };
 
     return (
         <SidebarProvider>
             <IneligibilityDialog 
                 isOpen={dialogState.isOpen}
-                onClose={() => setDialogState({ isOpen: false, studentId: null, studentName: null })}
+                onClose={() => setDialogState({ isOpen: false, student: null })}
                 onSubmit={handleConfirmIneligibility}
-                studentName={dialogState.studentName || ''}
+                studentName={dialogState.student?.name || ''}
                 subjectCode={params.subjectCode}
             />
             <div className="flex min-h-screen">
@@ -231,7 +221,7 @@ export default function SubjectStudentsPage({ params: paramsProp }: { params: { 
                                                                 }
                                                             </TableCell>
                                                             <TableCell className="text-right">
-                                                                <Button variant="outline" size="sm" onClick={() => handleToggleEligibility(student.id)}>
+                                                                <Button variant="outline" size="sm" onClick={() => handleToggleEligibility(student)}>
                                                                     <Ban className="mr-2 h-3 w-3" />
                                                                     Toggle Eligibility
                                                                 </Button>

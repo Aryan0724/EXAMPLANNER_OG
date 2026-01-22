@@ -1,8 +1,9 @@
+
 import type {Metadata} from 'next';
 import { Toaster } from "@/components/ui/toaster"
 import './globals.css';
 import { AllotmentProvider } from '@/context/AllotmentContext';
-import { DataProvider } from '@/context/DataContext';
+import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
   title: 'Examplanner',
@@ -23,11 +24,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <DataProvider>
-          <AllotmentProvider>
-              {children}
-          </AllotmentProvider>
-        </DataProvider>
+        <FirebaseClientProvider>
+            <AllotmentProvider>
+                {children}
+            </AllotmentProvider>
+        </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>

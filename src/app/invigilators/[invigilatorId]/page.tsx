@@ -10,20 +10,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { User, Calendar, Clock, Building, BookOpen } from 'lucide-react';
-import { DataContext } from '@/context/DataContext';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { Invigilator } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function InvigilatorHistoryPage() {
   const params = useParams();
   const { invigilatorId } = params;
   
-  const { invigilators } = useContext(DataContext);
+  const firestore = useFirestore();
+  const invigilatorRef = useMemoFirebase(() => firestore && invigilatorId ? doc(firestore, 'invigilators', invigilatorId as string) : null, [firestore, invigilatorId]);
+  const { data: invigilator, isLoading } = useDoc<Invigilator>(invigilatorRef);
+  
   const { fullAllotment } = useContext(AllotmentContext);
-
-  const invigilator = useMemo(() => {
-    return invigilators.find(inv => inv.id === invigilatorId);
-  }, [invigilators, invigilatorId]);
 
   const dutyHistory = useMemo(() => {
     if (!fullAllotment || !invigilatorId) return [];
@@ -54,6 +56,28 @@ export default function InvigilatorHistoryPage() {
         return dateA.getTime() - dateB.getTime();
     });
   }, [fullAllotment, invigilatorId]);
+
+  if (isLoading) {
+    return (
+      <SidebarProvider>
+        <div className="flex min-h-screen">
+          <MainSidebar />
+          <SidebarInset>
+            <div className="flex flex-col h-full">
+              <MainHeader />
+              <main className="flex-1 p-6">
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-1/2" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              </main>
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    );
+  }
 
   if (!invigilator) {
     return (

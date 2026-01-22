@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useContext } from 'react';
+import { useState, useMemo } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -9,16 +9,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Building, Search, CalendarOff, Users2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Classroom } from '@/lib/types';
+import { Classroom, createClassroom } from '@/lib/types';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { DataContext } from '@/context/DataContext';
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ClassroomsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const { classrooms, setClassrooms, examSchedule } = useContext(DataContext);
+  const firestore = useFirestore();
+
+  const classroomsCol = useMemoFirebase(() => firestore ? collection(firestore, 'classrooms') : null, [firestore]);
+  const { data: classroomsData, isLoading } = useCollection<Omit<Classroom, 'capacity'>>(classroomsCol);
+  
+  // Re-create the full classroom objects with the capacity getter
+  const classrooms = useMemo(() => (classroomsData || []).map(c => createClassroom(c)), [classroomsData]);
+
+  const examScheduleCol = useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]);
+  const { data: examSchedule } = useCollection(examScheduleCol);
+
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Classroom | null }>({ isOpen: false, resource: null });
 
   const filteredClassrooms = useMemo(() => {
@@ -42,57 +54,46 @@ export default function ClassroomsPage() {
   }
 
   const handleAddUnavailability = (slotId: string, reason: string) => {
-    if (!dialogState.resource) return;
+    if (!dialogState.resource || !firestore) return;
 
-    let resourceName = '';
-    const updatedClassrooms = classrooms.map(c => {
-      if (c.id === dialogState.resource?.id) {
-        resourceName = c.id;
-        // Avoid adding duplicate unavailability
-        if (c.unavailableSlots.some(s => s.slotId === slotId)) {
-          toast({
+    const resourceName = dialogState.resource.id;
+    if (dialogState.resource.unavailableSlots.some(s => s.slotId === slotId)) {
+        toast({
             variant: 'destructive',
             title: 'Already Unavailable',
             description: `${resourceName} is already marked as unavailable for this slot.`,
-          });
-          return c;
-        }
-        const newSlots = [...c.unavailableSlots, { slotId, reason }];
-        return { ...c, unavailableSlots: newSlots };
-      }
-      return c;
+        });
+        return;
+    }
+
+    const classroomRef = doc(firestore, 'classrooms', dialogState.resource.id);
+    const newSlots = [...dialogState.resource.unavailableSlots, { slotId, reason }];
+    updateDocumentNonBlocking(classroomRef, { unavailableSlots: newSlots });
+
+    toast({
+        title: 'Unavailability Added',
+        description: `${resourceName} is now unavailable for the selected slot.`,
     });
 
-    setDialogState(prev => ({ ...prev, resource: updatedClassrooms.find(c => c.id === prev.resource?.id) || null }));
-    setClassrooms(updatedClassrooms);
-    
-    if (resourceName) {
-        toast({
-            title: 'Unavailability Added',
-            description: `${resourceName} is now unavailable for the selected slot.`,
-        });
-    }
+    const updatedResource = { ...dialogState.resource, unavailableSlots: newSlots };
+    setDialogState({ isOpen: true, resource: updatedResource });
   };
 
   const handleRemoveUnavailability = (slotId: string) => {
-    if (!dialogState.resource) return;
+    if (!dialogState.resource || !firestore) return;
 
-    let resourceName = '';
-    const updatedClassrooms = classrooms.map(c => {
-        if (c.id === dialogState.resource?.id) {
-            resourceName = c.id;
-            const newSlots = c.unavailableSlots.filter(s => s.slotId !== slotId);
-            return { ...c, unavailableSlots: newSlots };
-        }
-        return c;
-    });
+    const resourceName = dialogState.resource.id;
+    const classroomRef = doc(firestore, 'classrooms', dialogState.resource.id);
+    const newSlots = dialogState.resource.unavailableSlots.filter(s => s.slotId !== slotId);
+    updateDocumentNonBlocking(classroomRef, { unavailableSlots: newSlots });
     
-    setDialogState(prev => ({ ...prev, resource: updatedClassrooms.find(c => c.id === prev.resource?.id) || null }));
-    setClassrooms(updatedClassrooms);
     toast({
         title: 'Unavailability Removed',
         description: `${resourceName} is now available for the selected slot.`,
     });
+
+    const updatedResource = { ...dialogState.resource, unavailableSlots: newSlots };
+    setDialogState({ isOpen: true, resource: updatedResource });
   };
 
   return (
@@ -104,6 +105,7 @@ export default function ClassroomsPage() {
         resourceType="Classroom"
         onSubmit={handleAddUnavailability}
         onRemove={handleRemoveUnavailability}
+        examSchedule={examSchedule || []}
       />
       <div className="flex min-h-screen">
         <MainSidebar />
@@ -149,7 +151,18 @@ export default function ClassroomsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredClassrooms.map((room) => (
+                        {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                           <TableRow key={`skel-${i}`}>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                              <TableCell><Skeleton className="h-6 w-28" /></TableCell>
+                              <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                              <TableCell className="text-right"><Skeleton className="h-8 w-40 ml-auto" /></TableCell>
+                           </TableRow>
+                        ))}
+                        {!isLoading && filteredClassrooms.map((room) => (
                           <TableRow key={room.id}>
                             <TableCell className="font-medium">{room.id}</TableCell>
                             <TableCell>{room.roomNo}</TableCell>
@@ -171,7 +184,7 @@ export default function ClassroomsPage() {
                                 )}
                             </TableCell>
                             <TableCell className="text-right">
-                                <Button variant="outline" size="sm" onClick={() => openDialog(room)}>
+                                <Button variant="outline" size="sm" onClick={() => openDialog(room)} disabled={!examSchedule}>
                                     <CalendarOff className="mr-2 h-3 w-3" />
                                     Manage Availability
                                 </Button>
@@ -180,7 +193,7 @@ export default function ClassroomsPage() {
                         ))}
                       </TableBody>
                     </Table>
-                     {filteredClassrooms.length === 0 && (
+                     {!isLoading && filteredClassrooms.length === 0 && (
                         <div className="text-center p-8 text-muted-foreground">
                             No classrooms found.
                         </div>

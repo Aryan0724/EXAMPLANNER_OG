@@ -658,13 +658,3 @@ export const generateMockExamSchedule = (): ExamSlot[] => {
 
     return schedule.sort((a,b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
 };
-
-
-// Initial empty data, to be populated by user or mock data function
-export let STUDENTS: Student[] = [];
-
-export let CLASSROOMS: Classroom[] = [];
-
-export let INVIGILATORS: Invigilator[] = [];
-
-export let EXAM_SCHEDULE: ExamSlot[] = [];

@@ -13,17 +13,32 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { COURSES, DEPARTMENTS } from '@/lib/data';
-import type { ExamSlot, InvigilatorAssignment, SeatPlan } from '@/lib/types';
+import type { ExamSlot, InvigilatorAssignment, SeatPlan, Student, Classroom, Invigilator } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AllotmentContext } from '@/context/AllotmentContext';
-import { DataContext } from '@/context/DataContext';
 import { ExamDialog } from '@/components/exam-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, writeBatch } from 'firebase/firestore';
+import { createClassroom } from '@/lib/types';
 
 
 export default function SchedulePage() {
-    const { students, classrooms, invigilators, examSchedule, setExamSchedule, setStudents, setInvigilators } = useContext(DataContext);
+    const firestore = useFirestore();
+
+    const { data: studentsData } = useCollection<Student>(useMemoFirebase(() => firestore ? collection(firestore, 'students') : null, [firestore]));
+    const students = studentsData || [];
+
+    const { data: classroomsData } = useCollection<Omit<Classroom, 'capacity'>>(useMemoFirebase(() => firestore ? collection(firestore, 'classrooms') : null, [firestore]));
+    const classrooms = useMemo(() => (classroomsData || []).map(c => createClassroom(c)), [classroomsData]);
+
+    const { data: invigilatorsData } = useCollection<Invigilator>(useMemoFirebase(() => firestore ? collection(firestore, 'invigilators') : null, [firestore]));
+    const invigilators = invigilatorsData || [];
+
+    const { data: examScheduleData } = useCollection<ExamSlot>(useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]));
+    const examSchedule = examScheduleData || [];
+
     const [searchQuery, setSearchQuery] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -56,6 +71,10 @@ export default function SchedulePage() {
             });
             return;
         }
+        if (!firestore) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Database connection not found.' });
+            return;
+        }
 
         setIsGenerating(true);
         toast({ title: 'Generating Full Allotment...', description: 'The algorithm is creating plans session by session. This may take some time.' });
@@ -63,8 +82,8 @@ export default function SchedulePage() {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         try {
-            let studentMasterList = JSON.parse(JSON.stringify(students));
-            let invigilatorMasterList = JSON.parse(JSON.stringify(invigilators));
+            let studentMasterList: Student[] = JSON.parse(JSON.stringify(students));
+            let invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
             let classroomMasterList = JSON.parse(JSON.stringify(classrooms));
 
             const examSlotsByTime = examSchedule.reduce((acc, exam) => {
@@ -95,13 +114,26 @@ export default function SchedulePage() {
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
             
-            setStudents(studentMasterList); 
-            setInvigilators(invigilatorMasterList);
+            // Batch update Firestore
+            const studentBatch = writeBatch(firestore);
+            studentMasterList.forEach(student => {
+                const studentRef = doc(firestore, 'students', student.id);
+                studentBatch.set(studentRef, student);
+            });
+            await studentBatch.commit();
+
+            const invigilatorBatch = writeBatch(firestore);
+            invigilatorMasterList.forEach(inv => {
+                const invRef = doc(firestore, 'invigilators', inv.id);
+                invigilatorBatch.set(invRef, inv);
+            });
+            await invigilatorBatch.commit();
+
             setFullAllotment(generatedPlans);
 
             toast({
                 title: 'Generation Complete!',
-                description: 'Full allotment has been generated for all exam sessions.',
+                description: 'Full allotment has been generated for all exam sessions and saved.',
                 action: <Button onClick={() => router.push('/allotment')}>View Allotment</Button>,
                 duration: 10000
             });
@@ -119,13 +151,16 @@ export default function SchedulePage() {
     };
 
     const handleSaveExam = (exam: ExamSlot) => {
+        if (!firestore) return;
+        const examRef = doc(firestore, 'examSchedule', exam.id);
+
         if (selectedExam) {
             // Update
-            setExamSchedule(prev => prev.map(e => e.id === exam.id ? exam : e));
+            updateDocumentNonBlocking(examRef, exam);
             toast({ title: "Exam Updated", description: `Subject ${exam.subjectCode} has been updated.` });
         } else {
             // Create
-            setExamSchedule(prev => [...prev, { ...exam, id: `E${Date.now()}` }]);
+            setDocumentNonBlocking(examRef, exam, { merge: false });
             toast({ title: "Exam Added", description: `Subject ${exam.subjectCode} has been added to the schedule.` });
         }
         setIsDialogOpen(false);
@@ -138,9 +173,10 @@ export default function SchedulePage() {
     };
     
     const handleDeleteExam = () => {
-        if (examToDelete) {
+        if (examToDelete && firestore) {
             const exam = examSchedule.find(e => e.id === examToDelete);
-            setExamSchedule(prev => prev.filter(e => e.id !== examToDelete));
+            const examRef = doc(firestore, 'examSchedule', examToDelete);
+            deleteDocumentNonBlocking(examRef);
             toast({ title: "Exam Deleted", description: `Subject ${exam?.subjectCode} has been removed from the schedule.` });
             setExamToDelete(null);
             setIsAlertOpen(false);

@@ -10,18 +10,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { BookCopy, ChevronRight, MoreHorizontal, PlusCircle } from 'lucide-react';
 import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
-import { DataContext } from '@/context/DataContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ExamDialog } from '@/components/exam-dialog';
 import { ExamSlot } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
 
 
 export default function CourseSubjectsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string } }) {
   const params = use(paramsProp);
-  const { examSchedule, setExamSchedule } = useContext(DataContext);
+  const firestore = useFirestore();
+
+  const { data: examScheduleData } = useCollection<ExamSlot>(useMemoFirebase(() => firestore ? collection(firestore, 'examSchedule') : null, [firestore]));
+  const examSchedule = examScheduleData || [];
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<ExamSlot | null>(null);
@@ -44,13 +48,13 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
   };
 
   const handleSaveExam = (exam: ExamSlot) => {
+    if (!firestore) return;
+    const examRef = doc(firestore, 'examSchedule', exam.id);
+    setDocumentNonBlocking(examRef, exam, { merge: true });
+
     if (selectedExam) {
-      // Update
-      setExamSchedule(prev => prev.map(e => e.id === exam.id ? exam : e));
       toast({ title: "Subject Updated", description: `Subject ${exam.subjectCode} has been updated.` });
     } else {
-      // Create
-      setExamSchedule(prev => [...prev, { ...exam, id: `E${Date.now()}` }]);
       toast({ title: "Subject Added", description: `Subject ${exam.subjectCode} has been added to this course.` });
     }
     setIsDialogOpen(false);
@@ -63,9 +67,10 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
   };
   
   const handleDeleteExam = () => {
-    if (examToDelete) {
+    if (examToDelete && firestore) {
         const exam = examSchedule.find(e => e.id === examToDelete);
-        setExamSchedule(prev => prev.filter(e => e.id !== examToDelete));
+        const examRef = doc(firestore, 'examSchedule', examToDelete);
+        deleteDocumentNonBlocking(examRef);
         toast({ title: "Subject Deleted", description: `Subject ${exam?.subjectCode} has been removed.` });
         setExamToDelete(null);
         setIsAlertOpen(false);

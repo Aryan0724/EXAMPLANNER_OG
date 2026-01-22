@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useContext } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   Card,
   CardContent,
@@ -12,11 +12,15 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { UploadCloud } from 'lucide-react';
-import { DataContext } from '@/context/DataContext';
+import { collection } from 'firebase/firestore';
+import { Skeleton } from './ui/skeleton';
 
 export function DashboardClient() {
-  const { students, classrooms, invigilators, examSchedule } = useContext(DataContext);
-  const hasData = students.length > 0 || classrooms.length > 0 || invigilators.length > 0 || examSchedule.length > 0;
+  const firestore = useFirestore();
+  const studentsCol = useMemoFirebase(() => firestore ? collection(firestore, 'students') : null, [firestore]);
+  const { data: students, isLoading } = useCollection(studentsCol);
+
+  const hasData = !isLoading && students && students.length > 0;
 
   return (
     <div className="space-y-8">
@@ -64,12 +68,23 @@ export function DashboardClient() {
                 </div>
             </CardContent>
         </Card>
-        {!hasData && (
+        {isLoading && (
+             <Card>
+                <CardHeader>
+                    <Skeleton className="h-6 w-1/2" />
+                    <Skeleton className="h-4 w-3/4" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-10 w-full" />
+                </CardContent>
+            </Card>
+        )}
+        {!hasData && !isLoading && (
              <Card>
                 <CardHeader>
                     <CardTitle>Get Started</CardTitle>
                     <CardDescription>
-                    Your application is empty. Populate it with mock data to see how it works, or upload your own data files.
+                    Your database is empty. Populate it with mock data to see how it works, or upload your own data files.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

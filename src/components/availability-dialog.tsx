@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useContext, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,8 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { X, CalendarOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { AvailabilitySlot, Classroom, Invigilator } from '@/lib/types';
-import { DataContext } from '@/context/DataContext';
+import { AvailabilitySlot, Classroom, ExamSlot, Invigilator } from '@/lib/types';
 
 
 interface AvailabilityDialogProps {
@@ -21,12 +20,12 @@ interface AvailabilityDialogProps {
   resourceType: 'Classroom' | 'Invigilator';
   onSubmit: (slotId: string, reason: string) => void;
   onRemove: (slotId: string) => void;
+  examSchedule: ExamSlot[];
 }
 
-export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, onSubmit, onRemove }: AvailabilityDialogProps) {
+export function AvailabilityDialog({ isOpen, onClose, resource, resourceType, onSubmit, onRemove, examSchedule }: AvailabilityDialogProps) {
   const [selectedSlot, setSelectedSlot] = useState('');
   const [reason, setReason] = useState('');
-  const { examSchedule } = useContext(DataContext);
   const [unavailableSlots, setUnavailableSlots] = useState(resource?.unavailableSlots || []);
 
   useEffect(() => {
