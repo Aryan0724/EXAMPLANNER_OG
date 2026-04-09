@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function InvigilatorHistoryPage() {
   const params = useParams();
   const { invigilatorId } = params;
-  
+
   const { invigilators } = useContext(DataContext);
   const { fullAllotment } = useContext(AllotmentContext);
 
@@ -53,9 +53,9 @@ export default function InvigilatorHistoryPage() {
 
     // Sort duties chronologically
     return duties.sort((a, b) => {
-        const dateA = new Date(`${a.date}T${a.time}`);
-        const dateB = new Date(`${b.date}T${b.time}`);
-        return dateA.getTime() - dateB.getTime();
+      const dateA = new Date(`${a.date}T${a.time}`);
+      const dateB = new Date(`${b.date}T${b.time}`);
+      return dateA.getTime() - dateB.getTime();
     });
   }, [fullAllotment, invigilatorId]);
 
@@ -122,15 +122,25 @@ export default function InvigilatorHistoryPage() {
               </div>
 
               <div className="space-y-6">
-                <Card>
+                <Card className="bg-gradient-to-br from-background to-muted/50 border-primary/5">
                   <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <User className="h-8 w-8 text-primary" />
-                      <div>
-                        <CardTitle className="text-2xl">{invigilator.name}</CardTitle>
-                        <CardDescription>
-                          ID: {invigilator.id} | Department: {invigilator.department}
-                        </CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-inner ${invigilator.gender === 'Female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {invigilator.name.charAt(4)}
+                        </div>
+                        <div>
+                          <CardTitle className="text-3xl font-bold tracking-tight">{invigilator.name}</CardTitle>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            <Badge variant="outline" className="uppercase text-[10px] tracking-widest">{invigilator.designation}</Badge>
+                            <Badge variant="secondary" className="uppercase text-[10px] tracking-widest">{invigilator.department}</Badge>
+                            <Badge variant="outline" className="uppercase text-[10px] tracking-widest font-mono">ID: {invigilator.id}</Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground uppercase tracking-tighter">Total Duties</div>
+                        <div className="text-4xl font-black text-primary">{dutyHistory.length}</div>
                       </div>
                     </div>
                   </CardHeader>
@@ -171,9 +181,9 @@ export default function InvigilatorHistoryPage() {
                     </div>
                     {dutyHistory.length === 0 && (
                       <div className="text-center p-8 text-muted-foreground">
-                        {fullAllotment 
-                            ? `No duties have been assigned to ${invigilator.name} in the current allotment.`
-                            : "Generate a full allotment from the Schedule page to see duty history."
+                        {fullAllotment
+                          ? `No duties have been assigned to ${invigilator.name} in the current allotment.`
+                          : "Generate a full allotment from the Schedule page to see duty history."
                         }
                       </div>
                     )}

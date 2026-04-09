@@ -6,11 +6,12 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Search, CalendarOff, Users2 } from 'lucide-react';
+import { Building, Search, CalendarOff, Users2, Settings2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Classroom } from '@/lib/types';
 import { AvailabilityDialog } from '@/components/availability-dialog';
+import { BlockPriorityDialog } from '@/components/block-priority-dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -18,10 +19,21 @@ import { DataContext } from '@/context/DataContext';
 
 export default function ClassroomsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const { classrooms, setClassrooms, examSchedule } = useContext(DataContext);
+  const {
+    classrooms,
+    setClassrooms,
+    examSchedule,
+    blockPriority,
+    setBlockPriority,
+    excludedBlocks,
+    setExcludedBlocks,
+    excludedRooms,
+    setExcludedRooms
+  } = useContext(DataContext);
   const isLoading = !classrooms; // Simulate loading state
 
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Classroom | null }>({ isOpen: false, resource: null });
+  const [isPriorityDialogOpen, setIsPriorityDialogOpen] = useState(false);
 
   const filteredClassrooms = useMemo(() => {
     if (!searchQuery) {
@@ -35,13 +47,28 @@ export default function ClassroomsPage() {
     );
   }, [searchQuery, classrooms]);
 
+  const availableBlocks = useMemo(() => {
+    const blocks = new Set(classrooms.map(c => c.building));
+    return Array.from(blocks).sort();
+  }, [classrooms]);
+
   const openDialog = (classroom: Classroom) => {
     setDialogState({ isOpen: true, resource: classroom });
   };
-  
+
   const closeDialog = () => {
     setDialogState({ isOpen: false, resource: null });
   }
+
+  const handleSavePriority = (newPriority: string[], exBlocks: string[], exRooms: string[]) => {
+    setBlockPriority(newPriority);
+    setExcludedBlocks(exBlocks);
+    setExcludedRooms(exRooms);
+    toast({
+      title: 'Settings Updated',
+      description: 'Allotment preferences have been saved.',
+    });
+  };
 
   const handleAddUnavailability = (slotId: string, reason: string) => {
     if (!dialogState.resource) return;
@@ -50,12 +77,12 @@ export default function ClassroomsPage() {
     const isAlreadyUnavailable = dialogState.resource.unavailableSlots.some(s => s.slotId === slotId);
 
     if (isAlreadyUnavailable) {
-        toast({
-            variant: 'destructive',
-            title: 'Already Unavailable',
-            description: `${resourceName} is already marked as unavailable for this slot.`,
-        });
-        return;
+      toast({
+        variant: 'destructive',
+        title: 'Already Unavailable',
+        description: `${resourceName} is already marked as unavailable for this slot.`,
+      });
+      return;
     }
 
     const updatedClassrooms = classrooms.map(c => {
@@ -68,10 +95,10 @@ export default function ClassroomsPage() {
     setClassrooms(updatedClassrooms as Classroom[]);
 
     toast({
-        title: 'Unavailability Added',
-        description: `${resourceName} is now unavailable for the selected slot.`,
+      title: 'Unavailability Added',
+      description: `${resourceName} is now unavailable for the selected slot.`,
     });
-    
+
     // The dialog needs to be updated with the new state
     const updatedResource = updatedClassrooms.find(c => c.id === dialogState.resource!.id);
     setDialogState({ isOpen: true, resource: updatedResource || null });
@@ -89,10 +116,10 @@ export default function ClassroomsPage() {
       return c;
     });
     setClassrooms(updatedClassrooms as Classroom[]);
-    
+
     toast({
-        title: 'Unavailability Removed',
-        description: `${resourceName} is now available for the selected slot.`,
+      title: 'Unavailability Removed',
+      description: `${resourceName} is now available for the selected slot.`,
     });
 
     const updatedResource = updatedClassrooms.find(c => c.id === dialogState.resource!.id);
@@ -109,6 +136,16 @@ export default function ClassroomsPage() {
         onSubmit={handleAddUnavailability}
         onRemove={handleRemoveUnavailability}
         examSchedule={examSchedule || []}
+      />
+      <BlockPriorityDialog
+        isOpen={isPriorityDialogOpen}
+        onClose={() => setIsPriorityDialogOpen(false)}
+        currentPriority={blockPriority}
+        availableBlocks={availableBlocks}
+        excludedBlocks={excludedBlocks}
+        excludedRooms={excludedRooms}
+        classrooms={classrooms}
+        onSave={handleSavePriority}
       />
       <div className="flex min-h-screen">
         <MainSidebar />
@@ -127,15 +164,19 @@ export default function ClassroomsPage() {
                       <CardDescription>List of all classrooms available for examinations.</CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-full max-w-sm">
+                      <Button variant="outline" onClick={() => setIsPriorityDialogOpen(true)} className="gap-2">
+                        <Settings2 className="h-4 w-4" />
+                        Priority Settings
+                      </Button>
+                      <div className="w-full max-w-sm">
                         <Input
-                            placeholder="Search by ID, Room No, Building..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-8"
-                            icon={<Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
+                          placeholder="Search by ID, Room No, Building..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-8"
+                          icon={<Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
                         />
-                        </div>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -155,9 +196,9 @@ export default function ClassroomsPage() {
                       </TableHeader>
                       <TableBody>
                         {isLoading && (
-                           <TableRow>
-                              <TableCell colSpan={7} className="text-center p-8">Loading classroom data...</TableCell>
-                           </TableRow>
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center p-8">Loading classroom data...</TableCell>
+                          </TableRow>
                         )}
                         {!isLoading && filteredClassrooms.map((room) => (
                           <TableRow key={room.id}>
@@ -174,26 +215,26 @@ export default function ClassroomsPage() {
                               )}
                             </TableCell>
                             <TableCell>
-                                {room.unavailableSlots.length > 0 ? (
-                                    <Badge variant="destructive">Unavailable ({room.unavailableSlots.length} slots)</Badge>
-                                ) : (
-                                    <Badge variant="secondary">Available</Badge>
-                                )}
+                              {room.unavailableSlots.length > 0 ? (
+                                <Badge variant="destructive">Unavailable ({room.unavailableSlots.length} slots)</Badge>
+                              ) : (
+                                <Badge variant="secondary">Available</Badge>
+                              )}
                             </TableCell>
                             <TableCell className="text-right">
-                                <Button variant="outline" size="sm" onClick={() => openDialog(room)} disabled={!examSchedule}>
-                                    <CalendarOff className="mr-2 h-3 w-3" />
-                                    Manage Availability
-                                </Button>
+                              <Button variant="outline" size="sm" onClick={() => openDialog(room)} disabled={!examSchedule}>
+                                <CalendarOff className="mr-2 h-3 w-3" />
+                                Manage Availability
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                     {!isLoading && filteredClassrooms.length === 0 && (
-                        <div className="text-center p-8 text-muted-foreground">
-                            No classrooms found.
-                        </div>
+                    {!isLoading && filteredClassrooms.length === 0 && (
+                      <div className="text-center p-8 text-muted-foreground">
+                        No classrooms found.
+                      </div>
                     )}
                   </div>
                 </CardContent>

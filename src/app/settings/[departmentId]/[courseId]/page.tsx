@@ -2,7 +2,8 @@
 'use client';
 
 import Link from 'next/link';
-import { use, useContext, useState } from 'react';
+import { useContext, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -19,17 +20,17 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DataContext } from '@/context/DataContext';
 
 
-export default function CourseSubjectsPage({ params: paramsProp }: { params: { departmentId: string, courseId: string } }) {
-  const params = use(paramsProp);
+export default function CourseSubjectsPage() {
+  const params = useParams<{ departmentId: string; courseId: string }>();
   const { examSchedule, setExamSchedule } = useContext(DataContext);
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<ExamSlot | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<string | null>(null);
-  
+
   const departmentName = DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department';
-  
+
   const courseName = (COURSES[departmentName as keyof typeof COURSES] || []).find(c => encodeURIComponent(c.toLowerCase().replace(/ /g, '-')) === params.courseId) || 'Unknown Course';
 
   const subjectsForCourse = examSchedule.filter(
@@ -59,21 +60,21 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
     setExamToDelete(examId);
     setIsAlertOpen(true);
   };
-  
+
   const handleDeleteExam = () => {
     if (examToDelete) {
-        const exam = examSchedule.find(e => e.id === examToDelete);
-        setExamSchedule(prev => prev.filter(e => e.id !== examToDelete));
-        toast({ title: "Subject Deleted", description: `Subject ${exam?.subjectCode} has been removed.` });
-        setExamToDelete(null);
-        setIsAlertOpen(false);
+      const exam = examSchedule.find(e => e.id === examToDelete);
+      setExamSchedule(prev => prev.filter(e => e.id !== examToDelete));
+      toast({ title: "Subject Deleted", description: `Subject ${exam?.subjectCode} has been removed.` });
+      setExamToDelete(null);
+      setIsAlertOpen(false);
     }
   };
 
 
   return (
     <>
-      <ExamDialog 
+      <ExamDialog
         isOpen={isDialogOpen}
         onClose={() => { setIsDialogOpen(false); setSelectedExam(null); }}
         onSave={handleSaveExam}
@@ -85,18 +86,18 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
         isExplorerContext={true}
       />
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the subject and its exam slot.
-              </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setExamToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteExam}>Continue</AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the subject and its exam slot.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setExamToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteExam}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
 
       <SidebarProvider>
@@ -126,16 +127,16 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
                 <Card>
                   <CardHeader>
                     <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle>Subjects for {courseName}</CardTitle>
-                          <CardDescription>
-                            Select a subject to manage student eligibility, or add a new subject to this course.
-                          </CardDescription>
-                        </div>
-                        <Button onClick={() => handleOpenDialog()}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Subject
-                        </Button>
+                      <div>
+                        <CardTitle>Subjects for {courseName}</CardTitle>
+                        <CardDescription>
+                          Select a subject to manage student eligibility, or add a new subject to this course.
+                        </CardDescription>
+                      </div>
+                      <Button onClick={() => handleOpenDialog()}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Subject
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
@@ -144,38 +145,38 @@ export default function CourseSubjectsPage({ params: paramsProp }: { params: { d
                         key={subject.code}
                         className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors group"
                       >
-                         <Link
+                        <Link
                           href={`/settings/${params.departmentId}/${params.courseId}/${subject.code}`}
                           className="flex-grow flex items-center gap-3"
                         >
                           <BookCopy className="h-5 w-5 text-muted-foreground" />
                           <div>
-                              <span className="text-md font-medium">{subject.name}</span>
-                              <span className="text-muted-foreground ml-2 font-code">({subject.code})</span>
+                            <span className="text-md font-medium">{subject.name}</span>
+                            <span className="text-muted-foreground ml-2 font-code">({subject.code})</span>
                           </div>
                         </Link>
                         <div className="flex items-center">
                           <Link href={`/settings/${params.departmentId}/${params.courseId}/${subject.code}`} className="hidden group-hover:block">
                             <ChevronRight className="h-5 w-5 text-muted-foreground" />
                           </Link>
-                           <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" className="h-8 w-8 p-0">
-                                      <span className="sr-only">Open menu</span>
-                                      <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleOpenDialog(subject.id)}>Edit</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openDeleteAlert(subject.id)} className="text-destructive">Delete</DropdownMenuItem>
-                              </DropdownMenuContent>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenDialog(subject.id)}>Edit</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openDeleteAlert(subject.id)} className="text-destructive">Delete</DropdownMenuItem>
+                            </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                       </div>
                     ))}
                     {subjects.length === 0 && (
                       <div className="text-center text-muted-foreground py-8">
-                          No subjects found. Add a new subject to get started.
+                        No subjects found. Add a new subject to get started.
                       </div>
                     )}
                   </CardContent>

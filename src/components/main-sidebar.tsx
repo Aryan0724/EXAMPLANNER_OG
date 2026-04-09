@@ -22,22 +22,26 @@ import {
   Printer,
   CalendarDays,
   Upload,
+  GraduationCap,
+  Ban,
 } from 'lucide-react';
 import Link from 'next/link';
 
 const menuItems = [
-    { id: 'dashboard', href: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'schedule', href: '/schedule', icon: CalendarDays, label: 'Schedule' },
-    { id: 'allotment', href: '/allotment', icon: Printer, label: 'Allotment' },
-    { id: 'students', href: '/students', icon: Users, label: 'Students' },
-    { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
-    { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
-    { id: 'import-export', href: '/import-export', icon: Upload, label: 'Import / Export' },
-    { id: 'settings', href: '/settings', icon: Telescope, label: 'Explorer' },
+  { id: 'dashboard', href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { id: 'schedule', href: '/schedule', icon: CalendarDays, label: 'Schedule' },
+  { id: 'allotment', href: '/allotment', icon: Printer, label: 'Allotment' },
+  { id: 'course-view', href: '/allotment/course-view', icon: GraduationCap, label: 'Course View' },
+  { id: 'students', href: '/students', icon: Users, label: 'Students' },
+  { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
+  { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
+  { id: 'import-export', href: '/import-export', icon: Upload, label: 'Import / Export' },
+  { id: 'bulk-availability', href: '/settings/bulk-availability', icon: Ban, label: 'Bulk Availability' },
+  { id: 'settings', href: '/settings', icon: Telescope, label: 'Explorer' },
 ];
 
 const helpMenuItems = [
-    { id: 'help', href: '#', icon: CircleHelp, label: 'Help & Support' },
+  { id: 'help', href: '#', icon: CircleHelp, label: 'Help & Support' },
 ]
 
 export function MainSidebar() {
@@ -58,33 +62,33 @@ export function MainSidebar() {
       <SidebarContent className="p-2">
         <SidebarMenu>
           {menuItems.map(item => (
-             <SidebarMenuItem key={item.id}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={activeItem === item.id}
-                  tooltip={item.label}
-                >
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
+            <SidebarMenuItem key={item.id}>
+              <SidebarMenuButton
+                asChild
+                isActive={activeItem === item.id}
+                tooltip={item.label}
+              >
+                <Link href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="p-2">
         <SidebarMenu>
-           {helpMenuItems.map(item => (
-             <SidebarMenuItem key={item.id}>
-                <SidebarMenuButton asChild tooltip={item.label}>
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
+          {helpMenuItems.map(item => (
+            <SidebarMenuItem key={item.id}>
+              <SidebarMenuButton asChild tooltip={item.label}>
+                <Link href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
-           ))}
+          ))}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

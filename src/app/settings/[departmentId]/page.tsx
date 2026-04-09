@@ -2,7 +2,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, use } from 'react';
+import { useMemo } from 'react';
+import { useParams } from 'next/navigation';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -11,19 +12,19 @@ import { BookOpen, ChevronRight } from 'lucide-react';
 import { COURSES, DEPARTMENTS } from '@/lib/data';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
-export default function DepartmentCoursesPage({ params: paramsProp }: { params: { departmentId: string } }) {
-  const params = use(paramsProp);
+export default function DepartmentCoursesPage() {
+  const params = useParams<{ departmentId: string }>();
 
-  const departmentName = useMemo(() => 
+  const departmentName = useMemo(() =>
     DEPARTMENTS.find(d => encodeURIComponent(d.toLowerCase().replace(/ /g, '-')) === params.departmentId) || 'Unknown Department'
-  , [params.departmentId]);
+    , [params.departmentId]);
 
-  const courses = useMemo(() => 
+  const courses = useMemo(() =>
     (COURSES[departmentName as keyof typeof COURSES] || []).map(course => ({
       name: course,
       id: encodeURIComponent(course.toLowerCase().replace(/ /g, '-')),
     }))
-  , [departmentName]);
+    , [departmentName]);
 
   return (
     <SidebarProvider>
@@ -67,9 +68,9 @@ export default function DepartmentCoursesPage({ params: paramsProp }: { params: 
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </Link>
                   ))}
-                   {courses.length === 0 && (
+                  {courses.length === 0 && (
                     <div className="text-center text-muted-foreground py-8">
-                        No courses found for this department.
+                      No courses found for this department.
                     </div>
                   )}
                 </CardContent>

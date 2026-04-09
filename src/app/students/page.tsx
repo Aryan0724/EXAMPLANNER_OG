@@ -29,105 +29,105 @@ interface StatusDialogProps {
 }
 
 const DebarmentStatusDialog = ({ isOpen, onClose, student, onSubmitDebarred, onRemoveIneligibility }: StatusDialogProps) => {
-    const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('');
 
-    if (!student) return null;
+  if (!student) return null;
 
-    const handleSubmit = () => {
-        if (!student.isDebarred && !reason.trim()) {
-            toast({
-                variant: 'destructive',
-                title: 'Reason is required',
-                description: 'Please provide a reason for this status change.',
-            });
-            return;
-        }
-        onSubmitDebarred(reason, !student.isDebarred);
-        setReason('');
-    };
-
-    const handleRemove = (subjectCode: string) => {
-        onRemoveIneligibility(subjectCode);
+  const handleSubmit = () => {
+    if (!student.isDebarred && !reason.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Reason is required',
+        description: 'Please provide a reason for this status change.',
+      });
+      return;
     }
-    
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Manage Status for {student.name}</DialogTitle>
-                    <DialogDescription>
-                        Update global debarment status or view subject-specific ineligibility.
-                    </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 py-2">
-                    <Card>
-                         <CardHeader>
-                            <CardTitle>Global Debarment</CardTitle>
-                            <CardDescription>
-                                {student.isDebarred 
-                                    ? `This student is currently debarred. Reason: ${student.debarmentReason || 'Not specified'}. You can make them eligible again.`
-                                    : "This student is currently eligible. You can debar them from all exams."
-                                }
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                             {!student.isDebarred && (
-                                <>
-                                 <Label htmlFor="reason">Reason for Debarment</Label>
-                                 <Textarea 
-                                     id="reason" 
-                                     placeholder="e.g., Disciplinary action, Fee overdue, etc."
-                                     value={reason}
-                                     onChange={(e) => setReason(e.target.value)} 
-                                 />
-                                </>
-                             )}
-                        </CardContent>
-                        <CardFooter>
-                            <Button onClick={handleSubmit} variant={student.isDebarred ? 'default' : 'destructive'}>
-                                {student.isDebarred ? 'Make Eligible' : 'Mark as Debarred'}
-                            </Button>
-                        </CardFooter>
-                    </Card>
+    onSubmitDebarred(reason, !student.isDebarred);
+    setReason('');
+  };
 
-                   {student.ineligibilityRecords && student.ineligibilityRecords.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Subject-Specific Ineligibility</CardTitle>
-                                <CardDescription>
-                                    This student is ineligible for the following subjects. You can remove these restrictions here.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {student.ineligibilityRecords.map(record => (
-                                    <div key={record.subjectCode} className="flex items-center justify-between p-2 border rounded-md">
-                                        <div>
-                                            <p className="font-semibold">{record.subjectCode}</p>
-                                            <p className="text-sm text-muted-foreground">{record.reason}</p>
-                                        </div>
-                                        <Button variant="ghost" size="icon" onClick={() => handleRemove(record.subjectCode)}>
-                                            <X className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                   )}
-                </div>
-                 <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>Close</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
+  const handleRemove = (subjectCode: string) => {
+    onRemoveIneligibility(subjectCode);
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Manage Status for {student.name}</DialogTitle>
+          <DialogDescription>
+            Update global debarment status or view subject-specific ineligibility.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Global Debarment</CardTitle>
+              <CardDescription>
+                {student.isDebarred
+                  ? `This student is currently debarred. Reason: ${student.debarmentReason || 'Not specified'}. You can make them eligible again.`
+                  : "This student is currently eligible. You can debar them from all exams."
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {!student.isDebarred && (
+                <>
+                  <Label htmlFor="reason">Reason for Debarment</Label>
+                  <Textarea
+                    id="reason"
+                    placeholder="e.g., Disciplinary action, Fee overdue, etc."
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button onClick={handleSubmit} variant={student.isDebarred ? 'default' : 'destructive'}>
+                {student.isDebarred ? 'Make Eligible' : 'Mark as Debarred'}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {student.ineligibilityRecords && student.ineligibilityRecords.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Subject-Specific Ineligibility</CardTitle>
+                <CardDescription>
+                  This student is ineligible for the following subjects. You can remove these restrictions here.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {student.ineligibilityRecords.map(record => (
+                  <div key={record.subjectCode} className="flex items-center justify-between p-2 border rounded-md">
+                    <div>
+                      <p className="font-semibold">{record.subjectCode}</p>
+                      <p className="text-sm text-muted-foreground">{record.reason}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleRemove(record.subjectCode)}>
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 
 export default function StudentsPage() {
   const { students, setStudents } = useContext(DataContext);
   const isLoading = !students;
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'debarred' | 'ineligible'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,14 +142,14 @@ export default function StudentsPage() {
     } else if (filter === 'ineligible') {
       studentsToFilter = studentsToFilter.filter(s => s.ineligibilityRecords && s.ineligibilityRecords.length > 0);
     }
-    
+
     if (searchQuery) {
-        const lowercasedQuery = searchQuery.toLowerCase();
-        studentsToFilter = studentsToFilter.filter(student =>
-            student.id.toLowerCase().includes(lowercasedQuery) ||
-            student.rollNo.toLowerCase().includes(lowercasedQuery) ||
-            student.name.toLowerCase().includes(lowercasedQuery)
-        );
+      const lowercasedQuery = searchQuery.toLowerCase();
+      studentsToFilter = studentsToFilter.filter(student =>
+        student.id.toLowerCase().includes(lowercasedQuery) ||
+        student.rollNo.toLowerCase().includes(lowercasedQuery) ||
+        student.name.toLowerCase().includes(lowercasedQuery)
+      );
     }
 
     return studentsToFilter;
@@ -171,14 +171,14 @@ export default function StudentsPage() {
   const openStatusDialog = (student: Student) => {
     setDialogState({ isOpen: true, student });
   };
-  
+
   const closeStatusDialog = () => {
     setDialogState({ isOpen: false, student: null });
   }
 
   const handleSubmitDebarred = (reason: string, isDebarred: boolean) => {
     if (!dialogState.student) return;
-    
+
     const studentName = dialogState.student.name;
     const updatedStudents = students.map(s => {
       if (s.id === dialogState.student!.id) {
@@ -189,10 +189,10 @@ export default function StudentsPage() {
     setStudents(updatedStudents);
 
     toast({
-        title: `Status Updated for ${studentName}`,
-        description: `${studentName} is now ${isDebarred ? 'debarred' : 'eligible'}.`,
+      title: `Status Updated for ${studentName}`,
+      description: `${studentName} is now ${isDebarred ? 'debarred' : 'eligible'}.`,
     });
-    
+
     closeStatusDialog();
   };
 
@@ -200,26 +200,28 @@ export default function StudentsPage() {
     if (!dialogState.student) return;
 
     const studentName = dialogState.student.name;
-    let updatedStudent: Student | null = null;
+    const targetId = dialogState.student.id;
+
     const updatedStudents = students.map(s => {
-      if (s.id === dialogState.student!.id) {
+      if (s.id === targetId) {
         const newRecords = s.ineligibilityRecords.filter(r => r.subjectCode !== subjectCode);
-        updatedStudent = { ...s, ineligibilityRecords: newRecords };
-        return updatedStudent;
+        return { ...s, ineligibilityRecords: newRecords };
       }
       return s;
     });
     setStudents(updatedStudents);
 
+    const updatedStudent = updatedStudents.find(s => s.id === targetId);
+
     toast({
-        title: `Eligibility Updated for ${studentName}`,
-        description: `${studentName} is now eligible for ${subjectCode}.`,
+      title: `Eligibility Updated for ${studentName}`,
+      description: `${studentName} is now eligible for ${subjectCode}.`,
     });
-    
+
     if (updatedStudent && updatedStudent.ineligibilityRecords.length === 0 && !updatedStudent.isDebarred) {
-        closeStatusDialog();
+      closeStatusDialog();
     } else {
-        setDialogState({ isOpen: true, student: updatedStudent });
+      setDialogState({ isOpen: true, student: updatedStudent || null });
     }
   };
 
@@ -243,26 +245,26 @@ export default function StudentsPage() {
                   <div className="flex justify-between items-start flex-wrap gap-4">
                     <div>
                       <div className="flex items-center gap-2">
-                          <Users className="h-6 w-6" />
-                          <CardTitle>Students</CardTitle>
+                        <Users className="h-6 w-6" />
+                        <CardTitle>Students</CardTitle>
                       </div>
                       <CardDescription>Manage student eligibility and debarment status.</CardDescription>
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                        <div className="w-full sm:w-auto max-w-sm">
-                          <Input
-                            placeholder="Search students..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-8"
-                            icon={<Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>All</Button>
-                            <Button variant={filter === 'debarred' ? 'default' : 'outline'} onClick={() => setFilter('debarred')}>Debarred</Button>
-                            <Button variant={filter === 'ineligible' ? 'default' : 'outline'} onClick={() => setFilter('ineligible')}>Ineligible</Button>
-                        </div>
+                      <div className="w-full sm:w-auto max-w-sm">
+                        <Input
+                          placeholder="Search students..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-8"
+                          icon={<Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>All</Button>
+                        <Button variant={filter === 'debarred' ? 'default' : 'outline'} onClick={() => setFilter('debarred')}>Debarred</Button>
+                        <Button variant={filter === 'ineligible' ? 'default' : 'outline'} onClick={() => setFilter('ineligible')}>Ineligible</Button>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -282,9 +284,9 @@ export default function StudentsPage() {
                       </TableHeader>
                       <TableBody>
                         {isLoading && (
-                           <TableRow>
-                             <TableCell colSpan={7} className="p-8 text-center">Loading students...</TableCell>
-                           </TableRow>
+                          <TableRow>
+                            <TableCell colSpan={7} className="p-8 text-center">Loading students...</TableCell>
+                          </TableRow>
                         )}
                         {!isLoading && currentStudents.map((student) => (
                           <TableRow key={student.id}>
@@ -294,23 +296,23 @@ export default function StudentsPage() {
                             <TableCell>{student.department}</TableCell>
                             <TableCell>{student.course}</TableCell>
                             <TableCell>
-                                <div className="flex flex-col gap-1 items-start">
-                                    {student.isDebarred && <Badge variant="destructive" title={student.debarmentReason}>Debarred</Badge>}
-                                    {student.ineligibilityRecords && student.ineligibilityRecords.length > 0 && (
-                                        <Badge variant="secondary" title={student.ineligibilityRecords.map(r => `${r.subjectCode}: ${r.reason}`).join('\n')}>
-                                            Ineligible ({student.ineligibilityRecords.length} subjects)
-                                        </Badge>
-                                    )}
-                                    {!student.isDebarred && (!student.ineligibilityRecords || student.ineligibilityRecords.length === 0) && (
-                                        <Badge variant="outline">Eligible</Badge>
-                                    )}
-                                </div>
+                              <div className="flex flex-col gap-1 items-start">
+                                {student.isDebarred && <Badge variant="destructive" title={student.debarmentReason}>Debarred</Badge>}
+                                {student.ineligibilityRecords && student.ineligibilityRecords.length > 0 && (
+                                  <Badge variant="secondary" title={student.ineligibilityRecords.map(r => `${r.subjectCode}: ${r.reason}`).join('\n')}>
+                                    Ineligible ({student.ineligibilityRecords.length} subjects)
+                                  </Badge>
+                                )}
+                                {!student.isDebarred && (!student.ineligibilityRecords || student.ineligibilityRecords.length === 0) && (
+                                  <Badge variant="outline">Eligible</Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
-                                <Button variant="outline" size="sm" onClick={() => openStatusDialog(student)}>
-                                    <Ban className="mr-2 h-3 w-3" />
-                                    Manage Status
-                                </Button>
+                              <Button variant="outline" size="sm" onClick={() => openStatusDialog(student)}>
+                                <Ban className="mr-2 h-3 w-3" />
+                                Manage Status
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -318,33 +320,33 @@ export default function StudentsPage() {
                     </Table>
                     {!isLoading && currentStudents.length === 0 && (
                       <div className="text-center text-muted-foreground py-8">
-                          No students found for this filter.
+                        No students found for this filter.
                       </div>
                     )}
                   </div>
                 </CardContent>
                 <CardFooter className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                        Showing {Math.min(startIndex + 1, filteredStudents.length)}-{Math.min(endIndex, filteredStudents.length)} of {filteredStudents.length} students.
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={handlePreviousPage}
-                            disabled={currentPage === 1}
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={handleNextPage}
-                            disabled={currentPage === totalPages || totalPages === 0}
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                    </div>
+                  <div className="text-sm text-muted-foreground">
+                    Showing {Math.min(startIndex + 1, filteredStudents.length)}-{Math.min(endIndex, filteredStudents.length)} of {filteredStudents.length} students.
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages || totalPages === 0}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardFooter>
               </Card>
             </main>

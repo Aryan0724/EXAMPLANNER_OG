@@ -22,13 +22,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function SchedulePage() {
-    const { 
-        students, setStudents, 
-        classrooms, 
+    const {
+        students, setStudents,
+        classrooms,
         invigilators, setInvigilators,
-        examSchedule, setExamSchedule 
+        examSchedule, setExamSchedule,
+        isHydrated
     } = useContext(DataContext);
-    
+
     const [searchQuery, setSearchQuery] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -37,8 +38,6 @@ export default function SchedulePage() {
     const [examToDelete, setExamToDelete] = useState<string | null>(null);
 
     const { setFullAllotment } = useContext(AllotmentContext);
-    const router = useRouter();
-
     const filteredSchedule = useMemo(() => {
         if (!searchQuery) {
             return examSchedule;
@@ -52,6 +51,19 @@ export default function SchedulePage() {
         );
     }, [searchQuery, examSchedule]);
 
+    const router = useRouter();
+
+    if (!isHydrated) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-background">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="text-muted-foreground animate-pulse">Initializing Exam Planner...</p>
+                </div>
+            </div>
+        );
+    }
+
     const handleGenerateAll = async () => {
         if (students.length === 0 || classrooms.length === 0 || invigilators.length === 0 || examSchedule.length === 0) {
             toast({
@@ -64,7 +76,7 @@ export default function SchedulePage() {
 
         setIsGenerating(true);
         toast({ title: 'Generating Full Allotment...', description: 'The algorithm is creating plans session by session. This may take some time.' });
-        
+
         // Use a timeout to allow the UI to update before the heavy computation begins
         await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -74,33 +86,47 @@ export default function SchedulePage() {
             let classroomMasterList = JSON.parse(JSON.stringify(classrooms));
 
             const examSlotsByTime = examSchedule.reduce((acc, exam) => {
-              const key = `${exam.date} ${exam.time}`;
-              if (!acc[key]) {
-                acc[key] = [];
-              }
-              acc[key].push(exam);
-              return acc;
+                const key = `${exam.date} ${exam.time}`;
+                if (!acc[key]) {
+                    acc[key] = [];
+                }
+                acc[key].push(exam);
+                return acc;
             }, {} as Record<string, ExamSlot[]>);
 
             const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
             const sortedSessionKeys = Object.keys(examSlotsByTime).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-            
+
             for (const key of sortedSessionKeys) {
                 const concurrentExams = examSlotsByTime[key];
-                
+
+                if (!concurrentExams || concurrentExams.length === 0) continue;
+
                 toast({ title: `Processing Session: ${key}`, description: 'Generating seat plan and invigilator duties...' });
 
                 const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams);
-                studentMasterList = updatedStudents; 
-                
-                const classroomsInUse = [...new Map(plan.assignments.map(item => [item.classroom.id, item.classroom])).values()];
+                studentMasterList = updatedStudents;
 
-                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, classroomsInUse, concurrentExams[0]);
+                // Derive classrooms actually used in this plan
+                // We need to map from the plan assignments back to unique classroom objects
+                const classroomMap = new Map<string, Classroom>();
+                if (plan && plan.assignments) {
+                    plan.assignments.forEach(a => {
+                        if (a.student && a.classroom && !classroomMap.has(a.classroom.id)) {
+                            classroomMap.set(a.classroom.id, a.classroom);
+                        }
+                    });
+                }
+
+                // If no classrooms are used (e.g. no students eligible), we might still want to proceed or skip
+                // But assignInvigilators expects a valid SeatPlan.
+
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0]);
                 invigilatorMasterList = updatedInvigilators;
 
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
-            
+
             setStudents(studentMasterList);
             setInvigilators(invigilatorMasterList);
             setFullAllotment(generatedPlans);
@@ -142,7 +168,7 @@ export default function SchedulePage() {
         setSelectedExam(exam || null);
         setIsDialogOpen(true);
     };
-    
+
     const handleDeleteExam = () => {
         if (examToDelete) {
             const exam = examSchedule.find(e => e.id === examToDelete);
@@ -152,7 +178,7 @@ export default function SchedulePage() {
             setIsAlertOpen(false);
         }
     };
-    
+
     const openDeleteAlert = (examId: string) => {
         setExamToDelete(examId);
         setIsAlertOpen(true);
@@ -161,7 +187,7 @@ export default function SchedulePage() {
 
     return (
         <>
-            <ExamDialog 
+            <ExamDialog
                 isOpen={isDialogOpen}
                 onClose={() => { setIsDialogOpen(false); setSelectedExam(null); }}
                 onSave={handleSaveExam}
@@ -169,18 +195,18 @@ export default function SchedulePage() {
                 departments={DEPARTMENTS}
                 coursesByDept={COURSES}
             />
-             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the exam slot
-                        and remove it from the schedule.
-                    </AlertDialogDescription>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the exam slot
+                            and remove it from the schedule.
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setExamToDelete(null)}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteExam}>Continue</AlertDialogAction>
+                        <AlertDialogCancel onClick={() => setExamToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteExam}>Continue</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -203,7 +229,7 @@ export default function SchedulePage() {
                                                 <CardDescription>View, manage, and generate allotments for the exam schedule.</CardDescription>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                 <Button variant="outline" onClick={() => handleOpenDialog()}>
+                                                <Button variant="outline" onClick={() => handleOpenDialog()}>
                                                     <PlusCircle className="mr-2" />
                                                     Add New Exam
                                                 </Button>
@@ -230,6 +256,7 @@ export default function SchedulePage() {
                                                     <TableRow>
                                                         <TableHead>Date</TableHead>
                                                         <TableHead>Time</TableHead>
+                                                        <TableHead>Shift</TableHead>
                                                         <TableHead>Subject</TableHead>
                                                         <TableHead>Code</TableHead>
                                                         <TableHead>Group</TableHead>
@@ -239,10 +266,11 @@ export default function SchedulePage() {
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
-                                                    {filteredSchedule.map((exam) => (
-                                                        <TableRow key={exam.id}>
+                                                    {filteredSchedule.map((exam, index) => (
+                                                        <TableRow key={`${exam.id}-${index}`}>
                                                             <TableCell>{exam.date}</TableCell>
                                                             <TableCell>{exam.time}</TableCell>
+                                                            <TableCell>{exam.shift ? `Shift ${exam.shift}` : '-'}</TableCell>
                                                             <TableCell className="font-medium">{exam.subjectName}</TableCell>
                                                             <TableCell>{exam.subjectCode}</TableCell>
                                                             <TableCell>{exam.group || 'All'}</TableCell>

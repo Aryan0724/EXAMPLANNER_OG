@@ -5,12 +5,12 @@ import type { SeatPlan, InvigilatorAssignment } from '@/lib/types';
 
 interface AllotmentContextType {
   fullAllotment: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> | null;
-  setFullAllotment: (allotment: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> | null) => void;
+  setFullAllotment: React.Dispatch<React.SetStateAction<Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> | null>>;
 }
 
 export const AllotmentContext = createContext<AllotmentContextType>({
   fullAllotment: null,
-  setFullAllotment: () => {},
+  setFullAllotment: () => { },
 });
 
 export const AllotmentProvider = ({ children }: { children: React.ReactNode }) => {

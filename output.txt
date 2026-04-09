@@ -1,0 +1,9 @@
+﻿Testing Seat Persistence Logic...
+Session 1 Assignments:
+  Student 1: Room 101, Seat 1
+  Student 2: Room 101, Seat 2
+
+Session 2 (Persistent) Assignments:
+  Student 1: Room 101, Seat 1
+
+SUCCESS: Seat remained constant!

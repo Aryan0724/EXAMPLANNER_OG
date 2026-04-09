@@ -58,7 +58,9 @@ export interface Invigilator {
   id: string;
   name: string;
   department: string;
-  isAvailable: boolean; 
+  designation: 'Professor' | 'Associate Professor' | 'Assistant Professor' | 'Tutor' | 'Lab Assistant';
+  gender: 'Male' | 'Female';
+  isAvailable: boolean;
   maxDailySessions?: number;
   unavailableSlots: AvailabilitySlot[];
   assignedDuties: { date: string, count: number }[]; // To track duties per day
@@ -75,6 +77,9 @@ export interface ExamSlot {
   subjectCode: string;
   duration: number; // in minutes
   group?: 'A' | 'B'; // For group-specific exams
+  shift?: number; // 1, 2, 3, or 4
+  type?: 'Theory' | 'Practical';
+  mode?: 'Offline' | 'Online';
 }
 
 export interface Seat {
