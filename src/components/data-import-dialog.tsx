@@ -5,6 +5,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Upload, FileUp, AlertCircle, CheckCircle2, Download } from 'lucide-react';
+import { Student, Classroom, Invigilator, ExamSlot } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+import { parsePasteSchedule } from '@/lib/parsers';
+
+interface DataImportDialogProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onImportStudents: (data: Student[]) => void;
+    onImportClassrooms: (data: Classroom[]) => void;
+    onImportInvigilators: (data: Invigilator[]) => void;
+    onImportExams: (data: ExamSlot[]) => void;
+}
+
 /**
  * Robustly injects the XLSX library from a CDN if it's not already on the window.
  */
