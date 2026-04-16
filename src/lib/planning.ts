@@ -121,107 +121,91 @@ export function generateSeatPlan(
     // We iterate through rooms (Largest first).
     // For each room, we try to grab the two largest available pools and zipper them.
 
+    // 5. Assignment Preparation
+    // Sort pools by roll number (numeric-aware) so students sit in order
+    const sortedPools = new Map<string, (Student & { exam: ExamSlot })[]>();
+    studentPools.forEach((pool, key) => {
+        const sorted = [...pool].sort((a, b) => 
+            a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' })
+        );
+        sortedPools.set(key, sorted);
+    });
+
+    const activePoolKeys = Array.from(sortedPools.keys()).sort((a, b) => 
+        sortedPools.get(b)!.length - sortedPools.get(a)!.length
+    );
+
     availableClassrooms.forEach(room => {
         const map = roomSeatMaps.get(room.id)!;
+        
+        // Build logical tracks for this room
+        // Each bench has 'benchSize' seats. We want to fill vertically down the room.
+        // A "Track" is the set of the same-positioned seats in all benches of a single column.
+        
+        // Find max bench size to determine how many 'sides' we have
+        const maxBenchSize = Math.max(...room.benchCapacities);
+        
+        // Track the current course assigned to each vertical track for continuity
+        const trackCourseMap = new Map<string, string | null>();
 
-        // Find the absolute largest available pool for Side A
-        // Refetch/Resort keys because sizes change as we deplete them
-        sortedPoolKeys.sort((a, b) => studentPools.get(b)!.length - studentPools.get(a)!.length);
+        // Iterate through columns first, then sides, then rows
+        // This ensures the sequential flow (Col 1 Side A, then Col 1 Side B...)
+        for (let col = 0; col < room.columns; col++) {
+            for (let side = 0; side < maxBenchSize; side++) {
+                const trackKey = `${col}-${side}`;
 
-        // We need at least one pool to fill anything
-        if (sortedPoolKeys.length === 0 || studentPools.get(sortedPoolKeys[0])!.length === 0) return;
+                for (let row = 0; row < room.rows; row++) {
+                    const benchIdx = row * room.columns + col;
+                    if (benchIdx >= room.benchCapacities.length) continue;
+                    
+                    const benchSize = room.benchCapacities[benchIdx];
+                    if (side >= benchSize) continue;
 
-        let poolAKey = sortedPoolKeys[0];
-        let poolBKey: string | null = null;
+                    // Calculate the flat index in the room's map
+                    let flatIdx = 0;
+                    for (let b = 0; b < benchIdx; b++) flatIdx += room.benchCapacities[b];
+                    flatIdx += side;
 
-        // Try to find a compatible pool B
-        // Ideally the next largest, but strictly NOT same as A
-        for (let i = 1; i < sortedPoolKeys.length; i++) {
-            if (studentPools.get(sortedPoolKeys[i])!.length > 0) {
-                poolBKey = sortedPoolKeys[i];
-                break;
-            }
-        }
+                    if (map[flatIdx] !== null) continue; // Already handled (persistent seat)
 
-        const poolA = studentPools.get(poolAKey)!;
-        const poolB = poolBKey ? studentPools.get(poolBKey)! : null;
+                    // Adjacency Check: Left neighbor in same bench
+                    const leftNeighborFlatIdx = side > 0 ? flatIdx - 1 : -1;
+                    const leftNeighborSubject = (leftNeighborFlatIdx !== -1 && map[leftNeighborFlatIdx]) 
+                        ? map[leftNeighborFlatIdx]?.student?.exam.subjectCode 
+                        : null;
 
-        // Valid Seats iterator (skip already assigned persistent seats)
-        // We fill indices 0, 1, 2, 3... corresponding to physical layout (typically Left, Right, Left, Right)
-        // But logical layout might be different. usually seat 1 is Left, Seat 2 is Right in a bench.
-        // So Even indices (0, 2, 4) are "Left", Odd (1, 3, 5) are "Right".
-
-        for (let i = 0; i < map.length; i++) {
-            if (map[i] !== null) continue; // Skip occupied
-
-            const isLeft = i % 2 === 0;
-
-            // Logic:
-            // If Left: Prefer Pool A. If matched, assign.
-            // If Right: Prefer Pool B. If matched, assign.
-            // Critical: If A runs out, we need a new Pool A from remaining.
-            // If B runs out, we need a new Pool B from remaining.
-
-            let assignedStudent: (Student & { exam: ExamSlot }) | undefined;
-
-            if (isLeft) {
-                if (poolA.length > 0) {
-                    assignedStudent = poolA.shift();
-                } else {
-                    // Pool A empty. Swap A for the next largest available pool that ISN'T B
-                    // Refresh keys/counts needed? simpler: just search
-                    const nextLarge = sortedPoolKeys.find(k =>
-                        k !== poolBKey && studentPools.get(k)!.length > 0
-                    );
-                    if (nextLarge) {
-                        poolAKey = nextLarge;
-                        assignedStudent = studentPools.get(poolAKey)!.shift();
-                    } else if (poolB && poolB.length > 0) {
-                        // Only B is left. Can we put B in Left?
-                        // Only if the adjacent Right is NOT B.
-                        // But we haven't filled Right yet (it's i+1).
-                        // Or if neighbor (i-1) was B?
-                        // i is even. (i-1) is odd (Right neighbor of PREVIOUS bench).
-                        // Check previous seat (i-1) and next seat (i+1). 
-                        // Actually, we just want to avoid side-by-side. 
-                        // In a bench (Left: i, Right: i+1).
-                        // If we put B here, we must ensure i+1 is NOT B.
-                        // Better strategy: strict spacing if only 1 pool left via `continue` (leave empty)
-                        assignedStudent = undefined;
-                        // "Room shall not be left empty" vs "Strict matching".
-                        // If we skip, we leave empty. If we assign, we risk clamping.
-                        // User said "Not any case student of two courses shall sit together".
-                        // So skipping is the only valid option if no other course exists.
-                    }
-                }
-            } else {
-                // Right Seat
-                if (poolB && poolB.length > 0) {
-                    assignedStudent = poolB.shift();
-                } else {
-                    // Pool B empty. Find replacement.
-                    // Must not be A (which is current Left).
-                    const nextLarge = sortedPoolKeys.find(k =>
-                        k !== poolAKey && studentPools.get(k)!.length > 0
-                    );
-                    if (nextLarge) {
-                        poolBKey = nextLarge;
-                        assignedStudent = studentPools.get(poolBKey)?.shift();
+                    let poolKey: string | null = null;
+                    
+                    // Priority 1: Continuity - Check if current track already has a course locked
+                    const currentLockedPool = trackCourseMap.get(trackKey);
+                    if (currentLockedPool && sortedPools.get(currentLockedPool)!.length > 0 && currentLockedPool !== leftNeighborSubject) {
+                        poolKey = currentLockedPool;
                     } else {
-                        // Only A left (or nothing). 
-                        // Ensure we don't put A next to A.
-                        // Left (i-1) is A. So we cannot put A here.
-                        assignedStudent = undefined;
+                        // Priority 2: Select a NEW course for this track
+                        // Sort by remaining strength for stability
+                        activePoolKeys.sort((a, b) => sortedPools.get(b)!.length - sortedPools.get(a)!.length);
+                        const validPoolKeys = activePoolKeys.filter(k => 
+                            sortedPools.get(k)!.length > 0 && k !== leftNeighborSubject
+                        );
+
+                        if (validPoolKeys.length > 0) {
+                            poolKey = validPoolKeys[0];
+                            trackCourseMap.set(trackKey, poolKey); // Lock this track to the new course
+                        } else {
+                            // No valid pools (possibly empty or only conflicting pools left)
+                            trackCourseMap.set(trackKey, null);
+                        }
+                    }
+
+                    if (poolKey) {
+                        const student = sortedPools.get(poolKey)!.shift()!;
+                        map[flatIdx] = {
+                            student: student,
+                            classroom: room,
+                            seatNumber: flatIdx + 1
+                        };
                     }
                 }
-            }
-
-            if (assignedStudent) {
-                map[i] = {
-                    student: assignedStudent,
-                    classroom: room,
-                    seatNumber: i + 1
-                };
             }
         }
     });

@@ -60,22 +60,23 @@ export function ClassroomVisualizer({ assignments, classroom, courseColors }: Cl
 
   const grid: (Seat | null)[][] = Array.from({ length: classroom.rows }, () => Array(classroom.columns * 2).fill(null));
 
-  let seatIndex = 0;
-  for (let r = 0; r < classroom.rows; r++) {
-    for (let c = 0; c < classroom.columns * 2; c++) {
-      if (seatIndex < seatsForThisRoom.length) {
-        const benchIndex = Math.floor(c / 2);
-        const seatInBench = c % 2;
-        const gridR = r;
-        const gridC = benchIndex * 2 + seatInBench;
-
-        if (!grid[gridR]) grid[gridR] = [];
-
-        grid[gridR][gridC] = seatsForThisRoom[seatIndex];
-        seatIndex++;
+  const benches = useMemo(() => {
+    const result: Seat[][] = [];
+    let currentSeatIdx = 0;
+    
+    classroom.benchCapacities.forEach(capacity => {
+      const bench: Seat[] = [];
+      for (let i = 0; i < capacity; i++) {
+        if (currentSeatIdx < seatsForThisRoom.length) {
+          bench.push(seatsForThisRoom[currentSeatIdx]);
+          currentSeatIdx++;
+        }
       }
-    }
-  }
+      result.push(bench);
+    });
+    
+    return result;
+  }, [seatsForThisRoom, classroom.benchCapacities]);
 
 
   return (
@@ -89,22 +90,20 @@ export function ClassroomVisualizer({ assignments, classroom, courseColors }: Cl
         {Array.from({ length: classroom.columns }).map((_, c) => (
           <div key={`col-${c}`} className="flex flex-col gap-1">
             {Array.from({ length: classroom.rows }).map((_, r) => {
-              const leftSeat = grid[r]?.[c * 2];
-              const rightSeat = grid[r]?.[c * 2 + 1];
+              const benchIdx = r * classroom.columns + c;
+              const benchSeats = benches[benchIdx] || [];
 
               return (
                 <div
                   key={`bench-${r}-${c}`}
-                  className="flex items-center justify-center gap-0.5 p-0.5 rounded-md bg-background border shadow-sm flex-nowrap"
+                  className="flex items-center justify-center gap-0.5 p-0.5 rounded-md bg-background border shadow-sm flex-nowrap min-h-[3rem]"
                 >
-                  {[leftSeat, rightSeat].map((seat, seatIdx) => {
-                    if (!seat) return <div key={seatIdx} className="w-14 h-10 shrink-0" />;
-
+                  {benchSeats.map((seat, seatIdx) => {
                     const subjectCode = seat.student?.exam?.subjectCode;
                     const bgColor = subjectCode ? courseColors?.get(subjectCode) : undefined;
 
                     return (
-                      <Tooltip key={`seat-${r}-${c}-${seatIdx}`}>
+                      <Tooltip key={`seat-${benchIdx}-${seatIdx}`}>
                         <TooltipTrigger asChild>
                           <div
                             className={cn(
@@ -114,7 +113,7 @@ export function ClassroomVisualizer({ assignments, classroom, courseColors }: Cl
                             )}
                             style={{
                               backgroundColor: seat.student && bgColor ? bgColor : undefined,
-                              borderColor: seat.student && bgColor ? 'transparent' : undefined // Hide border if bg is set for cleaner look
+                              borderColor: seat.student && bgColor ? 'transparent' : undefined
                             }}
                           >
                             {seat.student ? (
@@ -138,6 +137,7 @@ export function ClassroomVisualizer({ assignments, classroom, courseColors }: Cl
                       </Tooltip>
                     );
                   })}
+                  {benchSeats.length === 0 && <div className="text-[10px] text-muted-foreground/30 italic">Empty Bench</div>}
                 </div>
               );
             })}

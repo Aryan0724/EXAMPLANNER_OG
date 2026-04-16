@@ -387,45 +387,135 @@ export function generateDateShiftWiseReport(fullAllotment: FullAllotment) {
     // Re-implementing a simple version if needed, but likely the User will use Master Report.
 }
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+/**
+ * Sanitizes a string for use as a filename in Windows/Linux/Mac.
+ */
+function sanitizeFilename(name: string): string {
+    return name.replace(/[<>:"/\\|?*]/g, '_').trim();
+}
 
-export function generateRoomSeatPlanPDF(
+export async function generateRoomSeatPlanPDF(
     classroom: Classroom,
     examDetails: { date: string, time: string, subjects: string },
     students: { seatNo: string, rollNo: string, name: string, course: string, subjectCode: string }[],
     invigilators: Invigilator[]
 ) {
-    const doc = new jsPDF();
-
-    // Title
-    doc.setFontSize(14);
-    doc.text(`SEAT PLAN`, 105, 10, { align: 'center' });
-    doc.setFontSize(11);
-    doc.text(`${classroom.building} - ${classroom.roomNo}`, 105, 18, { align: 'center' });
-
-    // Metadata Table
-    autoTable(doc, {
-        startY: 25,
-        body: [
-            ['Date:', examDetails.date, 'Time:', examDetails.time],
-            ['Subjects:', examDetails.subjects, 'Invigilators:', invigilators.length > 0 ? invigilators.map(i => i.name).join(', ') : 'Not Assigned']
-        ],
-        theme: 'plain',
-        styles: { fontSize: 10, cellPadding: 1 },
-        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 20 }, 2: { fontStyle: 'bold', cellWidth: 15 } }
-    });
-
-    // Student Table
-    autoTable(doc, {
-        startY: (doc as any).lastAutoTable.finalY + 5,
-        head: [['Seat', 'Roll No', 'Name', 'Course', 'Subject']],
-        body: students.map(s => [s.seatNo, s.rollNo, s.name, s.course, s.subjectCode]),
-        theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-        styles: { fontSize: 9, cellPadding: 2 },
-        alternateRowStyles: { fillColor: [245, 245, 245] }
-    });
-
-    doc.save(`SeatPlan_${classroom.roomNo}_${examDetails.date}.pdf`);
+    console.log("PDF generation shifted to Native Printing for reliability.");
 }
+
+/**
+ * Robustly injects the XLSX library from a CDN if it's not already on the window.
+ */
+async function ensureXLSX(): Promise<any> {
+    if ((window as any).XLSX) return (window as any).XLSX;
+
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        script.onload = () => resolve((window as any).XLSX);
+        script.onerror = () => reject(new Error('Failed to load XLSX from CDN'));
+        document.head.appendChild(script);
+    });
+}
+
+export async function generateRoomSeatPlanExcel(
+    classroom: Classroom,
+    representativeExam: ExamSlot,
+    assignments: any[] // Passing raw assignments for grid building
+) {
+    try {
+        // Use CDN injection to ensure library is available in all environments
+        const XLSX = await ensureXLSX();
+        
+        const wb = XLSX.utils.book_new();
+        const rows: any[][] = [];
+
+        // 1. Header Block
+        rows.push([`VISUAL SEATING CHART - ${classroom.roomNo}`]);
+        rows.push([`Date: ${representativeExam.date}`, `Time: ${representativeExam.time}`, `Building: ${classroom.building}`]);
+        rows.push(['']); // Spacer
+
+        // 2. Build the Grid
+        const maxBenchSize = Math.max(...classroom.benchCapacities);
+        
+        // Define Grid Header (Column labels)
+        const gridHeader = ['Row'];
+        for (let c = 0; c < classroom.columns; c++) {
+            for (let s = 0; s < maxBenchSize; s++) {
+                gridHeader.push(`Col ${c+1}-${String.fromCharCode(65+s)}`);
+            }
+        }
+        rows.push(gridHeader);
+
+        // Fill Rows
+        for (let r = 0; r < classroom.rows; r++) {
+            const rowArr: any[] = [`Row ${r+1}`];
+            for (let c = 0; c < classroom.columns; c++) {
+                const benchIdx = r * classroom.columns + c;
+                const benchCapacity = classroom.benchCapacities[benchIdx] || 0;
+                
+                // Calculate starting flat index for this bench
+                let flatIdxBase = 0;
+                for (let b = 0; b < benchIdx; b++) flatIdxBase += classroom.benchCapacities[b];
+
+                for (let s = 0; s < maxBenchSize; s++) {
+                    if (s < benchCapacity) {
+                        const seat = assignments[flatIdxBase + s];
+                        if (seat?.student) {
+                            rowArr.push(`${seat.student.rollNo}\n${seat.student.exam?.subjectCode || '-'}`);
+                        } else {
+                            rowArr.push(seat?.isDebarredSeat ? 'DEBARRED' : 'EMPTY');
+                        }
+                    } else {
+                        rowArr.push('-'); // Not a seat in this bench
+                    }
+                }
+            }
+            rows.push(rowArr);
+        }
+
+        // 3. Attendance List (Sheet 2)
+        const listData = assignments
+            .filter(a => a.student)
+            .map(a => ({
+                'Seat': a.seatNumber,
+                'Roll No': a.student.rollNo,
+                'Name': a.student.name,
+                'Subject': a.student.exam?.subjectCode || '-',
+                'Signature': '________________'
+            }));
+
+        const wsGrid = XLSX.utils.aoa_to_sheet(rows);
+        const wsList = XLSX.utils.json_to_sheet(listData);
+
+        // Formatting
+        wsGrid['!cols'] = [{ wch: 10 }, ...Array(40).fill({ wch: 18 })];
+        wsList['!cols'] = [{ wch: 8 }, { wch: 18 }, { wch: 28 }, { wch: 15 }, { wch: 20 }];
+
+        XLSX.utils.book_append_sheet(wb, wsGrid, "Seating Chart");
+        XLSX.utils.book_append_sheet(wb, wsList, "Attendance List");
+
+        // --- ROBUST DOWNLOAD TRIGGER ---
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        
+        const safeFilename = sanitizeFilename(`SeatPlan_${classroom.roomNo}_${representativeExam.date}`);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${safeFilename}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 0);
+        
+    } catch (error) {
+        console.error("Excel Generation Failed", error);
+        throw error;
+    }
+}
+

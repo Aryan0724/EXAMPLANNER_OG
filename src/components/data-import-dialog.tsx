@@ -5,18 +5,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Upload, FileUp, AlertCircle, CheckCircle2, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { Student, Classroom, Invigilator, ExamSlot } from '@/lib/types';
-import { useToast } from '@/hooks/use-toast';
-import { parsePasteSchedule } from '@/lib/parsers';
+/**
+ * Robustly injects the XLSX library from a CDN if it's not already on the window.
+ */
+async function ensureXLSX(): Promise<any> {
+    if ((window as any).XLSX) return (window as any).XLSX;
 
-interface DataImportDialogProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onImportStudents: (data: Student[]) => void;
-    onImportClassrooms: (data: Classroom[]) => void;
-    onImportInvigilators: (data: Invigilator[]) => void;
-    onImportExams: (data: ExamSlot[]) => void;
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        script.onload = () => resolve((window as any).XLSX);
+        script.onerror = () => reject(new Error('Failed to load XLSX from CDN'));
+        document.head.appendChild(script);
+    });
 }
 
 export function DataImportDialog({
@@ -73,27 +74,32 @@ export function DataImportDialog({
         setError(null);
         setStats(null);
 
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            try {
-                const bstr = evt.target?.result;
-                const wb = XLSX.read(bstr, { type: 'binary' });
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws);
+        try {
+            const XLSX = await ensureXLSX();
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    const bstr = evt.target?.result;
+                    const wb = XLSX.read(bstr, { type: 'binary' });
+                    const wsname = wb.SheetNames[0];
+                    const ws = wb.Sheets[wsname];
+                    const data = XLSX.utils.sheet_to_json(ws);
 
-                if (data.length === 0) {
-                    setError("The file appears to be empty.");
-                    return;
+                    if (data.length === 0) {
+                        setError("The file appears to be empty.");
+                        return;
+                    }
+
+                    validateAndSetData(data);
+                } catch (err) {
+                    console.error(err);
+                    setError("Failed to parse file. Please ensure it is a valid Excel or CSV file.");
                 }
-
-                validateAndSetData(data);
-            } catch (err) {
-                console.error(err);
-                setError("Failed to parse file. Please ensure it is a valid Excel or CSV file.");
-            }
-        };
-        reader.readAsBinaryString(file);
+            };
+            reader.readAsBinaryString(file);
+        } catch (err: any) {
+            setError("Failed to load Excel engine: " + err.message);
+        }
     };
 
     const validateAndSetData = (data: any[]) => {
@@ -204,28 +210,37 @@ export function DataImportDialog({
         }
     };
 
-    const downloadTemplate = () => {
-        let headers: any[] = [];
-        let fileName = 'template.xlsx';
+    const downloadTemplate = async () => {
+        try {
+            const XLSX = await ensureXLSX();
+            let headers: any[] = [];
+            let fileName = 'template.xlsx';
 
-        if (activeTab === 'students') {
-            headers = [{ name: "John Doe", rollNo: "1001", course: "B.Tech", department: "CSE", semester: 1, section: "A" }];
-            fileName = 'students_template.xlsx';
-        } else if (activeTab === 'classrooms') {
-            headers = [{ roomNo: "C-101", capacity: 60, building: "Block C", floor: 1 }];
-            fileName = 'classrooms_template.xlsx';
-        } else if (activeTab === 'invigilators') {
-            headers = [{ name: "Dr. Smith", department: "CSE", designation: "Professor", email: "smith@example.com", maxDuties: 5 }];
-            fileName = 'invigilators_template.xlsx';
-        } else if (activeTab === 'exams') {
-            headers = [{ date: "2025-05-20", time: "09:30", course: "B.Tech", department: "CSE", semester: 4, subjectName: "Data Structures", subjectCode: "CS201", duration: 90, shift: 1 }];
-            fileName = 'exam_schedule_template.xlsx';
+            if (activeTab === 'students') {
+                headers = [{ name: "John Doe", rollNo: "1001", course: "B.Tech", department: "CSE", semester: 1, section: "A" }];
+                fileName = 'students_template.xlsx';
+            } else if (activeTab === 'classrooms') {
+                headers = [{ roomNo: "C-101", capacity: 60, building: "Block C", floor: 1 }];
+                fileName = 'classrooms_template.xlsx';
+            } else if (activeTab === 'invigilators') {
+                headers = [{ name: "Dr. Smith", department: "CSE", designation: "Professor", email: "smith@example.com", maxDuties: 5 }];
+                fileName = 'invigilators_template.xlsx';
+            } else if (activeTab === 'exams') {
+                headers = [{ date: "2025-05-20", time: "09:30", course: "B.Tech", department: "CSE", semester: 4, subjectName: "Data Structures", subjectCode: "CS201", duration: 90, shift: 1 }];
+                fileName = 'exam_schedule_template.xlsx';
+            }
+
+            const ws = XLSX.utils.json_to_sheet(headers);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Template");
+            XLSX.writeFile(wb, fileName);
+        } catch (err: any) {
+            toast({
+                title: "Template Download Failed",
+                description: err.message,
+                variant: "destructive"
+            });
         }
-
-        const ws = XLSX.utils.json_to_sheet(headers);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Template");
-        XLSX.writeFile(wb, fileName);
     };
 
     const renderUploadUI = () => (

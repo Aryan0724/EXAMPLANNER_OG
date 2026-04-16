@@ -13,7 +13,7 @@ import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, Use
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
-import { generateRoomSeatPlanPDF } from '@/lib/report-generator';
+import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
@@ -208,6 +208,18 @@ export default function AllotmentPage() {
   const currentExams = seatPlan?.exam ? (Array.isArray(seatPlan.exam) ? seatPlan.exam : [seatPlan.exam]) : (examSlotsByTime[selectedSlotKey!] || []);
   const representativeExam = currentExams[0];
 
+  // Detection for potentially mismatched dates
+  const mismatchedConcurrentExams = useMemo(() => {
+    if (!selectedSlotKey || !representativeExam) return [];
+    
+    // Find all exams that share the same time but have different dates
+    return examSchedule.filter(e => 
+      e.time === representativeExam.time && 
+      e.date !== representativeExam.date &&
+      !currentExams.some(ce => ce.id === e.id)
+    );
+  }, [selectedSlotKey, representativeExam, examSchedule, currentExams]);
+
   const rollNumberRanges = useMemo(() => {
     if (!selectedClassroom || !seatPlan) return {};
 
@@ -379,89 +391,39 @@ export default function AllotmentPage() {
   };
 
   const handleDownloadPDF = () => {
-    if (!selectedClassroom || !seatPlan || !representativeExam) return;
-
-    const studentsInRoom = seatPlan.assignments
-      .filter(a => a.classroom.id === selectedClassroom.id && a.student)
-      .map(a => ({
-        seatNo: a.seatNumber.toString(),
-        rollNo: a.student!.rollNo,
-        name: a.student!.name,
-        course: a.student!.course,
-        subjectCode: a.student!.exam?.subjectCode || '-',
-      }));
-
-    if (studentsInRoom.length === 0) {
-      toast({
-        title: "No Data",
-        description: "No students allotted to this room.",
-        variant: "default"
-      });
-      return;
-    }
-
-    const examDetails = {
-      date: representativeExam.date,
-      time: representativeExam.time,
-      subjects: currentExams.map(e => e.subjectCode).join(', ')
-    };
-
-    generateRoomSeatPlanPDF(selectedClassroom, examDetails, studentsInRoom, invigilatorsForClassroom);
-
-    toast({
-      title: "Export Successful",
-      description: "Seat plan PDF downloaded successfully."
-    });
+    // Native Browser Printing is used for PDF export to ensure 100% reliability 
+    // and perfect rendering of colors and grids.
+    window.print();
   };
 
-  const handleDownloadExcel = () => {
-    if (!selectedClassroom || !seatPlan) return;
+  const handleDownloadExcel = async () => {
+    if (!selectedClassroom || !seatPlan || !representativeExam) return;
 
     try {
-      import('xlsx').then(XLSX => {
-        const studentsInRoom = seatPlan.assignments
-          .filter(a => a.classroom.id === selectedClassroom.id && a.student)
-          .map(a => ({
-            'Seat No': a.seatNumber,
-            'Roll No': a.student!.rollNo,
-            'Name': a.student!.name,
-            'Course': a.student!.course,
-            'Department': a.student!.department,
-            'Subject Code': a.student!.exam?.subjectCode || '-',
-            'Subject Name': a.student!.exam?.subjectName || '-',
-          }));
+      // For Excel, we now want to pass the full assignments for that room 
+      // so the generator can build a visual grid.
+      const roomAssignments = seatPlan.assignments.filter(a => a.classroom.id === selectedClassroom.id);
 
-        if (studentsInRoom.length === 0) {
-          toast({
-            title: "No Data",
-            description: "No students allotted to this room.",
-            variant: "default"
-          });
-          return;
-        }
-
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(studentsInRoom);
-
-        // Auto-width
-        const colWidths = Object.keys(studentsInRoom[0]).map(key => ({
-          wch: Math.max(key.length, ...studentsInRoom.map(row => String((row as any)[key]).length)) + 2
-        }));
-        ws['!cols'] = colWidths;
-
-        XLSX.utils.book_append_sheet(wb, ws, "Seat Plan");
-        XLSX.writeFile(wb, `SeatPlan_${selectedClassroom.roomNo}_${representativeExam?.date || 'Export'}.xlsx`);
-
+      if (roomAssignments.filter(a => a.student).length === 0) {
         toast({
-          title: "Export Successful",
-          description: "Seat plan downloaded successfully."
+          title: "No Data",
+          description: "No students allotted to this room.",
+          variant: "default"
         });
+        return;
+      }
+
+      await generateRoomSeatPlanExcel(selectedClassroom, representativeExam, roomAssignments);
+
+      toast({
+        title: "Export Successful",
+        description: "Seat plan Excel grid downloaded successfully."
       });
     } catch (error) {
-      console.error("Export failed", error);
+      console.error("Excel Export failed", error);
       toast({
-        title: "Export Failed",
-        description: "Could not generate Excel file.",
+        title: "Excel Export Failed",
+        description: "There was an error generating the Excel file. Please check the console.",
         variant: "destructive"
       });
     }
@@ -516,6 +478,27 @@ export default function AllotmentPage() {
                       </Button>
                     </CardContent>
                   </Card>
+
+                  {mismatchedConcurrentExams.length > 0 && !seatPlan && (
+                    <Card className="border-amber-200 bg-amber-50">
+                      <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+                          <Info className="w-4 h-4" />
+                          Potential Concurrent Exams Detected
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 text-xs text-amber-700">
+                        <p>The following exams share the same time (<strong>{representativeExam?.time}</strong>) but have different dates in the schedule. If you intended to mix these courses in the same rooms, please ensure their dates match in the Schedule tab.</p>
+                        <ul className="mt-2 list-disc list-inside space-y-1">
+                          {mismatchedConcurrentExams.map(e => (
+                            <li key={e.id}>
+                              {e.subjectCode} ({e.course}) on <strong>{e.date}</strong>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {showExclusionReport && excludedData && <ExclusionReport data={excludedData} />}
 
@@ -603,19 +586,19 @@ export default function AllotmentPage() {
                                   </div>
                                 ))}
                                 <div className="flex flex-col items-center gap-2">
-                                  {currentExams.map((exam, idx) => (
-                                    <div key={exam.id} className="flex flex-col items-center">
+                                  {representativeExam && (
+                                    <div className="flex flex-col items-center">
                                       <div className="text-4xl font-bold tracking-tighter">
-                                        {String(exam.time.split(':')[0]).padStart(2, '0')}:{String(exam.time.split(':')[1]).padStart(2, '0')}
+                                        {String(representativeExam.time.split(':')[0]).padStart(2, '0')}:{String(representativeExam.time.split(':')[1]).padStart(2, '0')}
                                       </div>
                                       <div className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">
-                                        {parseInt(exam.time.split(':')[0]) < 12 ? 'Morning' : 'Evening'} Session
+                                        {parseInt(representativeExam.time.split(':')[0]) < 12 ? 'Morning' : 'Evening'} Session
                                       </div>
                                       <Badge variant="outline" className="mt-2 text-[10px] uppercase">
-                                        {exam.duration} Minutes
+                                        {representativeExam.duration} Minutes
                                       </Badge>
                                     </div>
-                                  ))}
+                                  )}
                                 </div>
                               </div>
 
