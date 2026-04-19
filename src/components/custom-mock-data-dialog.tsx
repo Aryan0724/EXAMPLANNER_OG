@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Import Tabs
-import { Plus, Trash2, BookOpen, GraduationCap, Sparkles, Database, Info, Eraser, Lightbulb } from 'lucide-react';
+import { Plus, Trash2, BookOpen, GraduationCap, Sparkles, Database, Info, Eraser, Lightbulb, FileUp, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ExamSlot, Student } from '@/lib/types';
 import { parsePasteSchedule, parsePasteBatches } from '@/lib/parsers';
@@ -39,6 +39,8 @@ interface CustomMockDataDialogProps {
 export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateCustom, onGenerateRandom }: CustomMockDataDialogProps) {
     const [activeTab, setActiveTab] = useState('random');
     const [randomStudentCount, setRandomStudentCount] = useState(200);
+    const [isParsing, setIsParsing] = useState(false);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const [batches, setBatches] = useState<StudentBatch[]>([
         { id: '1', course: 'B.TECH', department: 'CSE', semester: '2', count: 100 }
@@ -72,6 +74,12 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
 
     const handlePasteProcess = () => {
         const parsedExams = parsePasteSchedule(pasteText);
+        processParsedExams(parsedExams);
+        setPasteText('');
+        setShowPasteInput(false);
+    };
+
+    const processParsedExams = (parsedExams: any[]) => {
         if (parsedExams.length === 0) return;
 
         // Smart Auto-Batching
@@ -115,8 +123,52 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
 
         setBatches([...batches, ...newBatches]);
         setExams([...exams, ...newCustomExams]);
-        setPasteText('');
-        setShowPasteInput(false);
+    };
+
+    const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsParsing(true);
+        try {
+            const pdfjsLib = await ensurePDFJS();
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let extractedText = '';
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                
+                // Group items by their Y coordinate to detect rows
+                const items = textContent.items as any[];
+                const lines: { [key: number]: any[] } = {};
+                
+                items.forEach(item => {
+                    const y = Math.round(item.transform[5]);
+                    if (!lines[y]) lines[y] = [];
+                    lines[y].push(item);
+                });
+                
+                // Sort rows top-to-bottom and items left-to-right
+                const sortedY = Object.keys(lines).map(Number).sort((a, b) => b - a);
+                sortedY.forEach(y => {
+                    const rowItems = lines[y].sort((a, b) => a.transform[4] - b.transform[4]);
+                    const rowText = rowItems.map(item => item.str.trim()).filter(Boolean).join(' | ');
+                    if (rowText) {
+                        extractedText += `| ${rowText} |\n`;
+                    }
+                });
+            }
+
+            const parsedExams = parsePasteSchedule(extractedText);
+            processParsedExams(parsedExams);
+        } catch (err) {
+            console.error("PDF Parsing Error:", err);
+        } finally {
+            setIsParsing(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
     const addBatch = () => {
@@ -389,6 +441,32 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
                                     <BookOpen className="h-4 w-4" /> Exam Slots
                                 </h3>
                                 <div className="flex gap-2">
+                                    <input
+                                        type="file"
+                                        accept=".pdf"
+                                        className="hidden"
+                                        ref={fileInputRef}
+                                        onChange={handlePDFUpload}
+                                    />
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isParsing}
+                                        className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                                    >
+                                        {isParsing ? (
+                                            <>
+                                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                                Parsing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FileUp className="h-3 w-3 mr-1" />
+                                                Import PDF
+                                            </>
+                                        )}
+                                    </Button>
                                     <Button size="sm" variant="outline" onClick={() => setShowPasteInput(!showPasteInput)}>
                                         {showPasteInput ? 'Cancel Paste' : 'Paste Schedule'}
                                     </Button>
@@ -480,4 +558,23 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
             </DialogContent>
         </Dialog>
     );
+}
+
+/**
+ * Dynamically loads PDF.js from a CDN
+ */
+async function ensurePDFJS(): Promise<any> {
+    if ((window as any).pdfjsLib) return (window as any).pdfjsLib;
+
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        script.onload = () => {
+            const pdfjsLib = (window as any).pdfjsLib;
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            resolve(pdfjsLib);
+        };
+        script.onerror = () => reject(new Error('Failed to load PDF.js from CDN'));
+        document.head.appendChild(script);
+    });
 }

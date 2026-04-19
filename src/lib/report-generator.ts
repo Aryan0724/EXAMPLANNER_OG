@@ -1,5 +1,7 @@
 
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import type { SeatPlan, InvigilatorAssignment, Student, Classroom, Invigilator, ExamSlot } from './types';
 
 // Helper to get day name
@@ -517,5 +519,199 @@ export async function generateRoomSeatPlanExcel(
         console.error("Excel Generation Failed", error);
         throw error;
     }
+}
+
+/**
+ * Generates the high-fidelity Styled Duty Chart matching the University Format.
+ * Uses ExcelJS for colors, merges, and borders.
+ */
+export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAllotment, allInvigilators: Invigilator[]) {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Invigilator Duty Chart');
+
+    // 1. COLLECT DATA & DIMENSIONS
+    const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const uniqueDates = Array.from(new Set(sessionKeys.map(key => key.split(' ')[0]))).sort();
+    
+    // Shifts: I (9:30-11:00), II (11:30-1:00), III (1:30-3:00), IV (3:30-5:00)
+    const shiftTimings = [
+        { id: 'I', label: 'Shift I: 9:30AM-11:00AM', color: 'FFFF00' }, // Yellow
+        { id: 'II', label: 'Shift II: 11:30AM-1:00PM', color: '92D050' }, // Green
+        { id: 'III', label: 'Shift III: 1:30PM-3:00PM', color: '00B0F0' }, // Blue
+        { id: 'IV', label: 'Shift IV: 3:30PM-5:00PM', color: 'FFC000' }, // Orange
+    ];
+
+    // Helper to get shift index from time
+    const getShiftIndex = (time: string) => {
+        const hour = parseInt(time.split(':')[0]);
+        if (hour <= 10) return 0;
+        if (hour <= 12) return 1;
+        if (hour <= 14) return 2;
+        return 3;
+    };
+
+    // Calculate columns: 4 fixed (Sr, Name, Desig, Dept) + (Dates * 4 shifts) + 1 (Total)
+    const dateColStart = 5;
+    const totalCols = dateColStart + (uniqueDates.length * 4);
+
+    // 2. HEADERS (Rows 1-3)
+    worksheet.mergeCells(1, 1, 1, totalCols);
+    const title1 = worksheet.getCell(1, 1);
+    title1.value = 'Graphic Era Hill University, Dehradun';
+    title1.font = { name: 'Arial', size: 16, bold: true };
+    title1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    worksheet.mergeCells(2, 1, 2, totalCols);
+    const title2 = worksheet.getCell(2, 1);
+    title2.value = 'Examination Center:- Graphic Era Hill University, Bhimtal Campus';
+    title2.font = { name: 'Arial', size: 14, bold: true };
+    title2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    worksheet.mergeCells(3, 1, 3, totalCols);
+    const title3 = worksheet.getCell(3, 1);
+    const monthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+    title3.value = `Mid Term & Trimester Examination (Even Semester) ${monthYear}`;
+    title3.font = { name: 'Arial', size: 14, bold: true };
+    title3.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // 3. SHIFT TIMING LEGEND (Rows 5-8) & Duty Required (Row 4)
+    worksheet.mergeCells(4, 1, 4, 4);
+    worksheet.getCell(4, 1).value = 'No of Duty Required';
+    worksheet.getCell(4, 1).font = { bold: true };
+
+    shiftTimings.forEach((shift, idx) => {
+        const rowNum = 5 + idx;
+        worksheet.mergeCells(rowNum, 1, rowNum, 4);
+        const cell = worksheet.getCell(rowNum, 1);
+        cell.value = shift.label;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: shift.color } };
+        cell.font = { bold: true };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    });
+
+    // 4. DATE & SHIFT HEADERS (Rows 9-10)
+    // Static Headers
+    worksheet.getCell(9, 1).value = 'Sr. No.';
+    worksheet.getCell(9, 2).value = 'Name of Invigilator';
+    worksheet.getCell(9, 3).value = 'Designation';
+    worksheet.getCell(9, 4).value = 'Deptt.';
+    worksheet.mergeCells(9, 1, 10, 1);
+    worksheet.mergeCells(9, 2, 10, 2);
+    worksheet.mergeCells(9, 3, 10, 3);
+    worksheet.mergeCells(9, 4, 10, 4);
+
+    // Dynamic Date Headers
+    uniqueDates.forEach((date, dateIdx) => {
+        const startCol = dateColStart + (dateIdx * 4);
+        worksheet.mergeCells(9, startCol, 9, startCol + 3);
+        const dateCell = worksheet.getCell(9, startCol);
+        dateCell.value = date; // Format: YYYY-MM-DD
+        dateCell.alignment = { horizontal: 'center' };
+        dateCell.font = { bold: true };
+
+        // Sub-headers (I, II, III, IV)
+        shiftTimings.forEach((shift, shiftIdx) => {
+            const cell = worksheet.getCell(10, startCol + shiftIdx);
+            cell.value = shift.id;
+            cell.alignment = { horizontal: 'center' };
+            cell.font = { bold: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: shift.color } };
+        });
+    });
+
+    const totalDutyCol = totalCols + 1;
+    worksheet.mergeCells(9, totalDutyCol, 10, totalDutyCol);
+    const totalHeader = worksheet.getCell(9, totalDutyCol);
+    totalHeader.value = 'Total Duty';
+    totalHeader.alignment = { horizontal: 'center', vertical: 'middle', textRotation: 90 };
+    totalHeader.font = { bold: true };
+
+    // 5. CALCULATE TOTALS PER SHIFT (No of Duty Required)
+    const shiftTotals = new Map<string, number>(); // key: "date-shiftIdx"
+    sessionKeys.forEach(key => {
+        const [date, time] = key.split(' ');
+        const shiftIdx = getShiftIndex(time);
+        const count = fullAllotment[key].invigilatorAssignments.length;
+        const mapKey = `${date}-${shiftIdx}`;
+        shiftTotals.set(mapKey, (shiftTotals.get(mapKey) || 0) + count);
+    });
+
+    uniqueDates.forEach((date, dateIdx) => {
+        const startCol = dateColStart + (dateIdx * 4);
+        shiftTimings.forEach((_, shiftIdx) => {
+            const count = shiftTotals.get(`${date}-${shiftIdx}`) || 0;
+            const cell = worksheet.getCell(4, startCol + shiftIdx);
+            cell.value = count > 0 ? count : '';
+            cell.alignment = { horizontal: 'center' };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        });
+    });
+
+    // 6. POPULATE INVIGILATORS
+    // Sort invigilators by name
+    const sortedInvigilators = [...allInvigilators].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Duty Map for easy lookup: invId -> date-shiftIdx -> true
+    const invDutyMap = new Map<string, Set<string>>();
+    sessionKeys.forEach(key => {
+        const [date, time] = key.split(' ');
+        const shiftIdx = getShiftIndex(time);
+        fullAllotment[key].invigilatorAssignments.forEach(asg => {
+            if (!invDutyMap.has(asg.invigilator.id)) invDutyMap.set(asg.invigilator.id, new Set());
+            invDutyMap.get(asg.invigilator.id)!.add(`${date}-${shiftIdx}`);
+        });
+    });
+
+    sortedInvigilators.forEach((inv, rowIdx) => {
+        const rowNum = 11 + rowIdx;
+        worksheet.getCell(rowNum, 1).value = rowIdx + 1;
+        worksheet.getCell(rowNum, 2).value = inv.name;
+        worksheet.getCell(rowNum, 3).value = inv.designation === 'Assistant Professor' ? 'AP' : (inv.designation === 'Associate Professor' ? 'Assoc.P' : 'Prof');
+        worksheet.getCell(rowNum, 4).value = inv.department;
+
+        let total = 0;
+        uniqueDates.forEach((date, dateIdx) => {
+            const startCol = dateColStart + (dateIdx * 4);
+            shiftTimings.forEach((_, shiftIdx) => {
+                if (invDutyMap.get(inv.id)?.has(`${date}-${shiftIdx}`)) {
+                    worksheet.getCell(rowNum, startCol + shiftIdx).value = 1;
+                    worksheet.getCell(rowNum, startCol + shiftIdx).alignment = { horizontal: 'center' };
+                    total++;
+                }
+            });
+        });
+
+        worksheet.getCell(rowNum, totalDutyCol).value = total;
+        worksheet.getCell(rowNum, totalDutyCol).alignment = { horizontal: 'center' };
+    });
+
+    // 7. FINAL STYLING (Borders & Column Widths)
+    worksheet.columns.forEach((col, idx) => {
+        const colIdx = idx + 1;
+        if (colIdx === 1) col.width = 5; // Sr No
+        else if (colIdx === 2) col.width = 30; // Name
+        else if (colIdx === 3) col.width = 10; // Desig
+        else if (colIdx === 4) col.width = 10; // Dept
+        else if (colIdx > 4 && colIdx <= totalCols) col.width = 4; // Shift columns
+        else if (colIdx === totalDutyCol) col.width = 8; // Total Duty
+    });
+
+    // Apply borders to all data cells
+    const lastRow = 10 + sortedInvigilators.length;
+    for (let r = 9; r <= lastRow; r++) {
+        for (let c = 1; c <= totalDutyCol; c++) {
+            const cell = worksheet.getCell(r, c);
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        }
+    }
+
+    // 8. DOWNLOAD
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), `Detailed_Duty_Chart_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 

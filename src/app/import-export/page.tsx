@@ -17,7 +17,7 @@ import { DataContext } from '@/context/DataContext';
 import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
 import { createClassroom, Invigilator } from '@/lib/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { generateMasterReport, generateInvigilatorDutyRoster, generateDateShiftWiseReport, generateVisualSeatPlanExcel } from '@/lib/report-generator';
+import { generateMasterReport, generateInvigilatorDutyRoster, generateDateShiftWiseReport, generateVisualSeatPlanExcel, generateDetailedInvigilatorDutyChart } from '@/lib/report-generator';
 
 const ImportItem = ({ title, format, onUpload }: { title: string, format: string[], onUpload?: (data: string) => void }) => {
   const { toast } = useToast();
@@ -223,6 +223,37 @@ export default function ImportExportPage() {
       });
     }
   };
+  
+  const handleExportDetailedDutyChart = async () => {
+    if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Allotment Data',
+        description: 'Please generate a full allotment first.',
+      });
+      return;
+    }
+    if (!invigilators || invigilators.length === 0) {
+      toast({ variant: 'destructive', title: 'Data Missing', description: 'Invigilator data not loaded.' });
+      return;
+    }
+
+    try {
+      toast({ title: 'Generating Styled Chart...', description: 'Please wait while we format the Excel file.' });
+      await generateDetailedInvigilatorDutyChart(fullAllotment, invigilators);
+      toast({
+        title: 'Report Generated',
+        description: 'Detailed Duty Chart has been downloaded.',
+      });
+    } catch (error) {
+      console.error("Failed to generate report:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Export Failed',
+        description: 'Error generating styled duty chart.',
+      });
+    }
+  };
 
   const handleInvigilatorUpload = (csvData: string) => {
     try {
@@ -397,6 +428,10 @@ export default function ImportExportPage() {
                     <Button onClick={handleExportDateShiftWiseReport}>
                       <FileDown className="mr-2 h-4 w-4" />
                       Date & Shift-wise Duties (Excel)
+                    </Button>
+                    <Button onClick={handleExportDetailedDutyChart} className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-none shadow-md">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Detailed Duty Chart (University Format)
                     </Button>
                     <Button variant="secondary" disabled>
                       <FileDown className="mr-2 h-4 w-4" />
