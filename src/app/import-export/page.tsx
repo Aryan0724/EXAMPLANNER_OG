@@ -277,11 +277,11 @@ export default function ImportExportPage() {
   const handleExportDayWiseRosters = async () => {
     if (!fullAllotment) return;
     try {
-      toast({ title: 'Generating Files...', description: 'A separate file for each exam day will be downloaded.' });
+      toast({ title: 'Creating ZIP Folder...', description: 'All daily duty charts are being packaged into one download.' });
       await generateDayWiseSessionRosters(fullAllotment, classrooms);
     } catch (error) {
       console.error("Day-wise export failed:", error);
-      toast({ variant: 'destructive', title: 'Export Failed', description: 'Error generating multiple files.' });
+      toast({ variant: 'destructive', title: 'Export Failed', description: 'Error generating ZIP folder.' });
     }
   }
 
@@ -463,13 +463,13 @@ export default function ImportExportPage() {
                       <Sparkles className="mr-2 h-4 w-4" />
                       Detailed Duty Chart (University Format)
                     </Button>
-                    <Button onClick={handleExportSessionRoster} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-none shadow-md">
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Photo-Format Roster (Single File)
-                    </Button>
                     <Button onClick={handleExportDayWiseRosters} className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white border-none shadow-md">
                       <Sparkles className="mr-2 h-4 w-4" />
-                      Organized Day-wise Roster (Multiple Files)
+                      Day-wise Duty Charts (ZIP Folder)
+                    </Button>
+                    <Button onClick={handleExportSessionRoster} variant="secondary" className="opacity-70 hover:opacity-100">
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Consolidated Roster (All Days in 1 File)
                     </Button>
                     <Button variant="secondary" disabled>
                       <FileDown className="mr-2 h-4 w-4" />

@@ -2,6 +2,7 @@
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 import type { SeatPlan, InvigilatorAssignment, Student, Classroom, Invigilator, ExamSlot } from './types';
 
 // Helper to get day name
@@ -986,10 +987,11 @@ export async function generateSessionWiseInvigilationRoster(fullAllotment: FullA
 }
 
 /**
- * Generates separate Excel files for each day.
+ * Generates separate Excel files for each day and packages them into a single ZIP.
  * Each file contains sheets for each shift of that day.
  */
 export async function generateDayWiseSessionRosters(fullAllotment: FullAllotment, allClassrooms: Classroom[]) {
+    const zip = new JSZip();
     const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     if (sessionKeys.length === 0) return;
 
@@ -999,6 +1001,8 @@ export async function generateDayWiseSessionRosters(fullAllotment: FullAllotment
         if (!sessionsByDate.has(date)) sessionsByDate.set(date, []);
         sessionsByDate.get(date)!.push(key);
     });
+
+    const rootFolder = zip.folder(`Duty_Charts_${new Date().toISOString().split('T')[0]}`);
 
     for (const [date, dateKeys] of Array.from(sessionsByDate.entries())) {
         const workbook = new ExcelJS.Workbook();
@@ -1019,10 +1023,10 @@ export async function generateDayWiseSessionRosters(fullAllotment: FullAllotment
 
         const buffer = await workbook.xlsx.writeBuffer();
         const safeDate = date.replace(/\//g, '-');
-        saveAs(new Blob([buffer]), `DutyChart_${safeDate}.xlsx`);
-        
-        // Brief delay to allow multiple downloads
-        await new Promise(r => setTimeout(r, 600));
+        rootFolder?.file(`DutyChart_${safeDate}.xlsx`, buffer);
     }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    saveAs(zipBlob, `Exam_Duty_Charts_Pack_${new Date().toISOString().split('T')[0]}.zip`);
 }
 
