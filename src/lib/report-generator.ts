@@ -107,6 +107,22 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
                 '' // Signature placeholder
             ]);
         });
+
+        // 3. SHOW RESERVED STAFF FOR SESSION
+        const reservedStaff = invigilatorAssignments.filter(a => a.isReserved);
+        if (reservedStaff.length > 0) {
+            masterSheetRows.push(['']); // Spacer
+            masterSheetRows.push(['RESERVED STAFF (STANDBY):']);
+            reservedStaff.forEach((asg, idx) => {
+                masterSheetRows.push([
+                    '', // Column A
+                    '', // Column B
+                    '', // Column C
+                    `${idx + 1}. ${asg.invigilator.name} (${asg.invigilator.department})`,
+                    '' // Signature
+                ]);
+            });
+        }
     });
 
     const wsMaster = XLSX.utils.aoa_to_sheet(masterSheetRows);
@@ -338,11 +354,20 @@ export function generateInvigilatorDutyRoster(fullAllotment: FullAllotment, allI
         const header = formattedSessionHeaders[index];
 
         invigilatorAssignments.forEach(assignment => {
-            const { invigilator, classroom } = assignment;
+            const { invigilator, classroom, isReserved } = assignment;
             if (!dutyMap.has(invigilator.id)) dutyMap.set(invigilator.id, new Map());
 
-            const existing = dutyMap.get(invigilator.id)!.get(header);
-            dutyMap.get(invigilator.id)!.set(header, existing ? `${existing}, ${classroom.roomNo}` : classroom.roomNo);
+            const headerVal = dutyMap.get(invigilator.id)!.get(header);
+            const displayValue = isReserved ? 'RESERVED' : (classroom?.roomNo || 'Unassigned');
+            
+            // If it's already RESERVED but we found an active duty, prioritize active
+            if (headerVal === 'RESERVED' && !isReserved) {
+                dutyMap.get(invigilator.id)!.set(header, displayValue);
+            } else if (!headerVal) {
+                dutyMap.get(invigilator.id)!.set(header, displayValue);
+            } else if (headerVal !== 'RESERVED' && !isReserved) {
+                dutyMap.get(invigilator.id)!.set(header, `${headerVal}, ${displayValue}`);
+            }
         });
     });
 
@@ -358,12 +383,16 @@ export function generateInvigilatorDutyRoster(fullAllotment: FullAllotment, allI
         let total = 0;
         formattedSessionHeaders.forEach(h => {
             const val = duties?.get(h) || '-';
-            if (val !== '-') total++;
+            // Count towards total only if it's an active duty (room number, not RESERVED or -)
+            if (val !== '-' && val !== 'RESERVED') total++;
             row[h] = val;
         });
         row['Total'] = total;
         return row;
-    }).filter(r => r.Total > 0);
+    }).filter(r => {
+        const sessionValues = formattedSessionHeaders.map(h => r[h]);
+        return sessionValues.some(v => v !== '-');
+    });
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rosterData);
@@ -668,14 +697,17 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     };
     const usedAbbreviations = new Set<string>();
 
-    // Duty Map for easy lookup: invId -> date-shiftIdx -> true
-    const invDutyMap = new Map<string, Set<string>>();
+    // Duty Map for easy lookup: invId -> date-shiftIdx -> 1 (active) or 0 (reserved)
+    const invDutyMap = new Map<string, Map<string, number>>();
     sessionKeys.forEach(key => {
         const [date, time] = key.split(' ');
         const shiftIdx = getShiftIndex(time);
         fullAllotment[key].invigilatorAssignments.forEach(asg => {
-            if (!invDutyMap.has(asg.invigilator.id)) invDutyMap.set(asg.invigilator.id, new Set());
-            invDutyMap.get(asg.invigilator.id)!.add(`${date}-${shiftIdx}`);
+            if (!invDutyMap.has(asg.invigilator.id)) invDutyMap.set(asg.invigilator.id, new Map());
+            const current = invDutyMap.get(asg.invigilator.id)!.get(`${date}-${shiftIdx}`);
+            if (current !== 1) {
+                invDutyMap.get(asg.invigilator.id)!.set(`${date}-${shiftIdx}`, asg.isReserved ? 0 : 1);
+            }
         });
     });
 
@@ -693,10 +725,11 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         uniqueDates.forEach((date, dateIdx) => {
             const startCol = dateColStart + (dateIdx * 4);
             shiftTimings.forEach((_, shiftIdx) => {
-                if (invDutyMap.get(inv.id)?.has(`${date}-${shiftIdx}`)) {
-                    worksheet.getCell(rowNum, startCol + shiftIdx).value = 1;
+                const val = invDutyMap.get(inv.id)?.get(`${date}-${shiftIdx}`);
+                if (val !== undefined) {
+                    worksheet.getCell(rowNum, startCol + shiftIdx).value = val;
                     worksheet.getCell(rowNum, startCol + shiftIdx).alignment = { horizontal: 'center' };
-                    total++;
+                    if (val === 1) total++;
                 }
             });
         });

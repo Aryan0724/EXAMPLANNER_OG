@@ -50,7 +50,7 @@ const getSlotOptions = (allotment: Record<string, any> | null, examSchedule: Exa
 export default function AllotmentPage() {
   const { toast } = useToast();
   const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
-  const { students, classrooms, invigilators, setInvigilators, examSchedule, isHydrated } = useContext(DataContext);
+  const { students, classrooms, invigilators, setInvigilators, examSchedule, isHydrated, reservedCount, setReservedCount } = useContext(DataContext);
 
   const examSlotsByTime = useMemo(() => getExamSlotsByTime(examSchedule), [examSchedule]);
 
@@ -62,7 +62,6 @@ export default function AllotmentPage() {
   const [invigilatorAssignments, setInvigilatorAssignments] = useState<InvigilatorAssignment[] | null>(null);
 
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
-  const [reservedCount, setReservedCount] = useState<number>(4);
 
   const [excludedData, setExcludedData] = useState<{
     debarredStudents: Student[];

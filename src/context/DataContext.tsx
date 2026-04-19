@@ -20,6 +20,8 @@ interface DataContextType {
   excludedRooms: string[];
   setExcludedRooms: React.Dispatch<React.SetStateAction<string[]>>;
   isHydrated: boolean;
+  reservedCount: number;
+  setReservedCount: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export const DataContext = createContext<DataContextType>({
@@ -38,6 +40,8 @@ export const DataContext = createContext<DataContextType>({
   excludedRooms: [],
   setExcludedRooms: () => { },
   isHydrated: false,
+  reservedCount: 4,
+  setReservedCount: () => { },
 });
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
@@ -49,6 +53,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [excludedBlocks, setExcludedBlocks] = useState<string[]>([]);
   const [excludedRooms, setExcludedRooms] = useState<string[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [reservedCount, setReservedCount] = useState(4);
 
   useEffect(() => {
     // Start with empty state for most, but load Real Invigilators by default
@@ -71,7 +76,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       blockPriority, setBlockPriority,
       excludedBlocks, setExcludedBlocks,
       excludedRooms, setExcludedRooms,
-      isHydrated
+      isHydrated,
+      reservedCount, setReservedCount
     }}>
       {children}
     </DataContext.Provider>

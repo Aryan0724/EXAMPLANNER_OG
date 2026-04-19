@@ -27,7 +27,8 @@ export default function SchedulePage() {
         classrooms,
         invigilators, setInvigilators,
         examSchedule, setExamSchedule,
-        isHydrated
+        isHydrated,
+        reservedCount, setReservedCount
     } = useContext(DataContext);
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -121,7 +122,7 @@ export default function SchedulePage() {
                 // If no classrooms are used (e.g. no students eligible), we might still want to proceed or skip
                 // But assignInvigilators expects a valid SeatPlan.
 
-                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0]);
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], reservedCount);
                 invigilatorMasterList = updatedInvigilators;
 
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
@@ -228,12 +229,23 @@ export default function SchedulePage() {
                                                 </div>
                                                 <CardDescription>View, manage, and generate allotments for the exam schedule.</CardDescription>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className="text-[10px] uppercase font-bold text-muted-foreground mr-1">Reserved Staff</span>
+                                                    <Input 
+                                                        type="number" 
+                                                        value={reservedCount}
+                                                        onChange={(e) => setReservedCount(parseInt(e.target.value) || 0)}
+                                                        className="w-20 h-8 text-center font-bold"
+                                                        min="0"
+                                                        max="20"
+                                                    />
+                                                </div>
                                                 <Button variant="outline" onClick={() => handleOpenDialog()}>
                                                     <PlusCircle className="mr-2" />
                                                     Add New Exam
                                                 </Button>
-                                                <Button onClick={handleGenerateAll} disabled={isGenerating || examSchedule.length === 0}>
+                                                <Button onClick={handleGenerateAll} disabled={isGenerating || examSchedule.length === 0} className="bg-gradient-to-r from-primary to-indigo-600">
                                                     {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                                     Generate Full Allotment
                                                 </Button>

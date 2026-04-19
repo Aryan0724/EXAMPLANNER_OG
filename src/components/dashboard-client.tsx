@@ -36,7 +36,9 @@ export function DashboardClient() {
         examSchedule, setExamSchedule,
         blockPriority, setBlockPriority,
         excludedBlocks, setExcludedBlocks,
-        excludedRooms, setExcludedRooms
+        excludedBlocks, setExcludedBlocks,
+        excludedRooms, setExcludedRooms,
+        reservedCount, setReservedCount
     } = useContext(DataContext);
 
     const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
@@ -144,7 +146,7 @@ export function DashboardClient() {
 
                 const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority);
                 studentMasterList = updatedStudents;
-                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0]);
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], reservedCount);
                 invigilatorMasterList = updatedInvigilators;
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
@@ -198,8 +200,28 @@ export function DashboardClient() {
                         <CardDescription>Manage your data and generate examination plans.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-2">
-                            <Button className="w-full" onClick={handleGenerateAll} disabled={isGenerating || examSchedule.length === 0}>
+                        <div className="flex flex-col gap-4 p-4 rounded-xl bg-secondary/20 border border-secondary shadow-inner">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <h4 className="text-sm font-semibold">Reserved Staff Per Session</h4>
+                                    <p className="text-xs text-muted-foreground italic">Standby staff for emergency faculty absences</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <input 
+                                        type="number" 
+                                        value={reservedCount}
+                                        onChange={(e) => setReservedCount(parseInt(e.target.value) || 0)}
+                                        className="w-16 px-2 py-1 bg-background border border-input rounded-md text-sm text-center font-bold focus:ring-2 focus:ring-primary/20 outline-none"
+                                        min="0"
+                                        max="20"
+                                    />
+                                    <div className="flex flex-col">
+                                        <button onClick={() => setReservedCount(prev => Math.min(20, prev + 1))} className="text-[10px] hover:text-primary">▲</button>
+                                        <button onClick={() => setReservedCount(prev => Math.max(0, prev - 1))} className="text-[10px] hover:text-primary">▼</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <Button className="w-full bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-700 shadow-lg shadow-indigo-500/20 py-6 text-lg font-bold" onClick={handleGenerateAll} disabled={isGenerating || examSchedule.length === 0}>
                                 {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                 Generate Full Allotment
                             </Button>
