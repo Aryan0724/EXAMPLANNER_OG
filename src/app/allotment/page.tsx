@@ -13,7 +13,7 @@ import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, Use
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
-import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel } from '@/lib/report-generator';
+import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
@@ -256,6 +256,20 @@ export default function AllotmentPage() {
     setShowExclusionReport(false); // Hide report on slot change
   };
 
+  const handleExportSessionRoster = async () => {
+    if (!fullAllotment) return;
+    try {
+      await generateSessionWiseInvigilationRoster(fullAllotment, classrooms);
+      toast({
+        title: "Session Roster Generated",
+        description: "High-fidelity duty chart downloaded successfully."
+      });
+    } catch (error) {
+      console.error("Export failed", error);
+      toast({ variant: "destructive", title: "Export Failed", description: "Could not generate session roster." });
+    }
+  };
+
   const handleGeneration = () => {
     if (!selectedSlotKey) {
       toast({
@@ -486,14 +500,16 @@ export default function AllotmentPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <Button
-                        onClick={() => setShowExclusionReport(!showExclusionReport)}
-                        variant="outline"
-                        disabled={!excludedData}
-                      >
+                      <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setShowExclusionReport(!showExclusionReport)}>
                         {showExclusionReport ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                        Exclusion Report
+                        {showExclusionReport ? 'Hide Exclusions' : 'View Exclusions'}
                       </Button>
+                      <Button variant="secondary" size="sm" onClick={handleExportSessionRoster} disabled={!fullAllotment}>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Download Session Roster (Shift-wise)
+                      </Button>
+                    </div>
                       <div className="w-full sm:w-auto flex flex-col gap-2">
                         <span className="text-xs font-medium text-muted-foreground uppercase ml-1">Reserved Staff</span>
                         <input 

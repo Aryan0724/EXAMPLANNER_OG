@@ -827,3 +827,149 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     saveAs(new Blob([buffer]), `Detailed_Duty_Chart_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
+/**
+ * Generates the 'Session-wise Invigilation Roster' matching the user's specific format.
+ * Features: Sheet per shift, merged room cells, sign and answer script columns.
+ */
+export async function generateSessionWiseInvigilationRoster(fullAllotment: FullAllotment, allClassrooms: Classroom[]) {
+    const workbook = new ExcelJS.Workbook();
+    
+    const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    if (sessionKeys.length === 0) return;
+
+    sessionKeys.forEach(key => {
+        const { seatPlan, invigilatorAssignments } = fullAllotment[key];
+        const representativeExam = Array.isArray(seatPlan.exam) ? seatPlan.exam[0] : seatPlan.exam;
+        const date = representativeExam.date;
+        const time = representativeExam.time;
+
+        const hour = parseInt(time.split(':')[0]);
+        let shiftNum = 1;
+        if (hour <= 10) shiftNum = 1;
+        else if (hour <= 12) shiftNum = 2;
+        else if (hour <= 14) shiftNum = 3;
+        else shiftNum = 4;
+
+        // Calculate timing range string (e.g., 9:30 AM to 11:00 AM)
+        const [h, m] = time.split(':').map(Number);
+        const startDate = new Date();
+        startDate.setHours(h, m, 0);
+        const endDate = new Date(startDate.getTime() + (representativeExam.duration || 90) * 60000);
+        
+        const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const timingRange = `${formatTime(startDate)} to ${formatTime(endDate)}`;
+
+        const sheetName = `Shift ${shiftNum} (${date.replace(/\//g, '-')})`.substring(0, 31);
+        const worksheet = workbook.addWorksheet(sheetName);
+
+        // 1. HEADER (Photo Style)
+        worksheet.getCell('B2').value = `Date: ${date}`;
+        worksheet.getCell('C2').value = `Shift ${shiftNum}`;
+        worksheet.getCell('E2').value = `Timing ${timingRange}`;
+        [worksheet.getCell('B2'), worksheet.getCell('C2'), worksheet.getCell('E2')].forEach(c => {
+            c.font = { bold: true, size: 11, name: 'Times New Roman' };
+        });
+
+        // 2. TABLE HEADERS (Row 3 & 4)
+        worksheet.mergeCells('A3:A4');
+        worksheet.getCell('A3').value = 'Sr. No.';
+        worksheet.mergeCells('B3:B4');
+        worksheet.getCell('B3').value = 'Name of Invigilators';
+        worksheet.mergeCells('C3:C4');
+        worksheet.getCell('C3').value = 'Class Room/ Lecture Theater';
+        worksheet.mergeCells('D3:D4');
+        worksheet.getCell('D3').value = 'Sign.';
+        worksheet.mergeCells('E3:G3');
+        worksheet.getCell('E3').value = 'Number of Answer Scripts';
+        worksheet.getCell('E4').value = 'Issued';
+        worksheet.getCell('F4').value = 'Used';
+        worksheet.getCell('G4').value = 'Returned';
+
+        // Style Headers
+        ['A3', 'B3', 'C3', 'D3', 'E3', 'E4', 'F4', 'G4'].forEach(ref => {
+            const cell = worksheet.getCell(ref);
+            cell.font = { bold: true, name: 'Times New Roman' };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        });
+
+        // 3. POPULATE DATA
+        const activeAssignments = invigilatorAssignments.filter(a => !a.isReserved && a.classroom);
+        const roomGroups = new Map<string, InvigilatorAssignment[]>();
+        activeAssignments.forEach(asg => {
+            const rid = asg.classroom!.id;
+            if (!roomGroups.has(rid)) roomGroups.set(rid, []);
+            roomGroups.get(rid)!.push(asg);
+        });
+
+        const sortedRoomIds = Array.from(roomGroups.keys()).sort((a, b) => {
+            const rA = allClassrooms.find(c => c.id === a)?.roomNo || '';
+            const rB = allClassrooms.find(c => c.id === b)?.roomNo || '';
+            return rA.localeCompare(rB, undefined, { numeric: true });
+        });
+
+        let currentRow = 5;
+        let srNo = 1;
+
+        sortedRoomIds.forEach(roomId => {
+            const roomAsgs = roomGroups.get(roomId)!;
+            const room = allClassrooms.find(c => c.id === roomId);
+            const startRow = currentRow;
+
+            roomAsgs.forEach((asg, idx) => {
+                worksheet.getCell(currentRow, 1).value = srNo++;
+                worksheet.getCell(currentRow, 2).value = asg.invigilator.name;
+                worksheet.getCell(currentRow, 3).value = `${room?.building || ''} ${room?.roomNo || ''}`.trim();
+                
+                [1,2,3,4,5,6,7].forEach(col => {
+                    const cell = worksheet.getCell(currentRow, col);
+                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                    cell.font = { name: 'Times New Roman' };
+                    cell.alignment = { vertical: 'middle', wrapText: true };
+                });
+                currentRow++;
+            });
+
+            if (roomAsgs.length > 1) {
+                worksheet.mergeCells(startRow, 3, currentRow - 1, 3);
+                worksheet.getCell(startRow, 3).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            }
+        });
+
+        // 4. RESERVED STAFF
+        const reservedStaff = invigilatorAssignments.filter(a => a.isReserved);
+        if (reservedStaff.length > 0) {
+            currentRow++;
+            worksheet.mergeCells(currentRow, 1, currentRow, 7);
+            worksheet.getCell(currentRow, 1).value = 'RESERVED STANDBY STAFF';
+            worksheet.getCell(currentRow, 1).font = { bold: true, name: 'Times New Roman' };
+            worksheet.getCell(currentRow, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F2F2F2' } };
+            currentRow++;
+
+            reservedStaff.forEach(asg => {
+                worksheet.getCell(currentRow, 1).value = '-';
+                worksheet.getCell(currentRow, 2).value = asg.invigilator.name;
+                worksheet.getCell(currentRow, 3).value = 'RESERVED';
+                [1,2,3,4,5,6,7].forEach(col => {
+                    const cell = worksheet.getCell(currentRow, col);
+                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                    cell.font = { name: 'Times New Roman' };
+                });
+                currentRow++;
+            });
+        }
+
+        // Column Widths
+        worksheet.getColumn(1).width = 8;
+        worksheet.getColumn(2).width = 30;
+        worksheet.getColumn(3).width = 25;
+        worksheet.getColumn(4).width = 15;
+        worksheet.getColumn(5).width = 10;
+        worksheet.getColumn(6).width = 10;
+        worksheet.getColumn(7).width = 10;
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), `SessionWise_Roster_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+

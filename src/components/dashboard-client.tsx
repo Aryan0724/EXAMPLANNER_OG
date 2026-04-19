@@ -18,7 +18,7 @@ import { DataContext } from '@/context/DataContext';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
 import { createClassroom, type ExamSlot, type Student, type Invigilator, type SeatPlan, type InvigilatorAssignment } from '@/lib/types';
-import { generateMasterReport, generateInvigilatorDutyRoster } from '@/lib/report-generator';
+import { generateMasterReport, generateInvigilatorDutyRoster, generateSessionWiseInvigilationRoster } from '@/lib/report-generator';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 
 import { BlockPriorityDialog } from '@/components/block-priority-dialog'; // Assuming this component exists and is exported
@@ -108,6 +108,20 @@ export function DashboardClient() {
             toast({ title: 'Roster Generated', description: 'The invigilator duty roster has been downloaded.' });
         } catch (error) {
             console.error("Failed to generate roster:", error);
+            toast({ variant: 'destructive', title: 'Export Failed', description: 'There was an error generating the roster.' });
+        }
+    }
+
+    const handleExportSessionRoster = () => {
+        if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
+            toast({ variant: 'destructive', title: 'No Allotment Data', description: 'Please generate a full allotment first.' });
+            return;
+        }
+        try {
+            generateSessionWiseInvigilationRoster(fullAllotment, classrooms);
+            toast({ title: 'Session Roster Generated', description: 'The session-wise invigilation roster has been downloaded.' });
+        } catch (error) {
+            console.error("Failed to generate session roster:", error);
             toast({ variant: 'destructive', title: 'Export Failed', description: 'There was an error generating the roster.' });
         }
     }
@@ -274,6 +288,10 @@ export function DashboardClient() {
                         <Button onClick={handleExportDutyRoster} disabled={!fullAllotment}>
                             <FileDown className="mr-2 h-4 w-4" />
                             Generate Duty Roster (Excel)
+                        </Button>
+                        <Button variant="secondary" onClick={handleExportSessionRoster} disabled={!fullAllotment}>
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Generate Session-wise Roster (Photo Format)
                         </Button>
                     </CardContent>
                 </Card>
