@@ -17,6 +17,8 @@ import { DataContext } from '@/context/DataContext';
 import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
 import { createClassroom, Invigilator } from '@/lib/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   generateMasterReport, 
   generateInvigilatorDutyRoster, 
@@ -97,6 +99,10 @@ export default function ImportExportPage() {
     setStudents, setClassrooms, setInvigilators, setExamSchedule
   } = useContext(DataContext);
 
+  const [pdfPreviewData, setPdfPreviewData] = useState<ExamSlot[] | null>(null);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
 
   const handlePopulateMockData = () => {
     toast({ title: 'Populating Mock Data...', description: 'Sample data (except invigilators) has been loaded.' });
@@ -120,18 +126,30 @@ export default function ImportExportPage() {
   };
 
   const handlePdfExamUpload = async (file: File) => {
+    setIsProcessing(true);
     toast({ title: 'Processing PDF...', description: 'Extracting exam schedule from PDF. Please wait.' });
     try {
       const exams = await parseExamPDF(file);
       if (exams.length > 0) {
-        setExamSchedule(prev => [...prev, ...exams]);
-        toast({ title: 'PDF Import Successful', description: `Successfully extracted ${exams.length} exams from PDF.` });
+        setPdfPreviewData(exams);
+        setShowPdfPreview(true);
       } else {
-        toast({ variant: 'destructive', title: 'Import Failed', description: 'No exam data could be extracted from this PDF.' });
+        toast({ variant: 'destructive', title: 'Import Failed', description: 'No exam data could be extracted from this PDF. Please ensure it matches the university format.' });
       }
     } catch (error) {
       console.error("PDF Parse error:", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to process PDF. Check console for details.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const confirmPdfImport = () => {
+    if (pdfPreviewData) {
+      setExamSchedule(prev => [...prev, ...pdfPreviewData]);
+      toast({ title: 'Import Successful', description: `${pdfPreviewData.length} exams added to the schedule.` });
+      setPdfPreviewData(null);
+      setShowPdfPreview(false);
     }
   };
 
@@ -441,6 +459,7 @@ export default function ImportExportPage() {
                           </AlertDialogContent>
                         </AlertDialog>
                       </div>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -536,6 +555,50 @@ export default function ImportExportPage() {
           </div>
         </SidebarInset>
       </div>
+      <Dialog open={showPdfPreview} onOpenChange={setShowPdfPreview}>
+        <DialogContent className="max-w-5xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>PDF Import Preview</DialogTitle>
+            <DialogDescription>
+              We've extracted the following exams from your PDF. Please review the data before adding it to your schedule.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto border rounded-md mt-4">
+            <Table>
+              <TableHeader className="bg-muted sticky top-0">
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Course</TableHead>
+                  <TableHead>Sem</TableHead>
+                  <TableHead>Subject Name</TableHead>
+                  <TableHead>Code</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pdfPreviewData?.map((exam, idx) => (
+                  <TableRow key={exam.id || idx}>
+                    <TableCell className="font-medium">{exam.date}</TableCell>
+                    <TableCell>{exam.time}</TableCell>
+                    <TableCell className="max-w-[150px] truncate">{exam.course}</TableCell>
+                    <TableCell>{exam.semester}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{exam.subjectName}</TableCell>
+                    <TableCell>{exam.subjectCode}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          
+          <DialogFooter className="mt-4 gap-2">
+            <Button variant="outline" onClick={() => setShowPdfPreview(false)}>Cancel</Button>
+            <Button onClick={confirmPdfImport} className="bg-primary text-primary-foreground">
+              Add {pdfPreviewData?.length} Exams to Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 }
