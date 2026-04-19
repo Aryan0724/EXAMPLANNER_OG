@@ -17,7 +17,15 @@ import { DataContext } from '@/context/DataContext';
 import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
 import { createClassroom, Invigilator } from '@/lib/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { generateMasterReport, generateInvigilatorDutyRoster, generateDateShiftWiseReport, generateVisualSeatPlanExcel, generateDetailedInvigilatorDutyChart } from '@/lib/report-generator';
+import { 
+  generateMasterReport, 
+  generateInvigilatorDutyRoster, 
+  generateDateShiftWiseReport, 
+  generateVisualSeatPlanExcel, 
+  generateDetailedInvigilatorDutyChart,
+  generateSessionWiseInvigilationRoster,
+  generateDayWiseSessionRosters
+} from '@/lib/report-generator';
 
 const ImportItem = ({ title, format, onUpload }: { title: string, format: string[], onUpload?: (data: string) => void }) => {
   const { toast } = useToast();
@@ -255,6 +263,28 @@ export default function ImportExportPage() {
     }
   };
 
+  const handleExportSessionRoster = () => {
+    if (!fullAllotment) return;
+    try {
+      generateSessionWiseInvigilationRoster(fullAllotment, classrooms);
+      toast({ title: 'Roster Generated', description: 'The shift-wise invigilation roster has been downloaded.' });
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast({ variant: 'destructive', title: 'Export Failed', description: 'Error generating roster.' });
+    }
+  }
+
+  const handleExportDayWiseRosters = async () => {
+    if (!fullAllotment) return;
+    try {
+      toast({ title: 'Generating Files...', description: 'A separate file for each exam day will be downloaded.' });
+      await generateDayWiseSessionRosters(fullAllotment, classrooms);
+    } catch (error) {
+      console.error("Day-wise export failed:", error);
+      toast({ variant: 'destructive', title: 'Export Failed', description: 'Error generating multiple files.' });
+    }
+  }
+
   const handleInvigilatorUpload = (csvData: string) => {
     try {
       const lines = csvData.split('\n');
@@ -432,6 +462,14 @@ export default function ImportExportPage() {
                     <Button onClick={handleExportDetailedDutyChart} className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-none shadow-md">
                       <Sparkles className="mr-2 h-4 w-4" />
                       Detailed Duty Chart (University Format)
+                    </Button>
+                    <Button onClick={handleExportSessionRoster} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-none shadow-md">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Photo-Format Roster (Single File)
+                    </Button>
+                    <Button onClick={handleExportDayWiseRosters} className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white border-none shadow-md">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Organized Day-wise Roster (Multiple Files)
                     </Button>
                     <Button variant="secondary" disabled>
                       <FileDown className="mr-2 h-4 w-4" />
