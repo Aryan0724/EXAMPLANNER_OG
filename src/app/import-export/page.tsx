@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -26,13 +26,19 @@ import {
   generateSessionWiseInvigilationRoster,
   generateDayWiseSessionRosters
 } from '@/lib/report-generator';
+import { parseExamPDF } from '@/lib/pdf-parser';
 
-const ImportItem = ({ title, format, onUpload }: { title: string, format: string[], onUpload?: (data: string) => void }) => {
+const ImportItem = ({ title, format, onUpload, onPdfUpload, accept = ".csv" }: { title: string, format: string[], onUpload?: (data: string) => void, onPdfUpload?: (file: File) => void, accept?: string }) => {
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.type === "application/pdf" && onPdfUpload) {
+      onPdfUpload(file);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -56,7 +62,7 @@ const ImportItem = ({ title, format, onUpload }: { title: string, format: string
       </AccordionTrigger>
       <AccordionContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Upload a CSV file with the following columns:
+          {onPdfUpload ? `Upload a CSV or PDF file. PDF should match the university schedule format.` : `Upload a CSV file with the following columns:`}
         </p>
         <div className="text-sm font-mono bg-muted p-3 rounded-lg border border-primary/10">
           {format.join(', ')}
@@ -64,7 +70,7 @@ const ImportItem = ({ title, format, onUpload }: { title: string, format: string
         <div className="flex items-center gap-4">
           <Input
             type="file"
-            accept=".csv"
+            accept={onPdfUpload ? ".csv,.pdf" : accept}
             onChange={handleFileChange}
             className="hidden"
             id={`file-upload-${title}`}
@@ -74,7 +80,7 @@ const ImportItem = ({ title, format, onUpload }: { title: string, format: string
             className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 cursor-pointer"
           >
             <UploadCloud className="mr-2 h-4 w-4" />
-            Choose {title} CSV
+            Choose {title} {onPdfUpload ? 'CSV/PDF' : 'CSV'}
           </Label>
         </div>
       </AccordionContent>
@@ -106,6 +112,27 @@ export default function ImportExportPage() {
     setClassrooms([]);
     setInvigilators([]);
     setExamSchedule([]);
+  };
+
+  const handleDeleteExams = () => {
+    setExamSchedule([]);
+    toast({ title: 'Exams Deleted', description: 'All exam schedule data has been removed.' });
+  };
+
+  const handlePdfExamUpload = async (file: File) => {
+    toast({ title: 'Processing PDF...', description: 'Extracting exam schedule from PDF. Please wait.' });
+    try {
+      const exams = await parseExamPDF(file);
+      if (exams.length > 0) {
+        setExamSchedule(prev => [...prev, ...exams]);
+        toast({ title: 'PDF Import Successful', description: `Successfully extracted ${exams.length} exams from PDF.` });
+      } else {
+        toast({ variant: 'destructive', title: 'Import Failed', description: 'No exam data could be extracted from this PDF.' });
+      }
+    } catch (error) {
+      console.error("PDF Parse error:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to process PDF. Check console for details.' });
+    }
   };
 
   const handleExportMasterReport = () => {
@@ -371,27 +398,49 @@ export default function ImportExportPage() {
                     </div>
 
                     <div className="flex justify-end pt-4 border-t border-primary/10">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" className="text-destructive hover:bg-destructive/10">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Nuclear Reset (Clear All)
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will wipe EVERY category. You will lose any manual invigilator entries you've made.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleClearAllData} className="bg-destructive text-destructive-foreground">Yes, Wipe Everything</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+                      <div className="flex gap-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive/10">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Mass Delete Exams
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete All Exams?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will remove all imported and manual exam schedules. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleDeleteExams} className="bg-destructive text-destructive-foreground">Delete All</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" className="text-destructive hover:bg-destructive/10">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Nuclear Reset (Clear All)
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will wipe EVERY category. You will lose any manual invigilator entries you've made.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleClearAllData} className="bg-destructive text-destructive-foreground">Yes, Wipe Everything</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                   </CardContent>
                 </Card>
 
@@ -420,6 +469,7 @@ export default function ImportExportPage() {
                       <ImportItem
                         title="Exam Schedule"
                         format={['id', 'date', 'time', 'course', 'department', 'semester', 'subjectName', 'subjectCode', 'duration', 'group']}
+                        onPdfUpload={handlePdfExamUpload}
                       />
                       <ImportItem
                         title="Classroom Data"
