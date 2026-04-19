@@ -534,5 +534,3 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
         </Dialog>
     );
 }
-
-}
