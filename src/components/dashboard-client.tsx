@@ -36,7 +36,6 @@ export function DashboardClient() {
         examSchedule, setExamSchedule,
         blockPriority, setBlockPriority,
         excludedBlocks, setExcludedBlocks,
-        excludedBlocks, setExcludedBlocks,
         excludedRooms, setExcludedRooms,
         reservedCount, setReservedCount
     } = useContext(DataContext);
