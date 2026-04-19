@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Import Tabs
-import { Plus, Trash2, BookOpen, GraduationCap, Sparkles, Database, Info, Eraser, Lightbulb, FileUp, Loader2 } from 'lucide-react';
+import { Plus, Trash2, BookOpen, GraduationCap, Sparkles, Database, Info, Eraser, Lightbulb, FileUp, Loader2, UserCheck } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ExamSlot, Student } from '@/lib/types';
 import { parsePasteSchedule, parsePasteBatches } from '@/lib/parsers';
@@ -37,7 +37,7 @@ interface CustomMockDataDialogProps {
     isOpen: boolean;
     onClose: () => void;
     onClearData: () => void;
-    onGenerateCustom: (students: Student[], exams: ExamSlot[]) => void;
+    onGenerateCustom: (students: Student[], exams: ExamSlot[], reservedCount?: number) => void;
     onGenerateRandom: (count: number) => void;
 }
 
@@ -45,6 +45,7 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
     const { toast } = useToast(); // Add toast
     const [activeTab, setActiveTab] = useState('random');
     const [randomStudentCount, setRandomStudentCount] = useState(200);
+    const [wizardReservedCount, setWizardReservedCount] = useState(1);
     const [isParsing, setIsParsing] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -255,8 +256,12 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
             });
         });
 
-        onGenerateCustom(generatedStudents, generatedExams);
+        onGenerateCustom(generatedStudents, generatedExams, wizardReservedCount);
         onClose();
+    };
+
+    const getBatchSubjects = (batchId: string) => {
+        return exams.filter(e => e.linkedBatchId === batchId).map(e => e.subjectCode).filter(Boolean);
     };
 
     const handleGenerateRandom = () => {
@@ -431,10 +436,17 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
                                                     onChange={(e) => updateBatch(batch.id, 'count', Number(e.target.value))}
                                                     className="border-none bg-muted/30 focus-visible:ring-0 font-mono font-bold text-primary h-10"
                                                 />
-                                                <Button variant="ghost" size="icon" onClick={() => removeBatch(batch.id)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
                                             </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 items-center pt-2 md:pt-6">
+                                            {getBatchSubjects(batch.id).map((code, i) => (
+                                                <span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-md border border-primary/20">
+                                                    {code}
+                                                </span>
+                                            ))}
+                                            <Button variant="ghost" size="icon" onClick={() => removeBatch(batch.id)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </div>
                                     </div>
                                 ))}
@@ -443,18 +455,38 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
                     )}
 
                     {step === 3 && (
-                        <div className="space-y-6 animate-in fade-in duration-500">
-                            <div className="flex items-center justify-between bg-primary/5 p-4 rounded-2xl border border-primary/10 mb-8">
-                                <div className="flex items-center gap-3">
-                                    <BookOpen className="h-6 w-6 text-primary" />
-                                    <div>
-                                        <h3 className="text-lg font-bold">Finalize Exam Slots</h3>
-                                        <p className="text-xs text-muted-foreground">Verify dates, times, and subject mapping</p>
+                        <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                <div className="col-span-2 flex items-center justify-between bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                                    <div className="flex items-center gap-3">
+                                        <BookOpen className="h-6 w-6 text-primary" />
+                                        <div>
+                                            <h3 className="text-lg font-bold">Finalize Exam Slots</h3>
+                                            <p className="text-xs text-muted-foreground">Verify dates, times, and subject mapping</p>
+                                        </div>
+                                    </div>
+                                    <Button size="sm" variant="outline" onClick={addExam} className="border-primary/20 text-primary">
+                                        <Plus className="h-4 w-4 mr-2" /> Add Exam
+                                    </Button>
+                                </div>
+                                <div className="bg-indigo-600 rounded-2xl p-4 text-white shadow-xl shadow-indigo-200">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <UserCheck className="h-4 w-4" />
+                                        <h4 className="text-sm font-bold">Allotment Settings</h4>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold text-indigo-100 uppercase">Reserved Staff Per Session</Label>
+                                        <div className="flex items-center gap-3">
+                                            <Input 
+                                                type="number" 
+                                                value={wizardReservedCount}
+                                                onChange={(e) => setWizardReservedCount(parseInt(e.target.value) || 0)}
+                                                className="bg-white/20 border-white/30 text-white font-bold h-10 focus-visible:ring-white/20"
+                                            />
+                                            <span className="text-xs text-indigo-100 font-medium italic">Standby faculty</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <Button size="sm" variant="outline" onClick={addExam} className="border-primary/20 text-primary">
-                                    <Plus className="h-4 w-4 mr-2" /> Add Exam
-                                </Button>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4">

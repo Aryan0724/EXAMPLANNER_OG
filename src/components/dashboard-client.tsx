@@ -393,11 +393,13 @@ export function DashboardClient() {
                 isOpen={isCustomMockDialogOpen}
                 onClose={() => setIsCustomMockDialogOpen(false)}
                 onClearData={handleClearAllData}
-                onGenerateCustom={(newStudents, newExams) => {
+                onGenerateCustom={(newStudents, newExams, wizardReservedCount) => {
                     setStudents(prev => [...prev, ...newStudents]);
                     setExamSchedule(prev => [...prev, ...newExams]);
 
-                    let extraMsg = '';
+                    if (wizardReservedCount !== undefined) {
+                        setReservedCount(wizardReservedCount);
+                    }
                     if (classrooms.length === 0) {
                         setClassrooms(generateMockClassrooms());
                         extraMsg += ' Added default classrooms.';
