@@ -202,7 +202,7 @@ export default function AllotmentPage() {
   const selectedClassroom = selectedClassroomId ? classrooms.find(c => c.id === selectedClassroomId) : null;
 
   const invigilatorsForClassroom = selectedClassroom && invigilatorAssignments
-    ? invigilatorAssignments.filter(a => a.classroom.id === selectedClassroom?.id).map(a => a.invigilator)
+    ? invigilatorAssignments.filter(a => a.classroom?.id === selectedClassroom.id).map(a => a.invigilator)
     : [];
 
   const currentExams = seatPlan?.exam ? (Array.isArray(seatPlan.exam) ? seatPlan.exam : [seatPlan.exam]) : (examSlotsByTime[selectedSlotKey!] || []);
@@ -610,8 +610,8 @@ export default function AllotmentPage() {
                                     <div className="flex flex-col items-start leading-tight">
                                       <div className="flex items-center gap-1">
                                         <span className="text-sm font-bold">{i.name}</span>
-                                        {fullAllotment && fullAllotment[selectedSlotKey!] &&
-                                          !fullAllotment[selectedSlotKey!].invigilatorAssignments.some(asg => asg.invigilator.id === i.id) && (
+                                        {fullAllotment && selectedSlotKey && fullAllotment[selectedSlotKey] &&
+                                          !fullAllotment[selectedSlotKey].invigilatorAssignments.some(asg => asg.invigilator.id === i.id) && (
                                             <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 h-4 px-1 text-[8px] border-amber-200">
                                               <RotateCcw className="w-2 h-2 mr-0.5" />
                                               Replaced
@@ -749,8 +749,8 @@ export default function AllotmentPage() {
                 {invigilatorsForClassroom.map((i, idx) => (
                   <div key={i.id} className="text-md font-medium border-b-2 border-black/10 pb-1 flex items-center gap-2">
                     <span className="font-bold text-lg">{i.name}</span>
-                    {fullAllotment && fullAllotment[selectedSlotKey!] &&
-                      !fullAllotment[selectedSlotKey!].invigilatorAssignments.some(asg => asg.invigilator.id === i.id) && (
+                    {fullAllotment && selectedSlotKey && fullAllotment[selectedSlotKey] &&
+                      !fullAllotment[selectedSlotKey].invigilatorAssignments.some(asg => asg.invigilator.id === i.id) && (
                         <span className="text-[10px] text-amber-600 font-bold border border-amber-200 bg-amber-50 px-1 rounded">REPLACED</span>
                       )}
                     <span className="ml-3 text-xs uppercase tracking-widest text-muted-foreground italic">
