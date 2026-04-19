@@ -181,13 +181,73 @@ export function DashboardClient() {
     };
 
     return (
-        <div className="space-y-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Welcome to Examplanner</CardTitle>
-                    <CardDescription>Your centralized dashboard for exam management. Get a quick overview and access key actions below.</CardDescription>
-                </CardHeader>
-            </Card>
+        <div className="space-y-8 animate-in fade-in duration-700">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-primary to-purple-700 p-8 text-white shadow-2xl">
+                <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
+                <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl"></div>
+                
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div className="space-y-4 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider">
+                            <Sparkles className="h-3 w-3" /> System Ready
+                        </div>
+                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Smart Exam Planner</h1>
+                        <p className="text-lg text-indigo-100/90 font-medium leading-relaxed">
+                            Initialize your entire examination schedule, student batches, and invigilation roles in minutes using our AI-powered setup wizard.
+                        </p>
+                        <div className="flex flex-wrap gap-4 pt-4">
+                            <Button 
+                                size="lg" 
+                                onClick={() => setIsCustomMockDialogOpen(true)}
+                                className="bg-white text-primary hover:bg-indigo-50 font-bold px-8 h-14 rounded-2xl shadow-xl shadow-black/20 group"
+                            >
+                                <Sparkles className="mr-2 h-5 w-5 text-primary group-hover:rotate-12 transition-transform" />
+                                Launch Setup Wizard
+                                <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                            </Button>
+                            <Button 
+                                size="lg" 
+                                variant="outline" 
+                                onClick={() => setIsImportDialogOpen(true)}
+                                className="bg-white/10 border-white/20 hover:bg-white/20 text-white font-bold h-14 rounded-2xl backdrop-blur-sm"
+                            >
+                                <FileUp className="mr-2 h-5 w-5" />
+                                Bulk Import
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="hidden lg:block">
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-indigo-400 blur-2xl opacity-20 animate-pulse"></div>
+                            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl relative z-10">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                        <p className="text-[10px] text-indigo-200 font-bold uppercase">Accuracy</p>
+                                        <p className="text-2xl font-bold">99.8%</p>
+                                    </div>
+                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                        <p className="text-[10px] text-indigo-200 font-bold uppercase">Setup Time</p>
+                                        <p className="text-2xl font-bold">&lt; 3m</p>
+                                    </div>
+                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10 col-span-2">
+                                        <div className="flex justify-between items-end">
+                                            <div>
+                                                <p className="text-[10px] text-indigo-200 font-bold uppercase">Active Engine</p>
+                                                <p className="text-sm font-bold">PDF V4.0 Parser</p>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <div className="h-1 w-4 bg-white/20 rounded-full"></div>
+                                                <div className="h-1 w-4 bg-white/60 rounded-full"></div>
+                                                <div className="h-1 w-4 bg-white/20 rounded-full"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat) => (
@@ -246,11 +306,11 @@ export function DashboardClient() {
                         <div className="flex flex-col sm:flex-row gap-4">
                             <Button className="w-full" variant="outline" onClick={() => setIsImportDialogOpen(true)}>
                                 <FileUp className="mr-2 h-4 w-4" />
-                                Import Data
+                                Import CSV
                             </Button>
-                            <Button className="w-full" variant="secondary" onClick={() => setIsCustomMockDialogOpen(true)}>
-                                <Database className="mr-2 h-4 w-4" />
-                                Mock Data Generator
+                            <Button className="w-full h-10 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200" variant="outline" onClick={() => setIsCustomMockDialogOpen(true)}>
+                                <Sparkles className="mr-2 h-4 w-4" />
+                                Setup Wizard
                             </Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -348,8 +408,8 @@ export function DashboardClient() {
                     }
 
                     toast({
-                        title: "Custom Data Generated",
-                        description: `Added ${newStudents.length} students and ${newExams.length} exams.${extraMsg}`
+                        title: "Setup Complete",
+                        description: `Successfully configured ${newStudents.length} students and ${newExams.length} exams.${extraMsg}`
                     });
                 }}
                 onGenerateRandom={(count) => {

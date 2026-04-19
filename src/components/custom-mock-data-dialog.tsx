@@ -27,7 +27,10 @@ interface CustomExam {
     date: string;
     time: string;
     duration: number;
-    linkedBatchId?: string; // New field to link to a batch
+    linkedBatchId?: string;
+    course?: string;
+    semester?: string;
+    department?: string;
 }
 
 interface CustomMockDataDialogProps {
@@ -120,13 +123,19 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
                 date: pe.date,
                 time: pe.time,
                 duration: pe.duration,
-                linkedBatchId: batchId
+                linkedBatchId: batchId,
+                course: pe.course,
+                semester: pe.semester,
+                department: pe.department
             };
         });
 
         setBatches([...batches, ...newBatches]);
         setExams([...exams, ...newCustomExams]);
+        setStep(2); // Auto-advance to review step
     };
+
+    const [step, setStep] = useState(1);
 
     const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -255,281 +264,286 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
         onClose();
     };
 
+    const steps = [
+        { id: 1, title: 'Import Schedule', icon: FileUp },
+        { id: 2, title: 'Review Batches', icon: GraduationCap },
+        { id: 3, title: 'Finalize Exams', icon: BookOpen }
+    ];
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <DialogTitle className="text-2xl flex items-center gap-2">
-                                <Database className="h-6 w-6 text-primary" />
-                                Mock Data Generator
-                            </DialogTitle>
-                            <DialogDescription>Generate sample data to instantly test the allotment engine without heavy imports.</DialogDescription>
+            <DialogContent className="sm:max-w-[1000px] max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
+                <div className="bg-gradient-to-r from-primary/10 via-background to-indigo-50/30 p-6 border-b">
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary rounded-xl shadow-lg shadow-primary/20">
+                                <Sparkles className="h-6 w-6 text-primary-foreground" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-2xl font-bold tracking-tight">Smart Setup Wizard</DialogTitle>
+                                <DialogDescription className="text-sm font-medium text-muted-foreground/80">Configure your entire exam system in 3 simple steps</DialogDescription>
+                            </div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={onClearData} className="text-destructive border-destructive/20 hover:bg-destructive/10">
-                            <Eraser className="h-4 w-4 mr-2" />
-                            Clear Existing Data
-                        </Button>
-                    </div>
-                </DialogHeader>
-
-                <Alert className="bg-primary/5 border-primary/20">
-                    <Info className="h-4 w-4 text-primary" />
-                    <AlertTitle className="text-primary font-semibold">Pro Tip for Beginners</AlertTitle>
-                    <AlertDescription className="text-xs">
-                        This tool simulates a <b>"Schedule-First"</b> workflow. Simply paste your real exam schedule, and the system will automatically <b>"Smart-Mock"</b> matching student batches for you!
-                    </AlertDescription>
-                </Alert>
-
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="random">Random Data</TabsTrigger>
-                        <TabsTrigger value="custom">Custom Data</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="random" className="space-y-4 py-4">
-                        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg space-y-4 bg-muted/20">
-                            <div className="p-4 rounded-full bg-primary/10 text-primary">
-                                <Sparkles className="h-8 w-8" />
-                            </div>
-                            <div className="text-center">
-                                <h3 className="text-lg font-semibold">Generate Full Random Dataset</h3>
-                                <p className="text-sm text-muted-foreground max-w-sm">
-                                    Create a complete set of Students, Classrooms, Invigilators, and Exams with randomized values.
-                                </p>
-                            </div>
-
-                            <div className="flex items-center gap-4 w-full max-w-xs">
-                                <Label className="whitespace-nowrap">Number of Students:</Label>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Input
-                                                type="number"
-                                                value={randomStudentCount}
-                                                onChange={(e) => setRandomStudentCount(Number(e.target.value))}
-                                                className="font-mono"
-                                            />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>This will generate students across all GEHU courses/departments defined in the library.</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </div>
-
-                            <Button onClick={handleGenerateRandom} className="w-full max-w-xs">
-                                <Database className="mr-2 h-4 w-4" />
-                                Generate Random Data
+                        <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" onClick={onClearData} className="text-muted-foreground hover:text-destructive transition-colors">
+                                <Eraser className="h-4 w-4 mr-2" />
+                                Reset Setup
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+                                <Trash2 className="h-4 w-4" />
                             </Button>
                         </div>
-                    </TabsContent>
+                    </div>
 
-                    <TabsContent value="custom" className="space-y-6 py-4">
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-md font-semibold flex items-center gap-2">
-                                    <GraduationCap className="h-4 w-4" /> Student Batches
-                                </h3>
-                                <div className="flex gap-2">
-                                    <Button size="sm" variant="outline" onClick={loadTemplate} className="bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100">
-                                        <Lightbulb className="h-3 w-3 mr-1" /> Load Template
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={() => setShowPasteBatches(!showPasteBatches)}>
-                                        {showPasteBatches ? 'Cancel Paste' : 'Paste Batches'}
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={addBatch}>
-                                        <Plus className="h-3 w-3 mr-1" /> Add Batch
-                                    </Button>
+                    <div className="flex items-center justify-between px-10 relative">
+                        <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-muted -translate-y-1/2 z-0"></div>
+                        {steps.map((s) => (
+                            <div key={s.id} className="relative z-10 flex flex-col items-center gap-2">
+                                <div className={`h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                                    step >= s.id ? 'bg-primary border-primary text-primary-foreground shadow-md scale-110' : 'bg-background border-muted text-muted-foreground'
+                                }`}>
+                                    <s.icon className="h-5 w-5" />
                                 </div>
+                                <span className={`text-xs font-bold ${step >= s.id ? 'text-primary' : 'text-muted-foreground opacity-60'}`}>{s.title}</span>
                             </div>
+                        ))}
+                    </div>
+                </div>
 
-                            {showPasteBatches && (
-                                <div className="p-4 border rounded-md bg-muted/30 space-y-2">
-                                    <Label>Paste Batch Data (Format: | Course | Dept | Sem | Count |)</Label>
-                                    <textarea
-                                        className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        placeholder="| B.Tech | CSE | 4 | 60 |"
-                                        value={pasteBatchesText}
-                                        onChange={(e) => setPasteBatchesText(e.target.value)}
-                                    />
-                                    <Button size="sm" onClick={handlePasteBatchesProcess} disabled={!pasteBatchesText.trim()}>
-                                        Process & Add Batches
-                                    </Button>
-                                    <p className="text-xs text-muted-foreground">Batches will be appended to the list below.</p>
+                <div className="flex-1 overflow-y-auto p-8">
+                    {step === 1 && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div 
+                                    className="group relative flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-3xl border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 transition-all cursor-pointer overflow-hidden"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <div className="absolute -top-12 -right-12 h-40 w-40 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/20 transition-all"></div>
+                                    <div className="p-5 rounded-2xl bg-white shadow-xl mb-4 group-hover:scale-110 transition-transform">
+                                        <FileUp className="h-10 w-10 text-primary" />
+                                    </div>
+                                    <h4 className="text-xl font-bold mb-2">Import University PDF</h4>
+                                    <p className="text-sm text-center text-muted-foreground max-w-[250px]">
+                                        Drop your exam schedule PDF here. We'll auto-detect courses, dates, and subjects.
+                                    </p>
+                                    <input type="file" accept=".pdf" className="hidden" ref={fileInputRef} onChange={handlePDFUpload} />
+                                    {isParsing && (
+                                        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+                                            <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                                            <span className="font-bold text-primary">Analyzing PDF...</span>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
 
-                            {batches.map((batch, index) => (
-                                <div key={batch.id} className="grid grid-cols-12 gap-2 items-end border p-3 rounded-md bg-muted/20">
-                                    <div className="col-span-3">
-                                        <Label className="text-xs">Course</Label>
-                                        <Input
-                                            value={batch.course}
-                                            onChange={(e) => updateBatch(batch.id, 'course', e.target.value)}
-                                            placeholder="B.TECH"
-                                        />
+                                <div 
+                                    className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-3xl border-indigo-200 bg-indigo-50/30 hover:bg-indigo-50/50 transition-all cursor-pointer"
+                                    onClick={() => setShowPasteInput(true)}
+                                >
+                                    <div className="p-5 rounded-2xl bg-white shadow-xl mb-4">
+                                        <Sparkles className="h-10 w-10 text-indigo-600" />
                                     </div>
-                                    <div className="col-span-3">
-                                        <Label className="text-xs">Dept</Label>
-                                        <Input
-                                            value={batch.department}
-                                            onChange={(e) => updateBatch(batch.id, 'department', e.target.value)}
-                                            placeholder="CSE"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-xs">Sem</Label>
-                                        <Input
-                                            type="number"
-                                            value={batch.semester}
-                                            onChange={(e) => updateBatch(batch.id, 'semester', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="col-span-3">
-                                        <Label className="text-xs">Count</Label>
-                                        <Input
-                                            type="number"
-                                            value={batch.count}
-                                            onChange={(e) => updateBatch(batch.id, 'count', Number(e.target.value))}
-                                        />
-                                    </div>
-                                    <div className="col-span-1">
-                                        <Button variant="ghost" size="icon" onClick={() => removeBatch(batch.id)} className="text-destructive">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-
-                            <div className="p-3 bg-muted/30 rounded-md border border-dashed text-[10px] text-muted-foreground">
-                                <p className="font-semibold uppercase flex items-center gap-1 mb-1"><Info className="h-3 w-3" /> Roll Number Generation Logic</p>
-                                <p>Generated Roll No: <b>25</b> (Batch) + <b>{batches[0]?.course?.substring(0, 2).toUpperCase() || 'XX'}</b> (Course) + <b>{batches[0]?.department?.substring(0, 2).toUpperCase() || 'YY'}</b> (Dept) + <b>001</b> (Serial)</p>
-                            </div>
-                        </div>
-
-                        {/* Exams Section */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-md font-semibold flex items-center gap-2">
-                                    <BookOpen className="h-4 w-4" /> Exam Slots
-                                </h3>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="file"
-                                        accept=".pdf"
-                                        className="hidden"
-                                        ref={fileInputRef}
-                                        onChange={handlePDFUpload}
-                                    />
-                                    <Button 
-                                        size="sm" 
-                                        variant="outline" 
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={isParsing}
-                                        className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                                    >
-                                        {isParsing ? (
-                                            <>
-                                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                                Parsing...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FileUp className="h-3 w-3 mr-1" />
-                                                Import PDF
-                                            </>
-                                        )}
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={() => setShowPasteInput(!showPasteInput)}>
-                                        {showPasteInput ? 'Cancel Paste' : 'Paste Schedule'}
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={addExam}>
-                                        <Plus className="h-3 w-3 mr-1" /> Add Exam
-                                    </Button>
+                                    <h4 className="text-xl font-bold mb-2">Manual Setup</h4>
+                                    <p className="text-sm text-center text-muted-foreground max-w-[250px]">
+                                        Paste data or start from scratch. Use our smart templates to speed up the process.
+                                    </p>
                                 </div>
                             </div>
 
                             {showPasteInput && (
-                                <div className="p-4 border rounded-md bg-muted/30 space-y-2">
-                                    <Label>Paste Table Data (Advanced Format: | Date | Shift | Code | Subject | Course | Dept | Sem |)</Label>
+                                <div className="p-6 border rounded-2xl bg-muted/20 animate-in zoom-in-95 duration-300">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <Label className="text-lg font-bold">Paste Schedule Data</Label>
+                                        <Button variant="ghost" size="sm" onClick={() => setShowPasteInput(false)}>Cancel</Button>
+                                    </div>
                                     <textarea
-                                        className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        placeholder="| 2025-12-01 | 09:30 AM | TCS-401 | OS | B.Tech | CSE | 4 |"
+                                        className="flex min-h-[200px] w-full rounded-xl border border-input bg-background px-4 py-3 text-sm font-mono shadow-inner focus:ring-2 focus:ring-primary/20 transition-all"
+                                        placeholder="| Date | Shift | Code | Subject | Course | Dept | Sem |"
                                         value={pasteText}
                                         onChange={(e) => setPasteText(e.target.value)}
                                     />
-                                    <Button size="sm" onClick={handlePasteProcess} disabled={!pasteText.trim()}>
-                                        Process & Smart-Allot Mock Students
+                                    <Button className="mt-4 w-full h-12 text-md font-bold" onClick={handlePasteProcess} disabled={!pasteText.trim()}>
+                                        Analyze & Process Data
                                     </Button>
-                                    <p className="text-xs text-muted-foreground font-medium">🔥 Smart Mapper: Detected groups will automatically create mock batches.</p>
                                 </div>
                             )}
 
-                            {exams.map((exam) => (
-                                <div key={exam.id} className="grid grid-cols-12 gap-2 items-end border p-3 rounded-md bg-muted/20">
-                                    <div className="col-span-3">
-                                        <Label className="text-xs">For Batch</Label>
-                                        <select
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                            value={exam.linkedBatchId}
-                                            onChange={(e) => updateExam(exam.id, 'linkedBatchId', e.target.value)}
-                                        >
-                                            {batches.map(b => (
-                                                <option key={b.id} value={b.id}>
-                                                    {b.course} - {b.department} ({b.semester})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-xs">Subject</Label>
-                                        <Input
-                                            value={exam.subjectName}
-                                            onChange={(e) => updateExam(exam.id, 'subjectName', e.target.value)}
-                                            placeholder="Maths"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-xs">Code</Label>
-                                        <Input
-                                            value={exam.subjectCode}
-                                            onChange={(e) => updateExam(exam.id, 'subjectCode', e.target.value)}
-                                            placeholder="Code"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-xs">Date</Label>
-                                        <Input
-                                            type="date"
-                                            value={exam.date}
-                                            onChange={(e) => updateExam(exam.id, 'date', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-xs">Time</Label>
-                                        <Input
-                                            type="time"
-                                            value={exam.time}
-                                            onChange={(e) => updateExam(exam.id, 'time', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="col-span-1">
-                                        <Button variant="ghost" size="icon" onClick={() => removeExam(exam.id)} className="text-destructive">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-4 items-center">
+                                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                                    <Lightbulb className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-amber-900">Pro Tip</p>
+                                    <p className="text-xs text-amber-700">Importing a schedule automatically creates student batches for you! No need to enter students manually.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 2 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <div className="flex items-center justify-between bg-secondary/10 p-4 rounded-2xl border border-secondary/20 mb-8">
+                                <div className="flex items-center gap-3">
+                                    <GraduationCap className="h-6 w-6 text-primary" />
+                                    <div>
+                                        <h3 className="text-lg font-bold">Review Student Batches</h3>
+                                        <p className="text-xs text-muted-foreground">Adjust student counts for each detected course</p>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                                <Button size="sm" onClick={addBatch} className="bg-primary shadow-lg shadow-primary/20">
+                                    <Plus className="h-4 w-4 mr-2" /> Add Batch
+                                </Button>
+                            </div>
 
-                        <DialogFooter>
-                            <Button variant="outline" onClick={onClose}>Cancel</Button>
-                            <Button onClick={handleGenerateCustom}>Generate Custom Data</Button>
-                        </DialogFooter>
-                    </TabsContent>
-                </Tabs>
+                            <div className="grid grid-cols-1 gap-4">
+                                {batches.map((batch) => (
+                                    <div key={batch.id} className="group flex flex-col md:flex-row gap-4 p-5 border rounded-2xl bg-background hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all relative">
+                                        <div className="flex-1 space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground px-1">Course Name</Label>
+                                            <Input
+                                                value={batch.course}
+                                                onChange={(e) => updateBatch(batch.id, 'course', e.target.value)}
+                                                className="border-none bg-muted/30 focus-visible:ring-0 text-md font-bold h-10"
+                                            />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground px-1">Department</Label>
+                                            <Input
+                                                value={batch.department}
+                                                onChange={(e) => updateBatch(batch.id, 'department', e.target.value)}
+                                                className="border-none bg-muted/30 focus-visible:ring-0 text-sm h-10"
+                                            />
+                                        </div>
+                                        <div className="w-20 space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground px-1">Sem</Label>
+                                            <Input
+                                                type="number"
+                                                value={batch.semester}
+                                                onChange={(e) => updateBatch(batch.id, 'semester', e.target.value)}
+                                                className="border-none bg-muted/30 focus-visible:ring-0 text-center font-bold h-10"
+                                            />
+                                        </div>
+                                        <div className="w-32 space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground px-1">Students</Label>
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    type="number"
+                                                    value={batch.count}
+                                                    onChange={(e) => updateBatch(batch.id, 'count', Number(e.target.value))}
+                                                    className="border-none bg-muted/30 focus-visible:ring-0 font-mono font-bold text-primary h-10"
+                                                />
+                                                <Button variant="ghost" size="icon" onClick={() => removeBatch(batch.id)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 3 && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <div className="flex items-center justify-between bg-primary/5 p-4 rounded-2xl border border-primary/10 mb-8">
+                                <div className="flex items-center gap-3">
+                                    <BookOpen className="h-6 w-6 text-primary" />
+                                    <div>
+                                        <h3 className="text-lg font-bold">Finalize Exam Slots</h3>
+                                        <p className="text-xs text-muted-foreground">Verify dates, times, and subject mapping</p>
+                                    </div>
+                                </div>
+                                <Button size="sm" variant="outline" onClick={addExam} className="border-primary/20 text-primary">
+                                    <Plus className="h-4 w-4 mr-2" /> Add Exam
+                                </Button>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                {exams.map((exam) => (
+                                    <div key={exam.id} className="group grid grid-cols-12 gap-3 p-5 border rounded-2xl bg-background hover:border-primary/30 transition-all items-end">
+                                        <div className="col-span-3 space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Target Batch</Label>
+                                            <select
+                                                className="w-full h-10 rounded-xl border-none bg-muted/30 px-3 text-xs font-bold focus:ring-0"
+                                                value={exam.linkedBatchId}
+                                                onChange={(e) => updateExam(exam.id, 'linkedBatchId', e.target.value)}
+                                            >
+                                                {batches.map(b => (
+                                                    <option key={b.id} value={b.id}>
+                                                        {b.course} ({b.semester})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="col-span-3 space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Subject Name</Label>
+                                            <Input
+                                                value={exam.subjectName}
+                                                onChange={(e) => updateExam(exam.id, 'subjectName', e.target.value)}
+                                                className="border-none bg-muted/30 h-10 text-xs font-bold"
+                                            />
+                                        </div>
+                                        <div className="col-span-2 space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Date</Label>
+                                            <Input
+                                                type="date"
+                                                value={exam.date}
+                                                onChange={(e) => updateExam(exam.id, 'date', e.target.value)}
+                                                className="border-none bg-muted/30 h-10 text-xs"
+                                            />
+                                        </div>
+                                        <div className="col-span-2 space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Time</Label>
+                                            <Input
+                                                type="time"
+                                                value={exam.time}
+                                                onChange={(e) => updateExam(exam.id, 'time', e.target.value)}
+                                                className="border-none bg-muted/30 h-10 text-xs"
+                                            />
+                                        </div>
+                                        <div className="col-span-2 flex items-center justify-end">
+                                            <Button variant="ghost" size="icon" onClick={() => removeExam(exam.id)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-6 border-t bg-muted/10 flex justify-between items-center px-10">
+                    <Button 
+                        variant="ghost" 
+                        onClick={() => setStep(prev => prev - 1)} 
+                        disabled={step === 1}
+                        className="font-bold"
+                    >
+                        Previous Step
+                    </Button>
+                    
+                    <div className="flex gap-4">
+                        <Button variant="outline" onClick={onClose} className="font-bold border-muted-foreground/20">
+                            Save & Exit
+                        </Button>
+                        {step < 3 ? (
+                            <Button 
+                                onClick={() => setStep(prev => prev + 1)} 
+                                disabled={exams.length === 0}
+                                className="font-bold px-10 shadow-lg shadow-primary/20"
+                            >
+                                Next Step
+                            </Button>
+                        ) : (
+                            <Button 
+                                onClick={handleGenerateCustom} 
+                                className="font-bold px-10 bg-gradient-to-r from-primary to-indigo-600 shadow-lg shadow-indigo-500/20"
+                            >
+                                Complete Setup & Generate Data
+                            </Button>
+                        )}
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
     );
