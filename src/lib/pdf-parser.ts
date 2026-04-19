@@ -113,6 +113,16 @@ export async function parseExamPDF(file: File): Promise<ExamSlot[]> {
             }
         }
 
+        // For Department, if it's not in the PDF (which it usually isn't), 
+        // it's better to use the Course name or a derivation of it 
+        // to keep batches distinct and meaningful.
+        let department = 'Imported';
+        if (course && course !== "Imported Course") {
+            // Simplified derivation: use the first word or the full course name
+            // This is better than a generic "Imported" for allotment grouping.
+            department = course.split('(')[0].trim();
+        }
+
         exams.push({
             id: `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             date: formattedDate,
@@ -120,7 +130,7 @@ export async function parseExamPDF(file: File): Promise<ExamSlot[]> {
             subjectCode: subjectCode,
             subjectName: subjectName,
             course: course,
-            department: 'Imported', 
+            department: department, 
             semester: semester,
             duration: duration,
             type: 'Theory',
