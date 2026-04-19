@@ -651,6 +651,23 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     // Sort invigilators by name
     const sortedInvigilators = [...allInvigilators].sort((a, b) => a.name.localeCompare(b.name));
     
+    // 6.5. DEFINE ABBREVIATIONS
+    const deptAbbreviations: Record<string, string> = {
+        'Computer Science and Engineering': 'CSE',
+        'Mechanical Engineering': 'ME',
+        'Civil Engineering': 'CE',
+        'Electronics and Communication Engineering': 'ECE',
+        'Computer Applications': 'CA',
+        'Management': 'MGT',
+        'Commerce': 'COMM',
+        'Nursing': 'NUR',
+        'Pharmacy': 'PHR',
+        'Department of Personality Development': 'PDP',
+        'Polytechnic': 'POLY',
+        'Allied Sciences': 'AS'
+    };
+    const usedAbbreviations = new Set<string>();
+
     // Duty Map for easy lookup: invId -> date-shiftIdx -> true
     const invDutyMap = new Map<string, Set<string>>();
     sessionKeys.forEach(key => {
@@ -667,7 +684,10 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         worksheet.getCell(rowNum, 1).value = rowIdx + 1;
         worksheet.getCell(rowNum, 2).value = inv.name;
         worksheet.getCell(rowNum, 3).value = inv.designation === 'Assistant Professor' ? 'AP' : (inv.designation === 'Associate Professor' ? 'Assoc.P' : 'Prof');
-        worksheet.getCell(rowNum, 4).value = inv.department;
+        
+        const abbr = deptAbbreviations[inv.department] || inv.department;
+        if (deptAbbreviations[inv.department]) usedAbbreviations.add(inv.department);
+        worksheet.getCell(rowNum, 4).value = abbr;
 
         let total = 0;
         uniqueDates.forEach((date, dateIdx) => {
@@ -709,6 +729,22 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
             };
         }
     }
+
+    // 7.5. ADD ABBREVIATIONS LEGEND
+    const legendStartRow = lastRow + 3;
+    worksheet.mergeCells(legendStartRow, 1, legendStartRow, 4);
+    const legendHeader = worksheet.getCell(legendStartRow, 1);
+    legendHeader.value = 'ABBREVIATIONS USED:';
+    legendHeader.font = { bold: true, underline: true };
+
+    let currentLegendRow = legendStartRow + 1;
+    Array.from(usedAbbreviations).sort().forEach(dept => {
+        worksheet.getCell(currentLegendRow, 1).value = deptAbbreviations[dept];
+        worksheet.getCell(currentLegendRow, 1).font = { bold: true };
+        worksheet.mergeCells(currentLegendRow, 2, currentLegendRow, 4);
+        worksheet.getCell(currentLegendRow, 2).value = dept;
+        currentLegendRow++;
+    });
 
     // 8. DOWNLOAD
     const buffer = await workbook.xlsx.writeBuffer();
