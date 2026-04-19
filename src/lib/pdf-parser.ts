@@ -33,8 +33,13 @@ export async function parseExamPDF(file: File): Promise<ExamSlot[]> {
         sortedYs.forEach(y => {
             const rowItems = rowsMap.get(y)!.sort((a, b) => a.transform[4] - b.transform[4]);
             const rowText = rowItems.map(item => item.str).join(' ').trim();
-            // Filter out common header elements or noise
-            if (rowText && rowText.length > 5) {
+            
+            // Skip headers and noise
+            const lowerRow = rowText.toLowerCase();
+            const isHeader = lowerRow.includes('date') && lowerRow.includes('subject') && lowerRow.includes('time');
+            const isTitle = lowerRow.includes('examination') || lowerRow.includes('schedule') || lowerRow.includes('university');
+
+            if (rowText && rowText.length > 5 && !isHeader && !isTitle) {
                 allTextRows.push(rowText);
             }
         });

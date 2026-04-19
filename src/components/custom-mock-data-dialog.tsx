@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ExamSlot, Student } from '@/lib/types';
 import { parsePasteSchedule, parsePasteBatches } from '@/lib/parsers';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { parseExamPDF } from '@/lib/pdf-parser';
 
 interface StudentBatch {
     id: string;
@@ -37,6 +39,7 @@ interface CustomMockDataDialogProps {
 }
 
 export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateCustom, onGenerateRandom }: CustomMockDataDialogProps) {
+    const { toast } = useToast(); // Add toast
     const [activeTab, setActiveTab] = useState('random');
     const [randomStudentCount, setRandomStudentCount] = useState(200);
     const [isParsing, setIsParsing] = useState(false);
@@ -131,40 +134,12 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
 
         setIsParsing(true);
         try {
-            const pdfjsLib = await ensurePDFJS();
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            let extractedText = '';
-
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                
-                // Group items by their Y coordinate to detect rows
-                const items = textContent.items as any[];
-                const lines: { [key: number]: any[] } = {};
-                
-                items.forEach(item => {
-                    const y = Math.round(item.transform[5]);
-                    if (!lines[y]) lines[y] = [];
-                    lines[y].push(item);
-                });
-                
-                // Sort rows top-to-bottom and items left-to-right
-                const sortedY = Object.keys(lines).map(Number).sort((a, b) => b - a);
-                sortedY.forEach(y => {
-                    const rowItems = lines[y].sort((a, b) => a.transform[4] - b.transform[4]);
-                    const rowText = rowItems.map(item => item.str.trim()).filter(Boolean).join(' | ');
-                    if (rowText) {
-                        extractedText += `| ${rowText} |\n`;
-                    }
-                });
-            }
-
-            const parsedExams = parsePasteSchedule(extractedText);
+            const parsedExams = await parseExamPDF(file);
             processParsedExams(parsedExams);
+            toast({ title: "PDF Imported", description: `Detected ${parsedExams.length} exams and auto-magically matched student batches.` });
         } catch (err) {
             console.error("PDF Parsing Error:", err);
+            toast({ variant: "destructive", title: "PDF Error", description: "Could not parse university format correctly." });
         } finally {
             setIsParsing(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -560,21 +535,4 @@ export function CustomMockDataDialog({ isOpen, onClose, onClearData, onGenerateC
     );
 }
 
-/**
- * Dynamically loads PDF.js from a CDN
- */
-async function ensurePDFJS(): Promise<any> {
-    if ((window as any).pdfjsLib) return (window as any).pdfjsLib;
-
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        script.onload = () => {
-            const pdfjsLib = (window as any).pdfjsLib;
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-            resolve(pdfjsLib);
-        };
-        script.onerror = () => reject(new Error('Failed to load PDF.js from CDN'));
-        document.head.appendChild(script);
-    });
 }
