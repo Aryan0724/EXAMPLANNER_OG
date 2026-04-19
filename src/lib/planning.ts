@@ -261,10 +261,10 @@ export function assignInvigilators(
 
     const DUTY_LIMITS = {
         'Professor': 5,
-        'Assistant Professor': 10,
-        'Associate Professor': 15,
-        'Tutor': 15,
-        'Lab Assistant': 15
+        'Associate Professor': 10,
+        'Assistant Professor': 15,
+        'Tutor': 20,
+        'Lab Assistant': 20
     };
 
     const getTotalDuties = (inv: Invigilator) =>
@@ -312,7 +312,6 @@ export function assignInvigilators(
         if (aIdx < assistants.length) {
             availablePool.push(assistants[aIdx++]);
         }
-        // If we ran out of one, the loop continues and just adds the rest of the other
     }
 
 
@@ -352,10 +351,14 @@ export function assignInvigilators(
         const sessionRoomAssignments: Invigilator[] = [];
 
         for (let i = 0; i < requiredInvigilators; i++) {
+            // Check if we already have a Lab Assistant in this room
+            const hasLabAssistant = sessionRoomAssignments.some(inv => inv.designation === 'Lab Assistant');
+
             // Filter candidates not already assigned in this slot
             const candidates = availablePool.filter(inv =>
                 !assignments.some(a => a.invigilator.id === inv.id) &&
-                !sessionRoomAssignments.some(sra => sra.id === inv.id)
+                !sessionRoomAssignments.some(sra => sra.id === inv.id) &&
+                !(hasLabAssistant && inv.designation === 'Lab Assistant') // Strict Rule: Only 1 Lab Assistant
             );
 
             if (candidates.length === 0) break;
@@ -365,38 +368,32 @@ export function assignInvigilators(
                 const limit = DUTY_LIMITS[inv.designation] || 10;
 
                 // 1. Load Balance score (0 - 10000)
+                // We divide by limit to ensure higher limit people (Lower Rank) are picked more often
                 const loadRatio = (currentDuties + 1) / limit;
                 let score = loadRatio * 10000;
 
                 // 2. Gender Diversity Priority (High Priority)
-                // If we already have someone in the room, try to pick opposite gender
                 if (sessionRoomAssignments.length > 0) {
                     const existingGenders = new Set(sessionRoomAssignments.map(r => r.gender));
-                    // If we don't have this gender yet, huge preference
                     if (!existingGenders.has(inv.gender)) {
-                        score -= 5000; // Lower score is better (wait, previous logic was SORT ASCENDING??)
-                        // Checking previous logic: "scoredCandidates.sort((a, b) => a.score - b.score);"
-                        // Yes, lower score was better?
-                        // Let's re-read:
-                        // loadRatio = (current + 1) / limit. 0 is empty, 1 is full.
-                        // score = loadRatio * 10000. So 0 is best.
-                        // YES. Lower score is better.
+                        score -= 5000; 
                     }
                 }
 
                 // 3. Designation/Role Logic
-                // If it's the 1st person (Lead), prefer Professor/Assoc (-score)
+                // Rank Preference: Professor should be picked LAST.
+                // Lower rank = Better score (picked earlier)
                 if (i === 0) {
-                    if (inv.designation === 'Professor') score -= 200;
-                    else if (inv.designation === 'Associate Professor') score -= 100;
-                    else if (inv.designation === 'Assistant Professor') score += 100;
-                    else if (inv.designation === 'Tutor' || inv.designation === 'Lab Assistant') score += 300;
+                    // 1st person (Lead): Prefer Prof/Assoc but still respect load ratio
+                    if (inv.designation === 'Professor') score += 500; // Penalize high rank for Lead to keep their total low
+                    else if (inv.designation === 'Associate Professor') score += 200;
+                    else if (inv.designation === 'Assistant Professor') score -= 200;
                 } else {
                     // Support roles: Tutor/Asst preferred
-                    if (inv.designation === 'Tutor' || inv.designation === 'Lab Assistant') score -= 200;
-                    else if (inv.designation === 'Assistant Professor') score -= 100;
-                    else if (inv.designation === 'Associate Professor') score += 100;
-                    else if (inv.designation === 'Professor') score += 300;
+                    if (inv.designation === 'Tutor' || inv.designation === 'Lab Assistant') score -= 500;
+                    else if (inv.designation === 'Assistant Professor') score -= 200;
+                    else if (inv.designation === 'Associate Professor') score += 200;
+                    else if (inv.designation === 'Professor') score += 500;
                 }
 
                 score += Math.random() * 10; // Jitter
