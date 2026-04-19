@@ -62,6 +62,7 @@ export default function AllotmentPage() {
   const [invigilatorAssignments, setInvigilatorAssignments] = useState<InvigilatorAssignment[] | null>(null);
 
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const [reservedCount, setReservedCount] = useState<number>(4);
 
   const [excludedData, setExcludedData] = useState<{
     debarredStudents: Student[];
@@ -304,7 +305,7 @@ export default function AllotmentPage() {
         return !inv.unavailableSlots.some(s => s.slotId === selectedSlotKey || sessionExamIds.has(s.slotId));
       });
 
-      const { assignments: newInvigilatorAssignments } = assignInvigilators(sessionTargetPool, plan, selectedExams[0]);
+      const { assignments: newInvigilatorAssignments } = assignInvigilators(sessionTargetPool, plan, selectedExams[0], reservedCount);
       setInvigilatorAssignments(newInvigilatorAssignments);
 
       // Create update for global context so dashboard reports work too
@@ -358,8 +359,34 @@ export default function AllotmentPage() {
 
     const roomsInUse = [...new Map(seatPlan.assignments.filter(a => a.student).map(item => [item.classroom.id, item.classroom])).values()];
 
-    // 3. Generate NEW assignments
-    const { assignments: newInvAsg } = assignInvigilators(sessionTargetPool, seatPlan, representativeExam);
+    // 3. Check for existing reserved staff in this slot who can fill the gap
+    let newInvAsg: InvigilatorAssignment[] = [];
+    const currentAssignments = fullAllotment && fullAllotment[selectedSlotKey] ? fullAllotment[selectedSlotKey].invigilatorAssignments : [];
+    const availableReserved = currentAssignments.find(asg => asg.isReserved && !asg.classroom);
+
+    if (availableReserved) {
+      // Use the reserved person
+      newInvAsg = currentAssignments.map(asg => {
+        if (asg.invigilator.id === invigilatorId) {
+          // Replace absent person with the reserved one
+          return { ...asg, invigilator: availableReserved.invigilator, isReserved: false };
+        }
+        if (asg.invigilator.id === availableReserved.invigilator.id) {
+          // Remove the now-assigned reserved person from the standby list
+          return null;
+        }
+        return asg;
+      }).filter((asg): asg is InvigilatorAssignment => asg !== null);
+
+      toast({
+        title: 'Reserved Staff Deployed',
+        description: `${availableReserved.invigilator.name} has been moved from Reserved to active duty.`,
+      });
+    } else {
+      // No reserved staff available, generate NEW assignments for the whole slot (fallback)
+      const res = assignInvigilators(sessionTargetPool, seatPlan, representativeExam, reservedCount);
+      newInvAsg = res.assignments;
+    }
 
     if (newInvAsg.length === 0) {
       toast({
@@ -468,6 +495,17 @@ export default function AllotmentPage() {
                         {showExclusionReport ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
                         Exclusion Report
                       </Button>
+                      <div className="w-full sm:w-auto flex flex-col gap-2">
+                        <span className="text-xs font-medium text-muted-foreground uppercase ml-1">Reserved Staff</span>
+                        <input 
+                          type="number" 
+                          value={reservedCount}
+                          onChange={(e) => setReservedCount(parseInt(e.target.value) || 0)}
+                          className="w-20 px-3 py-2 bg-secondary/50 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          min="0"
+                          max="20"
+                        />
+                      </div>
                       <Button
                         onClick={handleGeneration}
                         disabled={isGenerating || !!(selectedSlotKey && fullAllotment && fullAllotment[selectedSlotKey]) || !selectedSlotKey}
@@ -545,9 +583,25 @@ export default function AllotmentPage() {
                               <Building className="w-6 h-6" />
                               Seat Plan: {selectedClassroom.roomNo} ({selectedClassroom.building})
                             </h3>
-                            <p className="text-center mb-1 text-muted-foreground">Exam(s): {currentExams.map(e => `${e.subjectName}${e.group ? ` (G${e.group})` : ''}`).join(', ')}</p>
-                            <p className="text-center mb-2 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
-                            <div className="text-center mb-4">
+                             <p className="text-center mb-1 text-muted-foreground">Exam(s): {currentExams.map(e => `${e.subjectName}${e.group ? ` (G${e.group})` : ''}`).join(', ')}</p>
+                             <p className="text-center mb-2 text-muted-foreground">Date: {representativeExam?.date} | Time: {representativeExam?.time}</p>
+                             
+                             {invigilatorAssignments?.some(a => a.isReserved && !a.classroom) && (
+                               <div className="flex flex-col items-center mb-6 p-3 rounded-lg bg-secondary/20 border border-border/50">
+                                 <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2">Reserved Standby Staff</span>
+                                 <div className="flex flex-wrap justify-center gap-2">
+                                   {invigilatorAssignments.filter(a => a.isReserved && !a.classroom).map(asg => (
+                                     <div key={asg.invigilator.id} className="flex items-center gap-2 px-3 py-1 rounded-full bg-background border shadow-sm">
+                                       <div className={`w-2 h-2 rounded-full ${asg.invigilator.gender === 'Female' ? 'bg-pink-400' : 'bg-blue-400'}`} />
+                                       <span className="text-xs font-medium">{asg.invigilator.name}</span>
+                                       <Badge variant="outline" className="text-[9px] h-4 px-1">{asg.invigilator.department}</Badge>
+                                     </div>
+                                   ))}
+                                 </div>
+                               </div>
+                             )}
+
+                             <div className="text-center mb-4">
                               <div className="flex flex-wrap justify-center gap-3">
                                 {invigilatorsForClassroom.map((i, idx) => (
                                   <div key={i.id} className="inline-flex items-center gap-2 p-2 px-4 rounded-xl bg-card border shadow-sm">

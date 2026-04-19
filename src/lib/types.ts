@@ -96,6 +96,7 @@ export interface SeatPlan {
 
 export interface InvigilatorAssignment {
   exam: ExamSlot;
-  classroom: Classroom;
+  classroom: Classroom | null; // Null if reserved/standby
   invigilator: Invigilator;
+  isReserved?: boolean;
 }

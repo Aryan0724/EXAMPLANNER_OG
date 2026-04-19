@@ -242,7 +242,8 @@ export function generateSeatPlan(
 export function assignInvigilators(
     invigilators: Invigilator[],
     seatPlan: SeatPlan,
-    exam: ExamSlot
+    exam: ExamSlot,
+    reservedCount: number = 0
 ): { assignments: InvigilatorAssignment[], updatedInvigilators: Invigilator[] } {
     if (!invigilators || !Array.isArray(invigilators)) {
         console.error("assignInvigilators: invigilators is invalid", invigilators);
@@ -368,7 +369,6 @@ export function assignInvigilators(
                 const limit = DUTY_LIMITS[inv.designation] || 10;
 
                 // 1. Load Balance score (0 - 10000)
-                // We divide by limit to ensure higher limit people (Lower Rank) are picked more often
                 const loadRatio = (currentDuties + 1) / limit;
                 let score = loadRatio * 10000;
 
@@ -381,15 +381,11 @@ export function assignInvigilators(
                 }
 
                 // 3. Designation/Role Logic
-                // Rank Preference: Professor should be picked LAST.
-                // Lower rank = Better score (picked earlier)
                 if (i === 0) {
-                    // 1st person (Lead): Prefer Prof/Assoc but still respect load ratio
-                    if (inv.designation === 'Professor') score += 500; // Penalize high rank for Lead to keep their total low
+                    if (inv.designation === 'Professor') score += 500;
                     else if (inv.designation === 'Associate Professor') score += 200;
                     else if (inv.designation === 'Assistant Professor') score -= 200;
                 } else {
-                    // Support roles: Tutor/Asst preferred
                     if (inv.designation === 'Tutor' || inv.designation === 'Lab Assistant') score -= 500;
                     else if (inv.designation === 'Assistant Professor') score -= 200;
                     else if (inv.designation === 'Associate Professor') score += 200;
@@ -412,6 +408,54 @@ export function assignInvigilators(
             });
 
             // Update state for loop consistency
+            const invRecord = invigilatorMasterList.find(im => im.id === winner.id);
+            if (invRecord) {
+                let dutyRecord = invRecord.assignedDuties.find(d => d.date === exam.date);
+                if (dutyRecord) dutyRecord.count++;
+                else invRecord.assignedDuties.push({ date: exam.date, count: 1 });
+            }
+
+            const poolIdx = availablePool.findIndex(p => p.id === winner.id);
+            if (poolIdx !== -1) availablePool[poolIdx] = JSON.parse(JSON.stringify(invRecord));
+        }
+    }
+
+    // --- RESERVED INVIGILATORS ALLOCATION ---
+    if (reservedCount > 0) {
+        for (let i = 0; i < reservedCount; i++) {
+            // Find best remaining candidates
+            const candidates = availablePool.filter(inv =>
+                !assignments.some(a => a.invigilator.id === inv.id)
+            );
+
+            if (candidates.length === 0) break;
+
+            const scoredCandidates = candidates.map(inv => {
+                const currentDuties = getTotalDuties(inv);
+                const limit = DUTY_LIMITS[inv.designation] || 10;
+                const loadRatio = (currentDuties + 1) / limit;
+                let score = loadRatio * 10000;
+                
+                // For reserved, we prefer Tutors/Lab Assistants or Asst Professors to keep high rank free
+                if (inv.designation === 'Tutor' || inv.designation === 'Lab Assistant') score -= 500;
+                else if (inv.designation === 'Assistant Professor') score -= 200;
+                else score += 500;
+
+                score += Math.random() * 50; // Jitter
+                return { inv, score };
+            });
+
+            scoredCandidates.sort((a, b) => a.score - b.score);
+            const winner = scoredCandidates[0].inv;
+
+            assignments.push({
+                exam,
+                classroom: null, // Reserved staff don't have a specific room
+                invigilator: winner,
+                isReserved: true
+            });
+
+            // Update state
             const invRecord = invigilatorMasterList.find(im => im.id === winner.id);
             if (invRecord) {
                 let dutyRecord = invRecord.assignedDuties.find(d => d.date === exam.date);

@@ -647,7 +647,7 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         });
     });
 
-    // 6. POPULATE INVIGILATORS
+    // 6. POPULATE INVIGILATORS (ACTIVE DUTY)
     // Sort invigilators by name
     const sortedInvigilators = [...allInvigilators].sort((a, b) => a.name.localeCompare(b.name));
     
@@ -744,6 +744,49 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         worksheet.mergeCells(currentLegendRow, 2, currentLegendRow, 4);
         worksheet.getCell(currentLegendRow, 2).value = dept;
         currentLegendRow++;
+    });
+
+    // 7.6. ADD RESERVED STAFF TABLE
+    const reservedStartRow = currentLegendRow + 3;
+    worksheet.mergeCells(reservedStartRow, 1, reservedStartRow, 4);
+    const reservedHeader = worksheet.getCell(reservedStartRow, 1);
+    reservedHeader.value = 'RESERVED STAFF LIST:';
+    reservedHeader.font = { bold: true, size: 12 };
+    reservedHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F2F2F2' } };
+
+    let currentReservedRow = reservedStartRow + 1;
+    // Header for Reserved
+    worksheet.getCell(currentReservedRow, 1).value = 'Sr.';
+    worksheet.getCell(currentReservedRow, 2).value = 'Reserved Invigilator Name';
+    worksheet.getCell(currentReservedRow, 3).value = 'Dept.';
+    worksheet.getCell(currentReservedRow, 4).value = 'Reserved On Sessions';
+    [1,2,3,4].forEach(c => {
+        worksheet.getCell(currentReservedRow, c).font = { bold: true };
+        worksheet.getCell(currentReservedRow, c).border = { bottom: { style: 'medium' } };
+    });
+
+    currentReservedRow++;
+    let resSr = 1;
+
+    // Group reserved staff by name/ID
+    const reservedMap = new Map<string, { inv: Invigilator, slots: string[] }>();
+    sessionKeys.forEach(key => {
+        fullAllotment[key].invigilatorAssignments.forEach(asg => {
+            if (asg.isReserved) {
+                if (!reservedMap.has(asg.invigilator.id)) {
+                    reservedMap.set(asg.invigilator.id, { inv: asg.invigilator, slots: [] });
+                }
+                reservedMap.get(asg.invigilator.id)!.slots.push(key);
+            }
+        });
+    });
+
+    reservedMap.forEach(({ inv, slots }) => {
+        worksheet.getCell(currentReservedRow, 1).value = resSr++;
+        worksheet.getCell(currentReservedRow, 2).value = inv.name;
+        worksheet.getCell(currentReservedRow, 3).value = deptAbbreviations[inv.department] || inv.department;
+        worksheet.getCell(currentReservedRow, 4).value = slots.join(', ');
+        currentReservedRow++;
     });
 
     // 8. DOWNLOAD
