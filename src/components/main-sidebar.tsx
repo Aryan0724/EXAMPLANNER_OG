@@ -31,13 +31,10 @@ const menuItems = [
   { id: 'dashboard', href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'schedule', href: '/schedule', icon: CalendarDays, label: 'Schedule' },
   { id: 'allotment', href: '/allotment', icon: Printer, label: 'Allotment' },
-  { id: 'course-view', href: '/allotment/course-view', icon: GraduationCap, label: 'Course View' },
   { id: 'students', href: '/students', icon: Users, label: 'Students' },
   { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
   { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },
   { id: 'import-export', href: '/import-export', icon: Upload, label: 'Import / Export' },
-  { id: 'bulk-availability', href: '/settings/bulk-availability', icon: Ban, label: 'Bulk Availability' },
-  { id: 'settings', href: '/settings', icon: Telescope, label: 'Explorer' },
 ];
 
 const helpMenuItems = [
