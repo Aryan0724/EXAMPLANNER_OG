@@ -17,7 +17,7 @@ type FullAllotment = Record<string, { seatPlan: SeatPlan, invigilatorAssignments
  * Generates a clean, human-readable Master Report in Excel.
  * Uses "Array of Arrays" (AoA) to create grouped sections for each session.
  */
-export function generateMasterReport(fullAllotment: FullAllotment, allStudents: Student[], allClassrooms: Classroom[], allInvigilators: Invigilator[]) {
+export function generateMasterReport(fullAllotment: FullAllotment, allStudents: Student[], allClassrooms: Classroom[], allInvigilators: Invigilator[], returnBuffer = false) {
     const wb = XLSX.utils.book_new();
 
     // --- SHEET 1: MASTER SEATING PLAN (Grouped by Session) ---
@@ -59,8 +59,9 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
         });
 
         invigilatorAssignments.forEach(asn => {
-            if (!roomGroups.has(asn.classroom.id)) roomGroups.set(asn.classroom.id, { students: [], invigilators: [] });
-            roomGroups.get(asn.classroom.id)!.invigilators.push(asn.invigilator);
+            const roomId = asn.classroom?.id || 'NA';
+            if (!roomGroups.has(roomId)) roomGroups.set(roomId, { students: [], invigilators: [] });
+            roomGroups.get(roomId)!.invigilators.push(asn.invigilator);
         });
 
         const sortedRoomIds = Array.from(roomGroups.keys()).sort((a, b) => {
@@ -72,10 +73,12 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
         sortedRoomIds.forEach(roomId => {
             const data = roomGroups.get(roomId)!;
             const room = allClassrooms.find(c => c.id === roomId);
-            if (!room) return;
-
+            
             // Format Room Cell
-            const roomDetails = `${room.roomNo}\n(${room.building})\nCap: ${room.capacity}`;
+            const roomDetails = room 
+                ? `${room.roomNo}\n(${room.building})\nCap: ${room.capacity}`
+                : 'General Duty\n(Unassigned Room)';
+
 
             // Format Courses Cell
             // Group students by Course -> Subject
@@ -93,10 +96,13 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
             const courseCell = courseTexts.join('\n');
 
             // Format Invigilators Cell
-            // "1. Name (Dept) - Desig"
             const invigilatorTexts = data.invigilators.map((inv, idx) => {
-                return `${idx + 1}. ${inv.name} (${inv.department})\n   - ${inv.designation}`;
+                // Use the user requested '01' / '001' marks
+                const isMid = invigilatorAssignments.some(a => a.invigilator.id === inv.id && a.exam.id.toLowerCase().includes('mid'));
+                const mark = isMid ? '001' : '01';
+                return `${idx + 1}. ${inv.name} (${inv.department}) - ${mark}`;
             });
+
             const invCell = invigilatorTexts.length > 0 ? invigilatorTexts.join('\n') : 'Unassigned';
 
             // Push Row
@@ -199,16 +205,20 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
     wsNotice['!cols'] = [{ wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 25 }, { wch: 30 }, { wch: 8 }];
     XLSX.utils.book_append_sheet(wb, wsNotice, "Notice Board");
 
-    // Write File
+    // Write File or Return Buffer
     const today = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `Exam_Master_Report_${today}.xlsx`);
+    const filename = `Exam_Master_Report_${today}.xlsx`;
+    if (returnBuffer) return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    XLSX.writeFile(wb, filename);
 }
+
 
 /**
  * Generates an Excel file where each sheet represents a SESSION.
  * Inside each sheet, rooms are stacked vertically with detailed headers.
  */
-export function generateVisualSeatPlanExcel(fullAllotment: FullAllotment, allClassrooms: Classroom[]) {
+export function generateVisualSeatPlanExcel(fullAllotment: FullAllotment, allClassrooms: Classroom[], returnBuffer = false) {
+
     const wb = XLSX.utils.book_new();
 
     const sortedSessions = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
@@ -242,7 +252,8 @@ export function generateVisualSeatPlanExcel(fullAllotment: FullAllotment, allCla
         });
 
         invigilatorAssignments.forEach(asn => {
-            getRoomGroup(asn.classroom.id).invigilators.push(asn.invigilator);
+            const rid = asn.classroom?.id || 'NA';
+            getRoomGroup(rid).invigilators.push(asn.invigilator);
         });
 
         // specific Room Sorting (Numeric/Alpha)
@@ -331,13 +342,16 @@ export function generateVisualSeatPlanExcel(fullAllotment: FullAllotment, allCla
     });
 
     const today = new Date().toISOString().split('T')[0];
+    if (returnBuffer) return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
     XLSX.writeFile(wb, `Visual_Seat_Plans_${today}.xlsx`);
 }
+
 
 /**
  * Standard Duty Roster
  */
-export function generateInvigilatorDutyRoster(fullAllotment: FullAllotment, allInvigilators: Invigilator[]) {
+export function generateInvigilatorDutyRoster(fullAllotment: FullAllotment, allInvigilators: Invigilator[], returnBuffer = false) {
+
     // 1. Get all unique, sorted session keys
     const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
@@ -359,7 +373,8 @@ export function generateInvigilatorDutyRoster(fullAllotment: FullAllotment, allI
             if (!dutyMap.has(invigilator.id)) dutyMap.set(invigilator.id, new Map());
 
             const headerVal = dutyMap.get(invigilator.id)!.get(header);
-            const displayValue = isReserved ? 'RESERVED' : (classroom?.roomNo || 'Unassigned');
+            const mark = assignment.exam.id.toLowerCase().includes('mid') ? '001' : '01';
+            const displayValue = isReserved ? `RESERVED (${mark})` : `${classroom?.roomNo || 'Unassigned'} (${mark})`;
             
             // If it's already RESERVED but we found an active duty, prioritize active
             if (headerVal === 'RESERVED' && !isReserved) {
@@ -404,8 +419,10 @@ export function generateInvigilatorDutyRoster(fullAllotment: FullAllotment, allI
 
     XLSX.utils.book_append_sheet(wb, ws, "Duty Roster");
     const today = new Date().toISOString().split('T')[0];
+    if (returnBuffer) return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
     XLSX.writeFile(wb, `Invigilator_Duty_Roster_${today}.xlsx`);
 }
+
 
 export function generateDateShiftWiseReport(fullAllotment: FullAllotment) {
     // Same as Master Report essentially, redirecting logic or keeping legacy support
@@ -683,18 +700,27 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     
     // 6.5. DEFINE ABBREVIATIONS
     const deptAbbreviations: Record<string, string> = {
-        'Computer Science and Engineering': 'CSE',
-        'Mechanical Engineering': 'ME',
-        'Civil Engineering': 'CE',
-        'Electronics and Communication Engineering': 'ECE',
-        'Computer Applications': 'CA',
-        'Management': 'MGT',
-        'Commerce': 'COMM',
-        'Nursing': 'NUR',
-        'Pharmacy': 'PHR',
-        'Department of Personality Development': 'PDP',
-        'Polytechnic': 'POLY',
-        'Allied Sciences': 'AS'
+        'Computer Science & Engineering': 'COM',
+        'Computer Science and Engineering': 'COM',
+        'School of Computing': 'SCH',
+        'Mechanical Engineering': 'MEC',
+        'Civil Engineering': 'CIV',
+        'Electronics &  Communication': 'ELE',
+        'Electronics and Communication Engineering': 'ELE',
+        'Computer Applications': 'SCH',
+        'School of Management': 'SCH',
+        'Management': 'SCH',
+        'Commerce': 'SCH',
+        'College of Nursing': 'COL',
+        'College  of Pharmacy': 'COL',
+        'College of Pharmacy': 'COL',
+        'PDP/PC': 'PDP',
+        'Allied Science (Chemistry)': 'ALL',
+        'Allied Science (Mathematics)': 'ALL',
+        'Allied Science(Mathematics)': 'ALL',
+        'Allied Science (Physics)': 'ALL',
+        'Allied Science(Environment)': 'ALL',
+        'Polytechnic': 'COL'
     };
     const usedAbbreviations = new Set<string>();
 
@@ -716,7 +742,19 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         const rowNum = 11 + rowIdx;
         worksheet.getCell(rowNum, 1).value = rowIdx + 1;
         worksheet.getCell(rowNum, 2).value = inv.name;
-        worksheet.getCell(rowNum, 3).value = inv.designation === 'Assistant Professor' ? 'AP' : (inv.designation === 'Associate Professor' ? 'Assoc.P' : 'Prof');
+        
+        // Use requested shorthand for designations
+        const desig = inv.designation.toLowerCase();
+        let desigShort = 'AP';
+        if (desig.includes('lecturer')) desigShort = 'Lec';
+        else if (desig.includes('nursing tutor')) desigShort = 'NT';
+        else if (desig.includes('teaching associate')) desigShort = 'TA';
+        else if (desig.includes('teaching assistant')) desigShort = 'TA';
+        else if (desig.includes('associate professor')) desigShort = 'AsP';
+        else if (desig.includes('assistant professor')) desigShort = 'AP';
+        else if (desig.includes('professor')) desigShort = 'P';
+        
+        worksheet.getCell(rowNum, 3).value = desigShort;
         
         const abbr = deptAbbreviations[inv.department] || inv.department;
         if (deptAbbreviations[inv.department]) usedAbbreviations.add(inv.department);
@@ -764,19 +802,30 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         }
     }
 
-    // 7.5. ADD ABBREVIATIONS LEGEND
+    // 7.5. ADD OFFICIAL ABBREVIATIONS LEGEND
     const legendStartRow = lastRow + 3;
-    worksheet.mergeCells(legendStartRow, 1, legendStartRow, 4);
+    worksheet.mergeCells(legendStartRow, 1, legendStartRow, 6);
     const legendHeader = worksheet.getCell(legendStartRow, 1);
-    legendHeader.value = 'ABBREVIATIONS USED:';
-    legendHeader.font = { bold: true, underline: true };
+    legendHeader.value = 'DEPARTMENT ABBREVIATIONS LEGEND:';
+    legendHeader.font = { bold: true, size: 12, underline: true };
+
+    const manualLegend = [
+        { abbr: 'ALL', full: 'Allied Sciences (Physics, Chemistry, Maths, EVS)' },
+        { abbr: 'COL', full: 'College of Pharmacy / College of Nursing / Polytechnic' },
+        { abbr: 'CIV', full: 'Civil Engineering' },
+        { abbr: 'SCH', full: 'School of Computing / School of Management / CA / Commerce' },
+        { abbr: 'COM', full: 'Computer Science & Engineering' },
+        { abbr: 'MEC', full: 'Mechanical Engineering' },
+        { abbr: 'ELE', full: 'Electronics & Communication Engineering' },
+        { abbr: 'PDP', full: 'PDP / Personal Development Program' }
+    ];
 
     let currentLegendRow = legendStartRow + 1;
-    Array.from(usedAbbreviations).sort().forEach(dept => {
-        worksheet.getCell(currentLegendRow, 1).value = deptAbbreviations[dept];
+    manualLegend.forEach(item => {
+        worksheet.getCell(currentLegendRow, 1).value = item.abbr;
         worksheet.getCell(currentLegendRow, 1).font = { bold: true };
-        worksheet.mergeCells(currentLegendRow, 2, currentLegendRow, 4);
-        worksheet.getCell(currentLegendRow, 2).value = dept;
+        worksheet.mergeCells(currentLegendRow, 2, currentLegendRow, 6);
+        worksheet.getCell(currentLegendRow, 2).value = item.full;
         currentLegendRow++;
     });
 

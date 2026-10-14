@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { Student, Classroom, Invigilator, ExamSlot, createClassroom } from '@/lib/types';
-import { generateMockStudents, generateMockClassrooms, generateMockInvigilators, generateMockExamSchedule } from '@/lib/data';
+import { generateMockStudents, generateMockClassrooms, generateMockInvigilators, generateMockExamSchedule, getBhimtalExamSchedule } from '@/lib/data';
 
 interface DataContextType {
   students: Student[];
@@ -56,12 +56,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [reservedCount, setReservedCount] = useState(4);
 
   useEffect(() => {
-    // Start with empty state for most, but load Real Invigilators by default
-    setStudents([]);
-    setClassrooms([]);
+    // Load Bhimtal specific data by default
+    setStudents(generateMockStudents(60)); // 60 students per course for realistic testing
+    setClassrooms(generateMockClassrooms());
     setInvigilators(generateMockInvigilators());
-    setExamSchedule([]);
-    setBlockPriority(['Academic Block C', 'Academic Block D', 'Academic Block E']); // Default priority order
+    setExamSchedule(getBhimtalExamSchedule());
+    setBlockPriority(['Academic Block C', 'Academic Block D', 'Academic Block E']);
     setExcludedBlocks([]);
     setExcludedRooms([]);
     setIsHydrated(true);

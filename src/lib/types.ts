@@ -64,6 +64,9 @@ export interface Invigilator {
   maxDailySessions?: number;
   unavailableSlots: AvailabilitySlot[];
   assignedDuties: { date: string, count: number }[]; // To track duties per day
+  lastAssignedSlotId?: string; 
+  lastAssignedDate?: string;
+  lastAssignedShift?: string;
 }
 
 export interface ExamSlot {

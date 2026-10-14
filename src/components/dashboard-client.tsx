@@ -180,6 +180,72 @@ export function DashboardClient() {
         }
     };
 
+    // One-click: flood fresh mock data in-memory and immediately run the allotment algorithm
+    // Avoids React stale-state issues by using freshly generated data directly.
+    const handleFloodAndGenerateAll = async () => {
+        setIsGenerating(true);
+        toast({ title: '⚡ Flooding Mock Data...', description: 'Generating students, classrooms, invigilators & schedule.' });
+        await new Promise(resolve => setTimeout(resolve, 150));
+        try {
+            const freshStudents: Student[] = JSON.parse(JSON.stringify(generateMockStudents(200)));
+            const freshClassrooms = generateMockClassrooms();
+            const freshInvigilators: Invigilator[] = JSON.parse(JSON.stringify(generateMockInvigilators()));
+            const freshExams: ExamSlot[] = generateMockExamSchedule();
+
+            // Persist to context so UI reflects the data
+            setStudents(freshStudents);
+            setClassrooms(freshClassrooms);
+            setInvigilators(freshInvigilators);
+            setExamSchedule(freshExams);
+
+            toast({ title: 'Mock Data Loaded ✅', description: 'Running allotment algorithm now...' });
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Run algorithm on fresh data directly (avoids stale closure issue)
+            let studentMasterList: Student[] = JSON.parse(JSON.stringify(freshStudents));
+            let invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(freshInvigilators));
+            const classroomMasterList = JSON.parse(JSON.stringify(freshClassrooms));
+
+            const examSlotsByTime = freshExams.reduce((acc, exam) => {
+                const key = `${exam.date} ${exam.time}`;
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(exam);
+                return acc;
+            }, {} as Record<string, ExamSlot[]>);
+
+            const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
+            const sortedSessionKeys = Object.keys(examSlotsByTime).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+            for (const key of sortedSessionKeys) {
+                const concurrentExams = examSlotsByTime[key];
+                if (!concurrentExams || concurrentExams.length === 0) continue;
+                const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority);
+                studentMasterList = updatedStudents;
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], reservedCount);
+                invigilatorMasterList = updatedInvigilators;
+                generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
+            }
+
+            setStudents(studentMasterList);
+            setInvigilators(invigilatorMasterList);
+            setFullAllotment(generatedPlans);
+
+            toast({
+                title: '🎉 Allotment Generated!',
+                description: `Full allotment complete for ${sortedSessionKeys.length} session(s) with mock data.`,
+                action: <Button onClick={() => router.push('/allotment')}>View Allotment</Button>,
+                duration: 10000
+            });
+        } catch (error: any) {
+            console.error('Flood+Generate error:', error);
+            toast({ variant: 'destructive', title: 'Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+
+
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-primary to-purple-700 p-8 text-white shadow-2xl">
@@ -397,6 +463,7 @@ export function DashboardClient() {
                     setStudents(prev => [...prev, ...newStudents]);
                     setExamSchedule(prev => [...prev, ...newExams]);
 
+                    let extraMsg = '';
                     if (wizardReservedCount !== undefined) {
                         setReservedCount(wizardReservedCount);
                     }
@@ -417,6 +484,7 @@ export function DashboardClient() {
                 onGenerateRandom={(count) => {
                     handlePopulateMockData(count);
                 }}
+                onFloodAndGenerate={handleFloodAndGenerateAll}
             />
         </div>
     );

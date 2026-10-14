@@ -31,6 +31,7 @@ const menuItems = [
   { id: 'dashboard', href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'schedule', href: '/schedule', icon: CalendarDays, label: 'Schedule' },
   { id: 'allotment', href: '/allotment', icon: Printer, label: 'Allotment' },
+  { id: 'manual-allotment', href: '/manual-allotment', icon: UserCheck, label: 'Manual Allotment' },
   { id: 'students', href: '/students', icon: Users, label: 'Students' },
   { id: 'classrooms', href: '/classrooms', icon: Building, label: 'Classrooms' },
   { id: 'invigilators', href: '/invigilators', icon: UserCheck, label: 'Invigilators' },

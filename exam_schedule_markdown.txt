@@ -1,0 +1,33 @@
+| Date | Shift | Code | Subject | Course | Dept | Sem |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-14 | Shift I | AEC-II | Fundamentals of Computer Application | B.A. (H) English | Humanities and Social Sciences | 2 |
+| 2026-05-14 | Shift I | BCH201 | Human Resource Management | B.Com. (Hons) | Commerce | 2 |
+| 2026-05-14 | Shift I | BBA201 | Organisational Behavior | Bachelor of Business Administration (BBA) | Management | 2 |
+| 2026-05-14 | Shift I | TBD201 | Foundations of AI | BCA (Hons.) - AI & Data Science | Computer Applications | 2 |
+| 2026-05-14 | Shift I | TMA201 | Engineering Mathematics-II | B.Tech Computer Science and Engineering | Computer Science and Engineering | 2 |
+| 2026-05-14 | Shift II | ENG401 | Creative Writing | B.A. (H) English | Humanities and Social Sciences | 4 |
+| 2026-05-14 | Shift II | BCH401 | Corporate Law | B.Com. (Hons) | Commerce | 4 |
+| 2026-05-14 | Shift II | TBC401 | Web Application Development | BCA | Computer Applications | 4 |
+| 2026-05-14 | Shift II | TCS801 | Soft Computing | B.Tech Computer Science and Engineering | Computer Science and Engineering | 8 |
+| 2026-05-15 | Shift I | ENG601 | Modern European Drama | B.A. (H) English | Humanities and Social Sciences | 6 |
+| 2026-05-15 | Shift I | BBA401 | Entrepreneurship and Startup Ecosystem | Bachelor of Business Administration (BBA) | Management | 4 |
+| 2026-05-15 | Shift I | TMC201 | Artificial Intelligence | MCA | Computer Applications | 2 |
+| 2026-05-15 | Shift II | BCH601 | GST Laws | B.Com. (Hons) | Commerce | 6 |
+| 2026-05-15 | Shift II | BBA601 | Project Management | Bachelor of Business Administration (BBA) | Management | 6 |
+| 2026-05-15 | Shift II | MBA401 | Project Management | Master of Business Administration (MBA) | Management | 4 |
+| 2026-05-16 | Shift I | ENG202 | Applied Phonetics | B.A. (H) English | Humanities and Social Sciences | 2 |
+| 2026-05-16 | Shift I | BCH202 | Business Statistics | B.Com. (Hons) | Commerce | 2 |
+| 2026-05-16 | Shift I | BBA202 | Marketing Management | Bachelor of Business Administration (BBA) | Management | 2 |
+| 2026-05-16 | Shift I | TCS201 | Programming for Problem Solving | B.Tech Computer Science and Engineering | Computer Science and Engineering | 2 |
+| 2026-05-16 | Shift II | ENG402 | Literary Criticism | B.A. (H) English | Humanities and Social Sciences | 4 |
+| 2026-05-16 | Shift II | BCH402 | Cost Accounting | B.Com. (Hons) | Commerce | 4 |
+| 2026-05-16 | Shift II | TBC402 | Computer Organization | BCA | Computer Applications | 4 |
+| 2026-05-18 | Shift I | TCS601 | Compiler Design | B.Tech Computer Science and Engineering | Computer Science and Engineering | 6 |
+| 2026-05-19 | Shift I | TCS202 | Fundamentals of AI and ML | B.Tech Computer Science and Engineering | Computer Science and Engineering | 2 |
+| 2026-05-20 | Shift I | TCS602 | Software Engineering | B.Tech Computer Science and Engineering | Computer Science and Engineering | 6 |
+| 2026-05-21 | Shift I | TEC201 | Basic Electronics | B.Tech Computer Science and Engineering | Computer Science and Engineering | 2 |
+| 2026-05-22 | Shift I | TCS603 | Computer Networks-II | B.Tech Computer Science and Engineering | Computer Science and Engineering | 6 |
+| 2026-05-23 | Shift I | TCH201 | Engineering Chemistry | B.Tech Computer Science and Engineering | Computer Science and Engineering | 2 |
+| 2026-05-25 | Shift I | TCS604 | Big Data | B.Tech Computer Science and Engineering | Computer Science and Engineering | 6 |
+| 2026-05-26 | Shift I | TEV201 | Environmental Science | B.Tech Computer Science and Engineering | Computer Science and Engineering | 2 |
+| 2026-05-28 | Shift I | TCS605 | Generative AI | B.Tech Computer Science and Engineering | Computer Science and Engineering | 6 |

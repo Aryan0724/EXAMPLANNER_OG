@@ -1,0 +1,281 @@
+id,name,rollNo,department,course,semester,section,group
+S2501001,Mohit Rao,2501001,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",1,A,
+S2501002,Atharv Rao,2501002,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",2,B,
+S2501003,Amit Mehra,2501003,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",3,C,
+S2501004,Neha Shah,2501004,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",4,A,
+S2501005,Myra Patel,2501005,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",5,B,
+S2501006,Advait Joshi,2501006,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",6,C,
+S2501007,Aarav Tiwari,2501007,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",7,A,A
+S2501008,Sanjay Joshi,2501008,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",8,B,
+S2501009,Krishna Iyer,2501009,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",1,C,
+S2501010,Ishaan Kumar,2501010,"Computer Science and Engineering","B.Tech CSE (Hons.) - Cyber Security",2,A,
+S2502001,Aditya Tiwari,2502001,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",3,B,A
+S2502002,Krishna Iyer,2502002,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",4,C,
+S2502003,Suresh Goel,2502003,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",5,A,
+S2502004,Sanjay Reddy,2502004,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",6,B,
+S2502005,Myra Joshi,2502005,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",7,C,
+S2502006,Mohit Yadav,2502006,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",8,A,
+S2502007,Mohit Pandey,2502007,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",1,B,B
+S2502008,Babita Goel,2502008,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",2,C,
+S2502009,Babita Deshmukh,2502009,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",3,A,
+S2502010,Ananya Mishra,2502010,"Computer Science and Engineering","B.Tech CSE (Hons.) - AI & ML",4,B,
+S2503001,Rahul Bhide,2503001,"Computer Science and Engineering","B.Tech Computer Science and Engineering",5,C,
+S2503002,Deepak Mishra,2503002,"Computer Science and Engineering","B.Tech Computer Science and Engineering",6,A,
+S2503003,Suresh Bansal,2503003,"Computer Science and Engineering","B.Tech Computer Science and Engineering",7,B,
+S2503004,Ananya Kumar,2503004,"Computer Science and Engineering","B.Tech Computer Science and Engineering",8,C,
+S2503005,Shweta Yadav,2503005,"Computer Science and Engineering","B.Tech Computer Science and Engineering",1,A,
+S2503006,Ramesh Mittal,2503006,"Computer Science and Engineering","B.Tech Computer Science and Engineering",2,B,A
+S2503007,Kavita Sharma,2503007,"Computer Science and Engineering","B.Tech Computer Science and Engineering",3,C,
+S2503008,Shweta Mishra,2503008,"Computer Science and Engineering","B.Tech Computer Science and Engineering",4,A,
+S2503009,Mohit Kapoor,2503009,"Computer Science and Engineering","B.Tech Computer Science and Engineering",5,B,
+S2503010,Advait Goel,2503010,"Computer Science and Engineering","B.Tech Computer Science and Engineering",6,C,
+S2504001,Sandeep Shah,2504001,"Computer Science and Engineering","Diploma in Computer Science and Engineering",7,A,A
+S2504002,Aditya Pandey,2504002,"Computer Science and Engineering","Diploma in Computer Science and Engineering",8,B,
+S2504003,Myra Bhide,2504003,"Computer Science and Engineering","Diploma in Computer Science and Engineering",1,C,
+S2504004,Vikram Kulkarni,2504004,"Computer Science and Engineering","Diploma in Computer Science and Engineering",2,A,
+S2504005,Anita Sharma,2504005,"Computer Science and Engineering","Diploma in Computer Science and Engineering",3,B,
+S2504006,Arjun Dubey,2504006,"Computer Science and Engineering","Diploma in Computer Science and Engineering",4,C,
+S2504007,Shweta Sharma,2504007,"Computer Science and Engineering","Diploma in Computer Science and Engineering",5,A,
+S2504008,Babita Deshmukh,2504008,"Computer Science and Engineering","Diploma in Computer Science and Engineering",6,B,
+S2504009,Aditya Patel,2504009,"Computer Science and Engineering","Diploma in Computer Science and Engineering",7,C,
+S2504010,Tanvi Mittal,2504010,"Computer Science and Engineering","Diploma in Computer Science and Engineering",8,A,
+S2505001,Advait Pandey,2505001,"Computer Science and Engineering","M.Tech Computer Science and Engineering",1,B,
+S2505002,Ayaan Sharma,2505002,"Computer Science and Engineering","M.Tech Computer Science and Engineering",2,C,
+S2505003,Diya Shah,2505003,"Computer Science and Engineering","M.Tech Computer Science and Engineering",3,A,
+S2505004,Kavita Reddy,2505004,"Computer Science and Engineering","M.Tech Computer Science and Engineering",4,B,
+S2505005,Anika Mittal,2505005,"Computer Science and Engineering","M.Tech Computer Science and Engineering",5,C,A
+S2505006,Aditya Rao,2505006,"Computer Science and Engineering","M.Tech Computer Science and Engineering",6,A,
+S2505007,Ayaan Pathak,2505007,"Computer Science and Engineering","M.Tech Computer Science and Engineering",7,B,
+S2505008,Advait Shah,2505008,"Computer Science and Engineering","M.Tech Computer Science and Engineering",8,C,
+S2505009,Anika Dubey,2505009,"Computer Science and Engineering","M.Tech Computer Science and Engineering",1,A,B
+S2505010,Myra Mehra,2505010,"Computer Science and Engineering","M.Tech Computer Science and Engineering",2,B,
+S2510001,Krishna Kumar,2510001,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",3,C,B
+S2510002,Ishani Goel,2510002,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",4,A,
+S2510003,Vihaan Bhide,2510003,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",5,B,
+S2510004,Vihaan Verma,2510004,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",6,C,
+S2510005,Deepak Kulkarni,2510005,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",7,A,
+S2510006,Rahul Reddy,2510006,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",8,B,
+S2510007,Mohit Verma,2510007,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",1,C,
+S2510008,Neha Gupta,2510008,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",2,A,A
+S2510009,Diya Bansal,2510009,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",3,B,
+S2510010,Riya Iyer,2510010,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Electric Vehicle",4,C,B
+S2511001,Ananya Kulkarni,2511001,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",5,A,
+S2511002,Kavita Pathak,2511002,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",6,B,
+S2511003,Kiara Bansal,2511003,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",7,C,
+S2511004,Amit Gupta,2511004,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",8,A,B
+S2511005,Vihaan Patel,2511005,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",1,B,
+S2511006,Riya Bhide,2511006,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",2,C,
+S2511007,Sandeep Pandey,2511007,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",3,A,B
+S2511008,Sandeep Tiwari,2511008,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",4,B,A
+S2511009,Krishna Verma,2511009,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",5,C,A
+S2511010,Shweta Kapoor,2511010,"Mechanical Engineering","B.Tech Mechanical Engineering (Hons.) - Mechatronics",6,A,B
+S2512001,Tanvi Sharma,2512001,"Mechanical Engineering","B.Tech Mechanical Engineering",7,B,A
+S2512002,Kavita Singh,2512002,"Mechanical Engineering","B.Tech Mechanical Engineering",8,C,
+S2512003,Amit Iyer,2512003,"Mechanical Engineering","B.Tech Mechanical Engineering",1,A,
+S2512004,Sneha Deshmukh,2512004,"Mechanical Engineering","B.Tech Mechanical Engineering",2,B,
+S2512005,Deepak Malhotra,2512005,"Mechanical Engineering","B.Tech Mechanical Engineering",3,C,A
+S2512006,Aavya Malhotra,2512006,"Mechanical Engineering","B.Tech Mechanical Engineering",4,A,A
+S2512007,Sandeep Iyer,2512007,"Mechanical Engineering","B.Tech Mechanical Engineering",5,B,A
+S2512008,Aavya Verma,2512008,"Mechanical Engineering","B.Tech Mechanical Engineering",6,C,
+S2512009,Aarav Pathak,2512009,"Mechanical Engineering","B.Tech Mechanical Engineering",7,A,
+S2512010,Myra Agrawal,2512010,"Mechanical Engineering","B.Tech Mechanical Engineering",8,B,
+S2513001,Ishaan Reddy,2513001,"Mechanical Engineering","Diploma in Mechanical Engineering",1,C,B
+S2513002,Krishna Pandey,2513002,"Mechanical Engineering","Diploma in Mechanical Engineering",2,A,A
+S2513003,Neha Nair,2513003,"Mechanical Engineering","Diploma in Mechanical Engineering",3,B,B
+S2513004,Vikram Tiwari,2513004,"Mechanical Engineering","Diploma in Mechanical Engineering",4,C,B
+S2513005,Ayaan Yadav,2513005,"Mechanical Engineering","Diploma in Mechanical Engineering",5,A,A
+S2513006,Deepak Pandey,2513006,"Mechanical Engineering","Diploma in Mechanical Engineering",6,B,B
+S2513007,Sanjay Kapoor,2513007,"Mechanical Engineering","Diploma in Mechanical Engineering",7,C,B
+S2513008,Riya Kumar,2513008,"Mechanical Engineering","Diploma in Mechanical Engineering",8,A,
+S2513009,Vihaan Dubey,2513009,"Mechanical Engineering","Diploma in Mechanical Engineering",1,B,
+S2513010,Saanvi Bansal,2513010,"Mechanical Engineering","Diploma in Mechanical Engineering",2,C,
+S2520001,Ishaan Kapoor,2520001,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",3,A,
+S2520002,Sanjay Dubey,2520002,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",4,B,A
+S2520003,Aarav Kulkarni,2520003,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",5,C,
+S2520004,Sneha Pathak,2520004,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",6,A,
+S2520005,Aryan Agrawal,2520005,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",7,B,
+S2520006,Sia Rao,2520006,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",8,C,
+S2520007,Arjun Kulkarni,2520007,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",1,A,
+S2520008,Tanvi Rao,2520008,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",2,B,
+S2520009,Sia Kumar,2520009,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",3,C,B
+S2520010,Riya Sharma,2520010,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Environmental Engineering",4,A,
+S2521001,Kavita Mehra,2521001,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",5,B,
+S2521002,Neha Kapoor,2521002,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",6,C,
+S2521003,Shweta Shah,2521003,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",7,A,A
+S2521004,Aarav Gupta,2521004,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",8,B,
+S2521005,Ishaan Mishra,2521005,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",1,C,
+S2521006,Arjun Deshmukh,2521006,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",2,A,B
+S2521007,Aditya Deshmukh,2521007,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",3,B,B
+S2521008,Kavita Iyer,2521008,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",4,C,B
+S2521009,Kiara Nair,2521009,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",5,A,
+S2521010,Deepak Tiwari,2521010,"Civil Engineering","B.Tech Civil Engineering (Hons.) - Geoinformatics",6,B,B
+S2522001,Krishna Kumar,2522001,"Civil Engineering","B.Tech Civil Engineering",7,C,
+S2522002,Myra Reddy,2522002,"Civil Engineering","B.Tech Civil Engineering",8,A,B
+S2522003,Ayaan Iyer,2522003,"Civil Engineering","B.Tech Civil Engineering",1,B,
+S2522004,Anika Goel,2522004,"Civil Engineering","B.Tech Civil Engineering",2,C,B
+S2522005,Anika Tiwari,2522005,"Civil Engineering","B.Tech Civil Engineering",3,A,
+S2522006,Amit Kapoor,2522006,"Civil Engineering","B.Tech Civil Engineering",4,B,A
+S2522007,Suresh Mittal,2522007,"Civil Engineering","B.Tech Civil Engineering",5,C,B
+S2522008,Anika Sharma,2522008,"Civil Engineering","B.Tech Civil Engineering",6,A,
+S2522009,Atharv Kapoor,2522009,"Civil Engineering","B.Tech Civil Engineering",7,B,B
+S2522010,Aryan Kumar,2522010,"Civil Engineering","B.Tech Civil Engineering",8,C,
+S2523001,Rahul Shah,2523001,"Civil Engineering","Diploma in Civil Engineering",1,A,
+S2523002,Arjun Singh,2523002,"Civil Engineering","Diploma in Civil Engineering",2,B,
+S2523003,Ayaan Verma,2523003,"Civil Engineering","Diploma in Civil Engineering",3,C,B
+S2523004,Sandeep Goel,2523004,"Civil Engineering","Diploma in Civil Engineering",4,A,
+S2523005,Vikram Tiwari,2523005,"Civil Engineering","Diploma in Civil Engineering",5,B,
+S2523006,Ishaan Joshi,2523006,"Civil Engineering","Diploma in Civil Engineering",6,C,
+S2523007,Ananya Mishra,2523007,"Civil Engineering","Diploma in Civil Engineering",7,A,
+S2523008,Ananya Joshi,2523008,"Civil Engineering","Diploma in Civil Engineering",8,B,A
+S2523009,Neha Verma,2523009,"Civil Engineering","Diploma in Civil Engineering",1,C,B
+S2523010,Kavita Goel,2523010,"Civil Engineering","Diploma in Civil Engineering",2,A,
+S2530001,Advait Mishra,2530001,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",3,B,A
+S2530002,Neha Bhide,2530002,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",4,C,
+S2530003,Arjun Pathak,2530003,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",5,A,
+S2530004,Sandeep Deshmukh,2530004,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",6,B,
+S2530005,Myra Joshi,2530005,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",7,C,A
+S2530006,Geeta Gupta,2530006,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",8,A,
+S2530007,Neha Singh,2530007,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",1,B,
+S2530008,Advait Shah,2530008,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",2,C,
+S2530009,Ayaan Kapoor,2530009,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",3,A,A
+S2530010,Sai Yadav,2530010,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - Drone Technology",4,B,
+S2531001,Aryan Shah,2531001,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",5,C,
+S2531002,Suresh Rao,2531002,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",6,A,A
+S2531003,Aavya Patel,2531003,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",7,B,
+S2531004,Advait Deshmukh,2531004,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",8,C,
+S2531005,Myra Nair,2531005,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",1,A,
+S2531006,Sneha Mittal,2531006,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",2,B,
+S2531007,Shweta Pandey,2531007,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",3,C,B
+S2531008,Ishani Nair,2531008,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",4,A,
+S2531009,Diya Kulkarni,2531009,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",5,B,
+S2531010,Sanjay Nair,2531010,"Electronics and Communication Engineering","B.Tech ECE (Hons.) - VLSI",6,C,
+S2532001,Aditya Bhide,2532001,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",7,A,
+S2532002,Vikram Reddy,2532002,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",8,B,
+S2532003,Lata Malhotra,2532003,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",1,C,
+S2532004,Aryan Goel,2532004,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",2,A,
+S2532005,Rahul Kapoor,2532005,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",3,B,
+S2532006,Diya Sharma,2532006,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",4,C,
+S2532007,Aavya Gupta,2532007,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",5,A,B
+S2532008,Ananya Nair,2532008,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",6,B,
+S2532009,Aavya Patel,2532009,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",7,C,B
+S2532010,Sneha Bhide,2532010,"Electronics and Communication Engineering","B.Tech Electronics and Communication Engineering",8,A,B
+S2540001,Ishani Bansal,2540001,"Computer Applications","BCA (Hons.) - AI & Data Science",1,B,A
+S2540002,Ananya Sharma,2540002,"Computer Applications","BCA (Hons.) - AI & Data Science",2,C,
+S2540003,Arjun Chopra,2540003,"Computer Applications","BCA (Hons.) - AI & Data Science",3,A,
+S2540004,Anita Yadav,2540004,"Computer Applications","BCA (Hons.) - AI & Data Science",4,B,A
+S2540005,Sai Kumar,2540005,"Computer Applications","BCA (Hons.) - AI & Data Science",5,C,
+S2540006,Neha Reddy,2540006,"Computer Applications","BCA (Hons.) - AI & Data Science",6,A,B
+S2540007,Tanvi Goel,2540007,"Computer Applications","BCA (Hons.) - AI & Data Science",7,B,
+S2540008,Mohit Joshi,2540008,"Computer Applications","BCA (Hons.) - AI & Data Science",8,C,B
+S2540009,Tanvi Agrawal,2540009,"Computer Applications","BCA (Hons.) - AI & Data Science",1,A,
+S2540010,Advait Singh,2540010,"Computer Applications","BCA (Hons.) - AI & Data Science",2,B,
+S2541001,Ishani Gupta,2541001,"Computer Applications","B.Sc. IT",3,C,
+S2541002,Mohit Pathak,2541002,"Computer Applications","B.Sc. IT",4,A,
+S2541003,Sia Pathak,2541003,"Computer Applications","B.Sc. IT",5,B,B
+S2541004,Aryan Tiwari,2541004,"Computer Applications","B.Sc. IT",6,C,
+S2541005,Krishna Kapoor,2541005,"Computer Applications","B.Sc. IT",7,A,A
+S2541006,Riya Bansal,2541006,"Computer Applications","B.Sc. IT",8,B,
+S2541007,Amit Joshi,2541007,"Computer Applications","B.Sc. IT",1,C,
+S2541008,Shweta Joshi,2541008,"Computer Applications","B.Sc. IT",2,A,
+S2541009,Ayaan Tiwari,2541009,"Computer Applications","B.Sc. IT",3,B,
+S2541010,Sai Tiwari,2541010,"Computer Applications","B.Sc. IT",4,C,A
+S2542001,Vihaan Agrawal,2542001,"Computer Applications","BCA",5,A,
+S2542002,Arjun Shah,2542002,"Computer Applications","BCA",6,B,B
+S2542003,Myra Goel,2542003,"Computer Applications","BCA",7,C,
+S2542004,Saanvi Nair,2542004,"Computer Applications","BCA",8,A,
+S2542005,Aryan Shah,2542005,"Computer Applications","BCA",1,B,
+S2542006,Advait Gupta,2542006,"Computer Applications","BCA",2,C,B
+S2542007,Riya Mittal,2542007,"Computer Applications","BCA",3,A,
+S2542008,Deepak Jain,2542008,"Computer Applications","BCA",4,B,
+S2542009,Myra Joshi,2542009,"Computer Applications","BCA",5,C,B
+S2542010,Tanvi Shah,2542010,"Computer Applications","BCA",6,A,
+S2543001,Atharv Deshmukh,2543001,"Computer Applications","MCA",7,B,
+S2543002,Deepak Singh,2543002,"Computer Applications","MCA",8,C,
+S2543003,Anita Sharma,2543003,"Computer Applications","MCA",1,A,B
+S2543004,Amit Kapoor,2543004,"Computer Applications","MCA",2,B,B
+S2543005,Neha Dubey,2543005,"Computer Applications","MCA",3,C,
+S2543006,Ramesh Pandey,2543006,"Computer Applications","MCA",4,A,
+S2543007,Suresh Dubey,2543007,"Computer Applications","MCA",5,B,
+S2543008,Sanjay Patel,2543008,"Computer Applications","MCA",6,C,B
+S2543009,Arjun Pathak,2543009,"Computer Applications","MCA",7,A,
+S2543010,Pooja Joshi,2543010,"Computer Applications","MCA",8,B,B
+S2544001,Ramesh Tiwari,2544001,"Computer Applications","MCA - AI & Data Science",1,C,B
+S2544002,Lata Yadav,2544002,"Computer Applications","MCA - AI & Data Science",2,A,
+S2544003,Ishani Pandey,2544003,"Computer Applications","MCA - AI & Data Science",3,B,
+S2544004,Aryan Shah,2544004,"Computer Applications","MCA - AI & Data Science",4,C,A
+S2544005,Rahul Patel,2544005,"Computer Applications","MCA - AI & Data Science",5,A,
+S2544006,Ayaan Iyer,2544006,"Computer Applications","MCA - AI & Data Science",6,B,
+S2544007,Ishani Tiwari,2544007,"Computer Applications","MCA - AI & Data Science",7,C,
+S2544008,Atharv Chopra,2544008,"Computer Applications","MCA - AI & Data Science",8,A,
+S2544009,Mohit Pathak,2544009,"Computer Applications","MCA - AI & Data Science",1,B,
+S2544010,Tanvi Kumar,2544010,"Computer Applications","MCA - AI & Data Science",2,C,
+S2550001,Geeta Jain,2550001,"Management","Master of Business Administration (MBA)",3,A,
+S2550002,Neha Sharma,2550002,"Management","Master of Business Administration (MBA)",4,B,
+S2550003,Arjun Sharma,2550003,"Management","Master of Business Administration (MBA)",5,C,
+S2550004,Sanjay Bansal,2550004,"Management","Master of Business Administration (MBA)",6,A,
+S2550005,Kiara Gupta,2550005,"Management","Master of Business Administration (MBA)",7,B,
+S2550006,Babita Bhide,2550006,"Management","Master of Business Administration (MBA)",8,C,
+S2550007,Arjun Joshi,2550007,"Management","Master of Business Administration (MBA)",1,A,
+S2550008,Riya Mittal,2550008,"Management","Master of Business Administration (MBA)",2,B,
+S2550009,Riya Jain,2550009,"Management","Master of Business Administration (MBA)",3,C,
+S2550010,Sandeep Bhide,2550010,"Management","Master of Business Administration (MBA)",4,A,B
+S2551001,Atharv Singh,2551001,"Management","BBA - International Finance & Accounting (ACCA)",5,B,B
+S2551002,Ramesh Malhotra,2551002,"Management","BBA - International Finance & Accounting (ACCA)",6,C,A
+S2551003,Sia Bansal,2551003,"Management","BBA - International Finance & Accounting (ACCA)",7,A,
+S2551004,Aryan Malhotra,2551004,"Management","BBA - International Finance & Accounting (ACCA)",8,B,
+S2551005,Shweta Mehra,2551005,"Management","BBA - International Finance & Accounting (ACCA)",1,C,
+S2551006,Diya Iyer,2551006,"Management","BBA - International Finance & Accounting (ACCA)",2,A,
+S2551007,Atharv Agrawal,2551007,"Management","BBA - International Finance & Accounting (ACCA)",3,B,
+S2551008,Aryan Mishra,2551008,"Management","BBA - International Finance & Accounting (ACCA)",4,C,
+S2551009,Kavita Bansal,2551009,"Management","BBA - International Finance & Accounting (ACCA)",5,A,
+S2551010,Suresh Singh,2551010,"Management","BBA - International Finance & Accounting (ACCA)",6,B,A
+S2552001,Aarav Patel,2552001,"Management","Bachelor of Business Administration (BBA)",7,C,
+S2552002,Advait Mishra,2552002,"Management","Bachelor of Business Administration (BBA)",8,A,A
+S2552003,Ananya Shah,2552003,"Management","Bachelor of Business Administration (BBA)",1,B,
+S2552004,Neha Kapoor,2552004,"Management","Bachelor of Business Administration (BBA)",2,C,
+S2552005,Vikram Shah,2552005,"Management","Bachelor of Business Administration (BBA)",3,A,A
+S2552006,Arjun Rao,2552006,"Management","Bachelor of Business Administration (BBA)",4,B,
+S2552007,Sandeep Agrawal,2552007,"Management","Bachelor of Business Administration (BBA)",5,C,
+S2552008,Tanvi Reddy,2552008,"Management","Bachelor of Business Administration (BBA)",6,A,A
+S2552009,Kiara Patel,2552009,"Management","Bachelor of Business Administration (BBA)",7,B,
+S2552010,Aavya Chopra,2552010,"Management","Bachelor of Business Administration (BBA)",8,C,A
+S2560001,Anika Goel,2560001,"Commerce","B.Com (Hons.)",1,A,B
+S2560002,Ramesh Singh,2560002,"Commerce","B.Com (Hons.)",2,B,A
+S2560003,Ananya Shah,2560003,"Commerce","B.Com (Hons.)",3,C,
+S2560004,Anika Sharma,2560004,"Commerce","B.Com (Hons.)",4,A,A
+S2560005,Deepak Kulkarni,2560005,"Commerce","B.Com (Hons.)",5,B,
+S2560006,Riya Malhotra,2560006,"Commerce","B.Com (Hons.)",6,C,B
+S2560007,Vikram Pathak,2560007,"Commerce","B.Com (Hons.)",7,A,B
+S2560008,Mohit Kulkarni,2560008,"Commerce","B.Com (Hons.)",8,B,
+S2560009,Anika Mishra,2560009,"Commerce","B.Com (Hons.)",1,C,
+S2560010,Advait Patel,2560010,"Commerce","B.Com (Hons.)",2,A,
+S2561001,Advait Nair,2561001,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",3,B,A
+S2561002,Amit Chopra,2561002,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",4,C,
+S2561003,Vikram Kapoor,2561003,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",5,A,
+S2561004,Sai Singh,2561004,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",6,B,
+S2561005,Aarav Iyer,2561005,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",7,C,A
+S2561006,Babita Joshi,2561006,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",8,A,
+S2561007,Sanjay Kulkarni,2561007,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",1,B,A
+S2561008,Krishna Pathak,2561008,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",2,C,A
+S2561009,Anita Bansal,2561009,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",3,A,
+S2561010,Geeta Singh,2561010,"Commerce","B.Com (Hons.) - International Finance & Accounting (ACCA UK)",4,B,B
+S2570001,Vikram Jain,2570001,"Nursing","B.Sc. Nursing",5,C,B
+S2570002,Riya Yadav,2570002,"Nursing","B.Sc. Nursing",6,A,
+S2570003,Sai Pathak,2570003,"Nursing","B.Sc. Nursing",7,B,
+S2570004,Babita Reddy,2570004,"Nursing","B.Sc. Nursing",8,C,
+S2570005,Advait Malhotra,2570005,"Nursing","B.Sc. Nursing",1,A,
+S2570006,Rahul Mehra,2570006,"Nursing","B.Sc. Nursing",2,B,
+S2570007,Sia Bansal,2570007,"Nursing","B.Sc. Nursing",3,C,A
+S2570008,Lata Goel,2570008,"Nursing","B.Sc. Nursing",4,A,
+S2570009,Rahul Mishra,2570009,"Nursing","B.Sc. Nursing",5,B,A
+S2570010,Tanvi Jain,2570010,"Nursing","B.Sc. Nursing",6,C,
+S2580001,Aavya Bhide,2580001,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",7,A,
+S2580002,Riya Mishra,2580002,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",8,B,
+S2580003,Anita Bhide,2580003,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",1,C,
+S2580004,Deepak Sharma,2580004,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",2,A,B
+S2580005,Riya Jain,2580005,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",3,B,A
+S2580006,Suresh Joshi,2580006,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",4,C,
+S2580007,Anita Deshmukh,2580007,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",5,A,
+S2580008,Aryan Pathak,2580008,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",6,B,
+S2580009,Babita Singh,2580009,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",7,C,
+S2580010,Vihaan Nair,2580010,"Pharmacy","Bachelor of Pharmacy (B.Pharm.)",8,A,

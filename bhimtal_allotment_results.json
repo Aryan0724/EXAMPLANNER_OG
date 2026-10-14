@@ -1,0 +1,697 @@
+[
+  {
+    "session": "2026-05-14 09:30",
+    "exams": [
+      {
+        "subject": "Fundamentals of Computer Application",
+        "course": "B.A. (H) English",
+        "students": 0
+      },
+      {
+        "subject": "Human Resource Management",
+        "course": "B.Com. (Hons)",
+        "students": 0
+      },
+      {
+        "subject": "Organisational Behavior",
+        "course": "Bachelor of Business Administration (BBA)",
+        "students": 9
+      },
+      {
+        "subject": "Foundations of AI",
+        "course": "BCA (Hons.) - AI & Data Science",
+        "students": 10
+      },
+      {
+        "subject": "Engineering Mathematics-II",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mr. Govind Singh Jethi",
+        "room": "D103",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Ms. Megha Upreti",
+        "room": "D103",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Ms. Neelam",
+        "room": "Reserved",
+        "dept": "Nursing"
+      },
+      {
+        "name": "Ms. Vaishali Dev",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Parthak Mehra",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Ms. Shivani Kumayan",
+        "room": "Reserved",
+        "dept": "Nursing"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-14 13:30",
+    "exams": [
+      {
+        "subject": "Creative Writing",
+        "course": "B.A. (H) English",
+        "students": 0
+      },
+      {
+        "subject": "Corporate Law",
+        "course": "B.Com. (Hons)",
+        "students": 0
+      },
+      {
+        "subject": "Web Application Development",
+        "course": "BCA",
+        "students": 10
+      },
+      {
+        "subject": "Soft Computing",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Ms. Sonia Pandey",
+        "room": "D103",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Mr. Abhishek Tamta",
+        "room": "D103",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Ms. Babita Bisht",
+        "room": "Reserved",
+        "dept": "Nursing"
+      },
+      {
+        "name": "Ms. Shivani Kirola",
+        "room": "Reserved",
+        "dept": "Nursing"
+      },
+      {
+        "name": "Mr. Nishant Koturiya",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Ms. Pooja Sijwali",
+        "room": "Reserved",
+        "dept": "Nursing"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-15 09:30",
+    "exams": [
+      {
+        "subject": "Modern European Drama",
+        "course": "B.A. (H) English",
+        "students": 0
+      },
+      {
+        "subject": "Entrepreneurship and Startup Ecosystem",
+        "course": "Bachelor of Business Administration (BBA)",
+        "students": 10
+      },
+      {
+        "subject": "Artificial Intelligence",
+        "course": "MCA",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Ms. Kavita Khati",
+        "room": "D103",
+        "dept": "Management"
+      },
+      {
+        "name": "Mr. Vaibhav Kumar Sharma",
+        "room": "D103",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Jaysurya Thapa",
+        "room": "Reserved",
+        "dept": "Nursing"
+      },
+      {
+        "name": "Ms. Jyoti Mishra",
+        "room": "Reserved",
+        "dept": "Nursing"
+      },
+      {
+        "name": "Ms. Pooja Negi",
+        "room": "Reserved",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Ms. Nidhi Joshi",
+        "room": "Reserved",
+        "dept": "Department of Personality Development"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-15 13:30",
+    "exams": [
+      {
+        "subject": "GST Laws",
+        "course": "B.Com. (Hons)",
+        "students": 0
+      },
+      {
+        "subject": "Project Management",
+        "course": "Bachelor of Business Administration (BBA)",
+        "students": 10
+      },
+      {
+        "subject": "Project Management",
+        "course": "Master of Business Administration (MBA)",
+        "students": 9
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mr. Vimal Singh Bisht",
+        "room": "D103",
+        "dept": "Electronics and Communication Engineering"
+      },
+      {
+        "name": "Mrs. Jyoti Gwasikoti",
+        "room": "Reserved",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Dr. Ankit Singh Mehra",
+        "room": "Reserved",
+        "dept": "Civil Engineering"
+      },
+      {
+        "name": "Dr. Mehul Manu",
+        "room": "Reserved",
+        "dept": "Allied Sciences"
+      },
+      {
+        "name": "Mr. Prince Kumar",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-16 09:30",
+    "exams": [
+      {
+        "subject": "Applied Phonetics",
+        "course": "B.A. (H) English",
+        "students": 0
+      },
+      {
+        "subject": "Business Statistics",
+        "course": "B.Com. (Hons)",
+        "students": 0
+      },
+      {
+        "subject": "Marketing Management",
+        "course": "Bachelor of Business Administration (BBA)",
+        "students": 9
+      },
+      {
+        "subject": "Programming for Problem Solving",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mr. Suraj Chaunal",
+        "room": "D103",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Naman Tewari",
+        "room": "Reserved",
+        "dept": "Civil Engineering"
+      },
+      {
+        "name": "Mr. Hrishabh Pandey",
+        "room": "Reserved",
+        "dept": "Management"
+      },
+      {
+        "name": "Mr. Divas Tewari",
+        "room": "Reserved",
+        "dept": "Department of Personality Development"
+      },
+      {
+        "name": "Dr. Saurabh Pargaien",
+        "room": "Reserved",
+        "dept": "Electronics and Communication Engineering"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-16 13:30",
+    "exams": [
+      {
+        "subject": "Literary Criticism",
+        "course": "B.A. (H) English",
+        "students": 0
+      },
+      {
+        "subject": "Cost Accounting",
+        "course": "B.Com. (Hons)",
+        "students": 0
+      },
+      {
+        "subject": "Computer Organization",
+        "course": "BCA",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mrs. Mamta Joshi",
+        "room": "D103",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Dr. Neha Bhatt",
+        "room": "Reserved",
+        "dept": "Nursing"
+      },
+      {
+        "name": "Mr. Jagdish Singh Mehta",
+        "room": "Reserved",
+        "dept": "Mechanical Engineering"
+      },
+      {
+        "name": "Mrs. Senam Pandey",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Saurabh Dhanik",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-18 09:30",
+    "exams": [
+      {
+        "subject": "Compiler Design",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mr. Ansh Dhingra",
+        "room": "D103",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Sandeep Bisht",
+        "room": "Reserved",
+        "dept": "Management"
+      },
+      {
+        "name": "Mr. Shashi Kumar Sharma",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mrs. Divya Rastogi",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Ms. Heera Patwal",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-19 09:30",
+    "exams": [
+      {
+        "subject": "Fundamentals of AI and ML",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mrs. Vandana Pandey",
+        "room": "D103",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Mr. Pawan Agarwal",
+        "room": "Reserved",
+        "dept": "Department of Personality Development"
+      },
+      {
+        "name": "Mr. Devesh Bora",
+        "room": "Reserved",
+        "dept": "Mechanical Engineering"
+      },
+      {
+        "name": "Ms. Srijana Karnatak",
+        "room": "Reserved",
+        "dept": "Department of Personality Development"
+      },
+      {
+        "name": "Dr. Manohar Giri",
+        "room": "Reserved",
+        "dept": "Management"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-20 09:30",
+    "exams": [
+      {
+        "subject": "Software Engineering",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Ms. Neema Bisht",
+        "room": "D103",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Mr. Harshit Pandey",
+        "room": "Reserved",
+        "dept": "Mechanical Engineering"
+      },
+      {
+        "name": "Dr. Kiran Patni",
+        "room": "Reserved",
+        "dept": "Allied Sciences"
+      },
+      {
+        "name": "Mrs. Kanak Pandey",
+        "room": "Reserved",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Ms. Chandni Manral",
+        "room": "Reserved",
+        "dept": "Nursing"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-21 09:30",
+    "exams": [
+      {
+        "subject": "Basic Electronics",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Dr. Himanshu Pant",
+        "room": "D103",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Ms. Shivali Sagar",
+        "room": "Reserved",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Mr. Manoj Kaushik",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Nagendra Singh Gaira",
+        "room": "Reserved",
+        "dept": "Mechanical Engineering"
+      },
+      {
+        "name": "Ms. Kashish Mirza",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-22 09:30",
+    "exams": [
+      {
+        "subject": "Computer Networks-II",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mr. Ramanuj Tewari",
+        "room": "D103",
+        "dept": "Management"
+      },
+      {
+        "name": "Dr. Amrita Pargaien",
+        "room": "Reserved",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Dr. Amit Mittal",
+        "room": "Reserved",
+        "dept": "Allied Sciences"
+      },
+      {
+        "name": "Dr. Janmejay Pant",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Ms. Isha Tewari",
+        "room": "Reserved",
+        "dept": "Management"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-23 09:30",
+    "exams": [
+      {
+        "subject": "Engineering Chemistry",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Dr. Farha Khan",
+        "room": "D103",
+        "dept": "Management"
+      },
+      {
+        "name": "Mr. Praveen Kumar Joshi",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Devesh Pandey",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Navneet Tiwari",
+        "room": "Reserved",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Mrs. Kalpana Chauhan",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-25 09:30",
+    "exams": [
+      {
+        "subject": "Big Data",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mr. Narendra Bisht",
+        "room": "D103",
+        "dept": "Department of Personality Development"
+      },
+      {
+        "name": "Dr. Deependra Singh Rawat",
+        "room": "Reserved",
+        "dept": "Allied Sciences"
+      },
+      {
+        "name": "Dr. Tarun Bangia",
+        "room": "Reserved",
+        "dept": "Mechanical Engineering"
+      },
+      {
+        "name": "Dr. Shilpa Jain",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Dr. Surabhi Saxena",
+        "room": "Reserved",
+        "dept": "Management"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-26 09:30",
+    "exams": [
+      {
+        "subject": "Environmental Science",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Mr. Preetam Kumar",
+        "room": "D103",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Mr. Mohit Pant",
+        "room": "Reserved",
+        "dept": "Electronics and Communication Engineering"
+      },
+      {
+        "name": "Mr. Bhavesh Joshi",
+        "room": "Reserved",
+        "dept": "Management"
+      },
+      {
+        "name": "Mr. Rahul Kumar Singh",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Mr. Aviral Awasthi",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      }
+    ]
+  },
+  {
+    "session": "2026-05-28 09:30",
+    "exams": [
+      {
+        "subject": "Generative AI",
+        "course": "B.Tech Computer Science and Engineering",
+        "students": 10
+      }
+    ],
+    "roomsUsed": [
+      "D103"
+    ],
+    "invigilators": [
+      {
+        "name": "Dr. Madan Mohan Sati",
+        "room": "D103",
+        "dept": "Allied Sciences"
+      },
+      {
+        "name": "Mr. Rajendra Singh Bisht",
+        "room": "Reserved",
+        "dept": "Computer Science and Engineering"
+      },
+      {
+        "name": "Dr. Sunita Waila Tiwari",
+        "room": "Reserved",
+        "dept": "Pharmacy"
+      },
+      {
+        "name": "Mr. Dikendra Kumar Verma",
+        "room": "Reserved",
+        "dept": "Electronics and Communication Engineering"
+      },
+      {
+        "name": "Mrs. Namita Joshi",
+        "room": "Reserved",
+        "dept": "Pharmacy"
+      }
+    ]
+  }
+]

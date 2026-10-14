@@ -260,10 +260,27 @@ export function assignInvigilators(
 
     const invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
 
-    const DUTY_LIMITS = {
+    const DESIGNATION_PRIORITY: Record<string, number> = {
+        'Lecturer': 1,
+        'Nursing Tutor': 1,
+        'Teaching Associate': 1,
+        'Teaching Assistant': 1,
+        'Assistant Professor': 2,
+        'Associate Professor': 3,
+        'Professor': 4,
+        'Lab Assistant': 5
+    };
+
+    const getPriority = (designation: string) => DESIGNATION_PRIORITY[designation] || 10;
+
+    const DUTY_LIMITS: Record<string, number> = {
         'Professor': 5,
         'Associate Professor': 10,
         'Assistant Professor': 15,
+        'Lecturer': 20,
+        'Nursing Tutor': 20,
+        'Teaching Associate': 20,
+        'Teaching Assistant': 20,
         'Tutor': 20,
         'Lab Assistant': 20
     };
@@ -292,28 +309,28 @@ export function assignInvigilators(
         );
     }
 
-    // Split into categories
-    const faculty = validInvigilators.filter(i => i.designation !== 'Lab Assistant' && i.designation !== 'Tutor');
-    const assistants = validInvigilators.filter(i => i.designation === 'Lab Assistant' || i.designation === 'Tutor');
+    // Split into categories based on strict priority
+    // Priority 1: Lec, NT, TA
+    // Priority 2: AP
+    // Priority 3: AsP
+    // Priority 4: Others
+    
+    validInvigilators.sort((a, b) => {
+        const pA = getPriority(a.designation);
+        const pB = getPriority(b.designation);
+        if (pA !== pB) return pA - pB;
+        
+        // Secondary: Load balance (those with fewer duties first)
+        const dA = getTotalDuties(a);
+        const dB = getTotalDuties(b);
+        if (dA !== dB) return dA - dB;
+        
+        return Math.random() - 0.5;
+    });
 
-    // Shuffle both pools for randomness within categories
-    faculty.sort(() => Math.random() - 0.5);
-    assistants.sort(() => Math.random() - 0.5);
+    let availablePool = [...validInvigilators];
 
-    // 4:1 Mixing Logic (4 Faculty, then 1 Assistant)
-    let availablePool: Invigilator[] = [];
-    let fIdx = 0, aIdx = 0;
-
-    while (fIdx < faculty.length || aIdx < assistants.length) {
-        // Take up to 4 faculty
-        for (let i = 0; i < 4 && fIdx < faculty.length; i++) {
-            availablePool.push(faculty[fIdx++]);
-        }
-        // Take 1 assistant
-        if (aIdx < assistants.length) {
-            availablePool.push(assistants[aIdx++]);
-        }
-    }
+    // The availablePool is already sorted by strict priority.
 
 
     const assignments: InvigilatorAssignment[] = [];
@@ -367,29 +384,21 @@ export function assignInvigilators(
             const scoredCandidates = candidates.map(inv => {
                 const currentDuties = getTotalDuties(inv);
                 const limit = DUTY_LIMITS[inv.designation] || 10;
+                const priority = getPriority(inv.designation);
 
-                // 1. Load Balance score (0 - 10000)
-                const loadRatio = (currentDuties + 1) / limit;
-                let score = loadRatio * 10000;
+                // 1. Priority score (Weighting priority extremely high)
+                let score = priority * 100000;
 
-                // 2. Gender Diversity Priority (High Priority)
+                // 2. Load Balance score
+                const loadRatio = (currentDuties) / limit;
+                score += loadRatio * 10000;
+
+                // 3. Gender Diversity Priority
                 if (sessionRoomAssignments.length > 0) {
                     const existingGenders = new Set(sessionRoomAssignments.map(r => r.gender));
                     if (!existingGenders.has(inv.gender)) {
                         score -= 5000; 
                     }
-                }
-
-                // 3. Designation/Role Logic
-                if (i === 0) {
-                    if (inv.designation === 'Professor') score += 500;
-                    else if (inv.designation === 'Associate Professor') score += 200;
-                    else if (inv.designation === 'Assistant Professor') score -= 200;
-                } else {
-                    if (inv.designation === 'Tutor' || inv.designation === 'Lab Assistant') score -= 500;
-                    else if (inv.designation === 'Assistant Professor') score -= 200;
-                    else if (inv.designation === 'Associate Professor') score += 200;
-                    else if (inv.designation === 'Professor') score += 500;
                 }
 
                 score += Math.random() * 10; // Jitter
@@ -431,15 +440,13 @@ export function assignInvigilators(
             if (candidates.length === 0) break;
 
             const scoredCandidates = candidates.map(inv => {
+                const priority = getPriority(inv.designation);
+                let score = priority * 100000;
+                
                 const currentDuties = getTotalDuties(inv);
                 const limit = DUTY_LIMITS[inv.designation] || 10;
-                const loadRatio = (currentDuties + 1) / limit;
-                let score = loadRatio * 10000;
-                
-                // For reserved, we prefer Tutors/Lab Assistants or Asst Professors to keep high rank free
-                if (inv.designation === 'Tutor' || inv.designation === 'Lab Assistant') score -= 500;
-                else if (inv.designation === 'Assistant Professor') score -= 200;
-                else score += 500;
+                const loadRatio = (currentDuties) / limit;
+                score += loadRatio * 10000;
 
                 score += Math.random() * 50; // Jitter
                 return { inv, score };
@@ -466,6 +473,256 @@ export function assignInvigilators(
             const poolIdx = availablePool.findIndex(p => p.id === winner.id);
             if (poolIdx !== -1) availablePool[poolIdx] = JSON.parse(JSON.stringify(invRecord));
         }
+    }
+
+    return { assignments, updatedInvigilators: invigilatorMasterList };
+}
+
+/**
+ * Performs faculty assignment based on manual room and staff counts.
+ * This is used when the user wants to bypass student-based logic and just say
+ * "I need X rooms and Y invigilators".
+ */
+export function generateManualFacultyAllotment(
+    invigilators: Invigilator[],
+    classrooms: Classroom[],
+    exam: ExamSlot,
+    roomCount: number,
+    activeStaffCount: number,
+    reservedStaffCount: number,
+    blockPriority: string[] = []
+): { assignments: InvigilatorAssignment[], updatedInvigilators: Invigilator[] } {
+    const invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
+    const assignments: InvigilatorAssignment[] = [];
+    
+    const DESIGNATION_PRIORITY: Record<string, number> = {
+        'Lecturer': 1,
+        'Nursing Tutor': 1,
+        'Teaching Associate': 1,
+        'Teaching Assistant': 1,
+        'Assistant Professor': 2,
+        'Associate Professor': 3,
+        'Professor': 4,
+        'Lab Assistant': 5
+    };
+    const getPriority = (designation: string) => DESIGNATION_PRIORITY[designation] || 10;
+    
+    const DUTY_LIMITS: Record<string, number> = { 
+        'Professor': 5, 
+        'Associate Professor': 10, 
+        'Assistant Professor': 15, 
+        'Lecturer': 20,
+        'Nursing Tutor': 20,
+        'Teaching Associate': 20,
+        'Teaching Assistant': 20,
+        'Tutor': 20, 
+        'Lab Assistant': 20 
+    };
+    const getTotalDuties = (inv: Invigilator) => inv.assignedDuties ? inv.assignedDuties.reduce((sum, duty) => sum + duty.count, 0) : 0;
+
+    // 1. Pick Classrooms based on priority and count
+    const sortedRooms = [...classrooms]
+        .filter(room => !exam.unavailableSlots?.some(slot => slot.slotId === exam.id))
+        .sort((a, b) => {
+            const indexA = blockPriority.indexOf(a.building);
+            const indexB = blockPriority.indexOf(b.building);
+            if (indexA !== -1 && indexB !== -1 && indexA !== indexB) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return b.capacity - a.capacity;
+        });
+
+    const roomsToUse = sortedRooms.slice(0, roomCount);
+
+    // 2. Prepare Invigilator Pool
+    const validInvigilators = invigilatorMasterList.filter(i => 
+        !i.unavailableSlots?.some(slot => slot.slotId === exam.id)
+    );
+
+    validInvigilators.sort((a, b) => {
+        const pA = getPriority(a.designation);
+        const pB = getPriority(b.designation);
+        if (pA !== pB) return pA - pB;
+        
+        const dA = getTotalDuties(a);
+        const dB = getTotalDuties(b);
+        if (dA !== dB) return dA - dB;
+        
+        return Math.random() - 0.5;
+    });
+
+    const currentShift = exam.manualShiftIndex ?? (exam.id.includes('Shift II') ? 1 : 0);
+    const currentDate = exam.date;
+
+    const isJunior = (desig: string) => {
+        const d = desig.toLowerCase();
+        return d.includes('lecturer') || d.includes('nursing tutor') || d.includes('teaching associate') || d.includes('teaching assistant') || d.includes('lec') || d.includes('nt') || d.includes('ta');
+    };
+
+    // HARD PRE-FILTER: Remove anyone who worked the SAME SHIFT or a PREVIOUS SHIFT today
+    // (Except Mid+Reg for Juniors, which we handle in the fallback)
+    let availablePool = validInvigilators.filter(inv => {
+        if (inv.lastAssignedDate === currentDate) {
+            // Worked same shift? Block.
+            if (Number(inv.lastAssignedShift) === currentShift) return false;
+            
+            // Worked previous shift? 
+            if (Number(inv.lastAssignedShift) + 1 === currentShift) {
+                // If they are not a Junior, block 001+01 too.
+                // If they ARE a Junior, we keep them in availablePool but Pass 1 will filter them out.
+                if (!isJunior(inv.designation)) return false;
+                
+                // If previous was NOT Mid, block them absolutely (even Juniors)
+                const prevWasMid = inv.lastAssignedSlotId?.includes('-Mid');
+                if (!prevWasMid) return false;
+            }
+        }
+        return true;
+    });
+
+    // 3. Assignment Logic
+    const performSelection = (room: Classroom | null, isReserved: boolean = false) => {
+        if (availablePool.length === 0) return null;
+
+        // PASS 1: The "Universal Law" - Strictly NO back-to-back duties and Respect Daily Limits
+        const nonConsecutiveCandidates = availablePool.filter(inv => {
+            // 1. Daily Session Limit Check
+            const dutiesToday = inv.assignedDuties?.find(d => d.date === currentDate)?.count || 0;
+            const maxSessions = inv.maxDailySessions || (isJunior(inv.designation) ? 2 : 1);
+            if (dutiesToday >= maxSessions) return false;
+
+            // 2. Consecutive Check
+            if (inv.lastAssignedDate === currentDate) {
+                // Same shift: Always block
+                if (currentShift === Number(inv.lastAssignedShift)) return false;
+                
+                // Back-to-back shift:
+                if (currentShift === Number(inv.lastAssignedShift) + 1) {
+                    const prevWasMid = inv.lastAssignedSlotId?.includes('-Mid');
+                    const currIsReg = exam.id?.includes('-Reg');
+                    
+                    // Allow 001 + 01 (Mid + Reg) ONLY in Pass 2 (fallback), so block it in Pass 1
+                    return false; 
+                }
+            }
+            return true;
+        });
+        
+        let poolToUse = nonConsecutiveCandidates;
+        let isFallback = false;
+
+        // PASS 2: Emergency Fallback - ONLY allow 001 + 01 (Mid + Reg) for Juniors
+        if (poolToUse.length === 0) {
+            const juniorCandidates = availablePool.filter(inv => {
+                if (!isJunior(inv.designation)) return false;
+                
+                // Still check daily limits
+                const dutiesToday = inv.assignedDuties?.find(d => d.date === currentDate)?.count || 0;
+                if (dutiesToday >= 2) return false;
+
+                // Check for 001 + 01 sequence
+                if (inv.lastAssignedDate === currentDate && Number(inv.lastAssignedShift) + 1 === currentShift) {
+                    const prevWasMid = inv.lastAssignedSlotId?.includes('-Mid');
+                    const currIsReg = exam.id?.includes('-Reg');
+                    return prevWasMid && currIsReg; // This is the ONLY acceptable consecutive case
+                }
+                
+                return true;
+            });
+
+            if (juniorCandidates.length > 0) {
+                poolToUse = juniorCandidates;
+                isFallback = true;
+            } else {
+                // ABSOLUTE BLOCK: We'd rather fail to allot than allow 01+01
+                poolToUse = []; 
+            }
+        }
+
+        const scoredCandidates = poolToUse.map(inv => {
+            const priority = getPriority(inv.designation);
+            let score = priority * 100000;
+
+            const currentDuties = getTotalDuties(inv);
+            const limit = DUTY_LIMITS[inv.designation] || 10;
+            const loadRatio = currentDuties / limit;
+            
+            // Duty load balancing
+            score += loadRatio * 20000;
+
+            // SAME-DAY PENALTY: Prefer people who haven't worked at all today
+            const workedToday = inv.assignedDuties?.some(d => d.date === currentDate && d.count > 0);
+            if (workedToday) {
+                score += 50000; // Large penalty but still keeps Junior (100k+50k) ahead of AP (200k)
+            }
+
+            // Massive penalty for breaking the "Universal Law" in fallback mode
+            if (isFallback) {
+                score += 500000; 
+            }
+
+            // Gender diversity
+            if (room) {
+                const existingGenders = new Set(assignments.filter(a => a.classroom?.id === room.id).map(a => a.invigilator.gender));
+                if (existingGenders.size > 0 && !existingGenders.has(inv.gender)) score -= 5000;
+            }
+
+            score += Math.random() * 50;
+            return { inv, score };
+        });
+
+        if (scoredCandidates.length === 0) return null;
+        scoredCandidates.sort((a, b) => a.score - b.score);
+        const winner = scoredCandidates[0].inv;
+
+        // Update persistence records
+        const invRecord = invigilatorMasterList.find(im => im.id === winner.id)!;
+        if (!invRecord.assignedDuties) invRecord.assignedDuties = [];
+        let dutyRecord = invRecord.assignedDuties.find(d => d.date === currentDate);
+        if (dutyRecord) dutyRecord.count++;
+        else invRecord.assignedDuties.push({ date: currentDate, count: 1 });
+
+        // Update universal tracking
+        invRecord.lastAssignedSlotId = exam.id;
+        invRecord.lastAssignedDate = currentDate;
+        invRecord.lastAssignedShift = String(currentShift);
+
+        // Update pool
+        availablePool = availablePool.filter(p => p.id !== winner.id);
+        
+        return winner;
+    };
+
+    // Distribute Active Staff
+    const staffPerRoom = Math.floor(activeStaffCount / Math.max(1, roomsToUse.length));
+    const extraStaff = activeStaffCount % Math.max(1, roomsToUse.length);
+
+    for (let r = 0; r < roomsToUse.length; r++) {
+        const room = roomsToUse[r];
+        const count = staffPerRoom + (r < extraStaff ? 1 : 0);
+        for (let i = 0; i < count; i++) {
+            const winner = performSelection(room);
+            if (winner) assignments.push({ exam, classroom: room, invigilator: winner });
+        }
+    }
+
+    // Handle leftover active staff if roomCount was 0 or rounding errors
+    while (assignments.length < activeStaffCount) {
+        const winner = performSelection(null);
+        if (winner) assignments.push({ exam, classroom: roomsToUse[0] || null, invigilator: winner });
+        else break;
+    }
+
+    // Assign Reserved Staff
+    for (let i = 0; i < reservedStaffCount; i++) {
+        const winner = performSelection(null, true);
+        if (winner) assignments.push({ exam, classroom: null as any, invigilator: winner, isReserved: true });
+        else break;
+    }
+
+    // 4. FINAL VERIFICATION: Ensure the count is EXACT
+    if (assignments.length !== (activeStaffCount + reservedStaffCount)) {
+        console.warn(`Manual Allotment Mismatch: Requested ${activeStaffCount + reservedStaffCount}, got ${assignments.length}`);
     }
 
     return { assignments, updatedInvigilators: invigilatorMasterList };

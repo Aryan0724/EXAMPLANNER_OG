@@ -1,0 +1,121 @@
+id,name,department,designation,gender,isAvailable
+ALS001,Dr. Navneet Joshi,Allied Sciences,Associate Professor,Male,true
+SOC001,Dr. Sandeep K. Budhani,Computer Science and Engineering,Associate Professor,Male,true
+ME001,Mr. Jagdish Singh Mehta,Mechanical Engineering,Assistant Professor,Male,true
+ECE001,Dr. S.K. Sunori,Electronics and Communication Engineering,Associate Professor,Male,true
+SOC002,Dr. Himanshu Pant,Computer Science and Engineering,Assistant Professor,Male,true
+MGT001,Dr. Farha Khan,Management,Assistant Professor,Female,true
+ECE002,Mr. Vimal Singh Bisht,Electronics and Communication Engineering,Assistant Professor,Male,true
+ECE003,Mr. Dikendra Kumar Verma,Electronics and Communication Engineering,Assistant Professor,Male,true
+PDP001,Dr. Kavita Ajay Joshi,Department of Personality Development,Associate Professor,Female,true
+SOC003,Mr. Rajendra Singh Bisht,Computer Science and Engineering,Assistant Professor,Male,true
+ECE004,Dr. Saurabh Pargaien,Electronics and Communication Engineering,Assistant Professor,Male,true
+ME002,Mr. Harshit Pandey,Mechanical Engineering,Assistant Professor,Male,true
+ME003,Mr. Devesh Bora,Mechanical Engineering,Assistant Professor,Male,true
+ME004,Mr. Nagendra Singh Gaira,Mechanical Engineering,Assistant Professor,Male,true
+ECE005,Mr. Mohit Pant,Electronics and Communication Engineering,Assistant Professor,Male,true
+PDP002,Dr. Shweta Arora,Department of Personality Development,Associate Professor,Female,true
+SOC004,Dr. Janmejay Pant,Computer Science and Engineering,Assistant Professor,Male,true
+PDP003,Mr. Pawan Agarwal,Department of Personality Development,Assistant Professor,Male,true
+PDP004,Mr. Narendra Bisht,Department of Personality Development,Assistant Professor,Male,true
+PDP005,Mr. Divas Tewari,Department of Personality Development,Assistant Professor,Male,true
+MGT002,Mr. Sandeep Bisht,Management,Assistant Professor,Male,true
+MGT003,Ms. Kavita Khati,Management,Assistant Professor,Female,true
+ALS002,Dr. Madan Mohan Sati,Allied Sciences,Assistant Professor,Male,true
+SOC005,Mr. Govind Singh Jethi,Computer Science and Engineering,Assistant Professor,Male,true
+ECE006,Mr. Abhijit Singh Bhakuni,Electronics and Communication Engineering,Assistant Professor,Male,true
+MGT004,Mr. Ramanuj Tewari,Management,Assistant Professor,Male,true
+MGT005,Mr. Bhavesh Joshi,Management,Assistant Professor,Male,true
+ALS003,Dr. Pushpa Negi,Allied Sciences,Professor,Female,true
+PDP006,Ms. Garima Pant,Department of Personality Development,Assistant Professor,Female,true
+SOC006,Mr. Devendra Singh,Computer Science and Engineering,Assistant Professor,Male,true
+ALS004,Dr. Mehul Manu,Allied Sciences,Assistant Professor,Male,true
+PHR001,Ms. Sonia Pandey,Pharmacy,Assistant Professor,Female,true
+PHR002,Dr. Amrita Pargaien,Pharmacy,Assistant Professor,Female,true
+PHR003,Ms. Shikha Pawar,Pharmacy,Assistant Professor,Female,true
+PHR004,Ms. Neema Bisht,Pharmacy,Assistant Professor,Female,true
+CE001,Mr. Pratul Raj,Civil Engineering,Assistant Professor,Male,true
+PHR005,Mrs. Kanak Pandey,Pharmacy,Assistant Professor,Female,true
+SOC007,Dr. Bhupesh Rawat,Computer Science and Engineering,Associate Professor,Male,true
+ALS005,Dr. Amit Mittal,Allied Sciences,Assistant Professor,Male,true
+ALS006,Dr. Kiran Patni,Allied Sciences,Assistant Professor,Female,true
+MGT006,Dr. Somesh Sharma,Management,Associate Professor,Male,true
+MGT007,Dr. Prakash Garia,Management,Assistant Professor,Male,true
+NUR001,Dr. Neha Bhatt,Nursing,Assistant Professor,Female,true
+NUR002,Mrs. Hansi Negi,Nursing,Professor,Female,true
+NUR003,Ms. Babita Bisht,Nursing,Tutor,Female,true
+SOC008,Dr. Naveen Tiwari,Computer Science and Engineering,Associate Professor,Male,true
+SOC009,Dr. Mukesh Joshi,Computer Science and Engineering,Associate Professor,Male,true
+MGT008,Ms. Isha Tewari,Management,Assistant Professor,Female,true
+PDP007,Mr. Lalit Singh,Department of Personality Development,Associate Professor,Male,true
+MGT009,Dr. Santoshi Sen Gupta,Management,Professor,Female,true
+SOC010,Dr. Ankur Singh Bist,Computer Science and Engineering,Professor,Male,true
+SOC011,Mr. Shashi Kumar Sharma,Computer Science and Engineering,Assistant Professor,Male,true
+ME005,Mr. Chetan Prakash Khurana,Mechanical Engineering,Assistant Professor,Male,true
+PHR006,Dr. Neha Joshi,Pharmacy,Assistant Professor,Female,true
+MGT010,Dr. Nidhi Bhatt Pant,Management,Associate Professor,Female,true
+NUR004,Ms. Chandni Manral,Nursing,Assistant Professor,Female,true
+PHR007,Dr. Sunita Waila Tiwari,Pharmacy,Assistant Professor,Female,true
+PHR008,Mr. Preetam Kumar,Pharmacy,Assistant Professor,Male,true
+PHR009,Ms. Garima Chand,Pharmacy,Assistant Professor,Female,true
+PHR010,Mrs. Namita Joshi,Pharmacy,Assistant Professor,Female,true
+SOC012,Mr. Devesh Pandey,Computer Science and Engineering,Assistant Professor,Male,true
+SOC013,Mr. Rahul Kumar Singh,Computer Science and Engineering,Assistant Professor,Male,true
+SOC014,Ms. Priyanka Jethi,Computer Science and Engineering,Assistant Professor,Female,true
+SOC015,Dr. Jitendra Kumar Chaudhary,Computer Science and Engineering,Associate Professor,Male,true
+ALS007,Dr. Deependra Singh Rawat,Allied Sciences,Assistant Professor,Male,true
+SOC016,Mr. Aviral Awasthi,Computer Science and Engineering,Assistant Professor,Male,true
+PDP008,Ms. Srijana Karnatak,Department of Personality Development,Assistant Professor,Female,true
+MGT011,Dr. Surabhi Saxena,Management,Assistant Professor,Female,true
+ALS008,Dr. Bhagwati Prasad Joshi,Allied Sciences,Associate Professor,Male,true
+SOC017,Mr. Praveen Kumar Joshi,Computer Science and Engineering,Assistant Professor,Male,true
+SOC018,Mrs. Senam Pandey,Computer Science and Engineering,Assistant Professor,Female,true
+PHR011,Ms. Shivali Sagar,Pharmacy,Assistant Professor,Female,true
+PHR012,Mrs. Mamta Joshi,Pharmacy,Assistant Professor,Female,true
+PHR013,Mrs. Jyoti Gwasikoti,Pharmacy,Assistant Professor,Female,true
+PHR014,Ms. Pooja Negi,Pharmacy,Assistant Professor,Female,true
+PHR015,Mrs. Vandana Pandey,Pharmacy,Assistant Professor,Female,true
+SOC019,Mr. Anubhav Bewerwal,Computer Science and Engineering,Assistant Professor,Male,true
+SOC020,Ms. Heera Patwal,Computer Science and Engineering,Assistant Professor,Female,true
+PDP009,Ms. Nidhi Joshi,Department of Personality Development,Assistant Professor,Female,true
+SOC021,Mr. Saurabh Dhanik,Computer Science and Engineering,Assistant Professor,Male,true
+SOC022,Dr. Shilpa Jain,Computer Science and Engineering,Assistant Professor,Female,true
+MGT012,Dr. Asheesh Sah,Management,Associate Professor,Male,true
+PHR016,Ms. Rashmi,Pharmacy,Assistant Professor,Female,true
+PHR017,Ms. Himani Kulyal,Pharmacy,Assistant Professor,Female,true
+PHR018,Dr. Amita Joshi Rana,Pharmacy,Associate Professor,Female,true
+PHR019,Mr. Navneet Tiwari,Pharmacy,Assistant Professor,Male,true
+SOC023,Ms. Kashish Mirza,Computer Science and Engineering,Assistant Professor,Female,true
+PHR020,Dr. Virender Kaur,Pharmacy,Associate Professor,Female,true
+MGT013,Dr. Jayant Gautam,Management,Associate Professor,Male,true
+NUR005,Ms. Shivani Kirola,Nursing,Tutor,Female,true
+SOC024,Mr. Ayush Kapri,Computer Science and Engineering,Assistant Professor,Male,true
+PDP010,Mrs. Maya G Pillai,Department of Personality Development,Assistant Professor,Female,true
+ME006,Dr. Tarun Bangia,Mechanical Engineering,Assistant Professor,Male,true
+ALS009,Mr. Shiva Biswas,Allied Sciences,Assistant Professor,Male,true
+MGT014,Ms. Sangeeta Bafila,Management,Assistant Professor,Female,true
+MGT015,Dr. Manohar Giri,Management,Assistant Professor,Male,true
+SOC025,Mr. Prince Kumar,Computer Science and Engineering,Assistant Professor,Male,true
+SOC026,Mr. Ansh Dhingra,Computer Science and Engineering,Assistant Professor,Male,true
+MGT016,Mr. Hrishabh Pandey,Management,Assistant Professor,Male,true
+SOC027,Ms. Vaishali Dev,Computer Science and Engineering,Lab Assistant,Female,true
+SOC028,Mrs. Divya Rastogi,Computer Science and Engineering,Assistant Professor,Female,true
+NUR006,Ms. Neelam,Nursing,Tutor,Female,true
+SOC029,Mrs. Kalpana Chauhan,Computer Science and Engineering,Assistant Professor,Female,true
+NUR007,Mr. Jaysurya Thapa,Nursing,Tutor,Male,true
+MGT017,Dr. Asheesh Bisht,Management,Associate Professor,Male,true
+SOC030,Ms. Megha Upreti,Computer Science and Engineering,Lab Assistant,Female,true
+MGT018,Dr. Manish Bisht,Management,Professor,Male,true
+CE002,Dr. Ankit Singh Mehra,Civil Engineering,Assistant Professor,Male,true
+CE003,Mr. Naman Tewari,Civil Engineering,Assistant Professor,Male,true
+NUR008,Ms. Pooja Sijwali,Nursing,Tutor,Female,true
+MGT019,Dr. Sanjay Kumar Mishra,Management,Associate Professor,Male,true
+NUR009,Ms. Shivani Kumayan,Nursing,Tutor,Female,true
+SOC031,Mr. Manoj Kaushik,Computer Science and Engineering,Assistant Professor,Male,true
+SOC032,Ms. Deepali Chaudhary,Computer Science and Engineering,Assistant Professor,Female,true
+NUR010,Ms. Jyoti Mishra,Nursing,Tutor,Female,true
+SOC033,Mr. Suraj Chaunal,Computer Science and Engineering,Assistant Professor,Male,true
+SOC034,Mr. Vaibhav Kumar Sharma,Computer Science and Engineering,Lab Assistant,Male,true
+SOC035,Mr. Nishant Koturiya,Computer Science and Engineering,Lab Assistant,Male,true
+SOC036,Mr. Abhishek Tamta,Computer Science and Engineering,Lab Assistant,Male,true
+SOC037,Mr. Parthak Mehra,Computer Science and Engineering,Lab Assistant,Male,true
