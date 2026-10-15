@@ -1,6 +1,6 @@
 
 
-import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat } from './types';
+import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat, BatchRoomAllocation, SessionAllotmentSummary, RoomBatchDistribution } from './types';
 
 function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Student[] {
     return allStudents.filter(s => {
@@ -522,7 +522,7 @@ export function generateManualFacultyAllotment(
 
     // 1. Pick Classrooms based on priority and count
     const sortedRooms = [...classrooms]
-        .filter(room => !exam.unavailableSlots?.some(slot => slot.slotId === exam.id))
+        .filter(room => !room.unavailableSlots?.some(slot => slot.slotId === exam.id))
         .sort((a, b) => {
             const indexA = blockPriority.indexOf(a.building);
             const indexB = blockPriority.indexOf(b.building);
@@ -551,7 +551,7 @@ export function generateManualFacultyAllotment(
         return Math.random() - 0.5;
     });
 
-    const currentShift = exam.manualShiftIndex ?? (exam.id.includes('Shift II') ? 1 : 0);
+    const currentShift = (exam as any).manualShiftIndex ?? (exam.shift ? exam.shift - 1 : (exam.id.includes('Shift II') ? 1 : 0));
     const currentDate = exam.date;
 
     const isJunior = (desig: string) => {
@@ -727,3 +727,239 @@ export function generateManualFacultyAllotment(
 
     return { assignments, updatedInvigilators: invigilatorMasterList };
 }
+
+/**
+ * Generates synthetic student roster from batch student counts.
+ * E.g., B.Tech CSE Sem 3: 120 -> S-25CSE001 to S-25CSE120
+ */
+export function generateStudentsFromBatches(
+    batches: { course: string; department?: string; semester: number | string; count: number }[]
+): Student[] {
+    const students: Student[] = [];
+    let rollCounter = 1;
+
+    batches.forEach(b => {
+        const count = Number(b.count) || 0;
+        if (count <= 0) return;
+
+        // Clean code for roll number prefix
+        const cleanCourse = b.course.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'STU';
+        const sem = Number(b.semester) || 1;
+        const dept = b.department || b.course.split('(')[0].trim() || 'General';
+
+        for (let i = 1; i <= count; i++) {
+            const rollNo = `25${cleanCourse}${String(i).padStart(3, '0')}`;
+            students.push({
+                id: `S-${cleanCourse}-${sem}-${String(i).padStart(3, '0')}`,
+                name: `${b.course} Student ${i}`,
+                rollNo,
+                course: b.course,
+                department: dept,
+                semester: sem,
+                section: ['A', 'B', 'C'][(i - 1) % 3],
+                ineligibilityRecords: [],
+                unavailableSlots: [],
+                seatAssignment: null,
+                isDebarred: false
+            });
+            rollCounter++;
+        }
+    });
+
+    return students;
+}
+
+/**
+ * Extracts room-by-room batch allocation, roll-number ranges, occupancy, and invigilators
+ * for a single exam session.
+ */
+export function extractSessionRoomSummary(
+    sessionKey: string,
+    seatPlan: SeatPlan,
+    invigilatorAssignments: InvigilatorAssignment[],
+    allClassrooms: Classroom[]
+): SessionAllotmentSummary {
+    const [date, time] = sessionKey.split(' ');
+    const hour = parseInt((time || '09:30').split(':')[0]);
+    const shift = hour < 12 ? 'Shift I (Morning)' : 'Shift II (Afternoon)';
+
+    const roomMap = new Map<string, {
+        classroom: Classroom;
+        students: (Student & { exam: ExamSlot })[];
+    }>();
+
+    seatPlan.assignments.forEach(seat => {
+        if (seat.student && seat.classroom) {
+            if (!roomMap.has(seat.classroom.id)) {
+                roomMap.set(seat.classroom.id, {
+                    classroom: seat.classroom,
+                    students: []
+                });
+            }
+            roomMap.get(seat.classroom.id)!.students.push(seat.student);
+        }
+    });
+
+    const rooms: BatchRoomAllocation[] = [];
+    let totalStudents = 0;
+
+    roomMap.forEach(({ classroom, students }) => {
+        totalStudents += students.length;
+
+        const batchMap = new Map<string, {
+            course: string;
+            semester: number;
+            subjectCode: string;
+            subjectName: string;
+            studentCount: number;
+            rollNumbers: string[];
+        }>();
+
+        students.forEach(s => {
+            const key = `${s.course}-${s.semester}-${s.exam.subjectCode}`;
+            if (!batchMap.has(key)) {
+                batchMap.set(key, {
+                    course: s.course,
+                    semester: s.semester,
+                    subjectCode: s.exam.subjectCode,
+                    subjectName: s.exam.subjectName,
+                    studentCount: 0,
+                    rollNumbers: []
+                });
+            }
+            const b = batchMap.get(key)!;
+            b.studentCount++;
+            if (s.rollNo) b.rollNumbers.push(s.rollNo);
+        });
+
+        const batches: RoomBatchDistribution[] = Array.from(batchMap.values()).map(b => {
+            b.rollNumbers.sort((x, y) => x.localeCompare(y, undefined, { numeric: true }));
+            const minRoll = b.rollNumbers[0];
+            const maxRoll = b.rollNumbers[b.rollNumbers.length - 1];
+            const rollNoRange = b.rollNumbers.length > 1 ? `${minRoll} - ${maxRoll}` : (minRoll || '');
+            return {
+                course: b.course,
+                semester: b.semester,
+                subjectCode: b.subjectCode,
+                subjectName: b.subjectName,
+                studentCount: b.studentCount,
+                rollNoRange
+            };
+        });
+
+        const roomInvigilators = invigilatorAssignments
+            .filter(a => a.classroom?.id === classroom.id && !a.isReserved)
+            .map(a => a.invigilator);
+
+        rooms.push({
+            roomId: classroom.id,
+            roomNo: classroom.roomNo,
+            building: classroom.building,
+            capacity: classroom.capacity,
+            allocatedCount: students.length,
+            occupancyPercent: Math.round((students.length / Math.max(1, classroom.capacity)) * 100),
+            batches,
+            invigilators: roomInvigilators
+        });
+    });
+
+    rooms.sort((a, b) => a.roomNo.localeCompare(b.roomNo, undefined, { numeric: true }));
+
+    const reservedInvigilators = invigilatorAssignments
+        .filter(a => a.isReserved)
+        .map(a => a.invigilator);
+
+    return {
+        sessionKey,
+        date: date || '',
+        time: time || '',
+        shift,
+        totalStudents,
+        totalRooms: rooms.length,
+        rooms,
+        reservedInvigilators
+    };
+}
+
+/**
+ * End-to-end Room & Batch Allotment Engine.
+ * Matches student numbers for each batch with classrooms session-by-session,
+ * assigning rooms, desk seats, and invigilators.
+ */
+export function generateFullBatchAllotment(
+    batches: { course: string; department?: string; semester: number | string; count: number }[],
+    classrooms: Classroom[],
+    invigilators: Invigilator[],
+    examSchedule: ExamSlot[],
+    options?: {
+        reservedCount?: number;
+        blockPriority?: string[];
+        excludedBlocks?: string[];
+        excludedRooms?: string[];
+    }
+): {
+    fullAllotment: Record<string, { seatPlan: SeatPlan; invigilatorAssignments: InvigilatorAssignment[] }>;
+    updatedStudents: Student[];
+    updatedInvigilators: Invigilator[];
+    sessionSummaries: Record<string, SessionAllotmentSummary>;
+} {
+    const reservedCount = options?.reservedCount ?? 2;
+    const blockPriority = options?.blockPriority ?? [];
+    const excludedBlocks = options?.excludedBlocks ?? [];
+    const excludedRooms = options?.excludedRooms ?? [];
+
+    // 1. Generate student master list from batch counts
+    let masterStudents = generateStudentsFromBatches(batches);
+    let masterInvigilators = JSON.parse(JSON.stringify(invigilators));
+
+    // Reset assigned duties
+    masterInvigilators.forEach((inv: Invigilator) => {
+        inv.assignedDuties = [];
+        delete inv.lastAssignedSlotId;
+        delete inv.lastAssignedDate;
+        delete inv.lastAssignedShift;
+    });
+
+    // 2. Filter available classrooms
+    const usableClassrooms = classrooms.filter(room =>
+        !excludedBlocks.includes(room.building) &&
+        !excludedRooms.includes(room.id)
+    );
+
+    // 3. Group exams by session (Date + Time)
+    const examSlotsByTime = examSchedule.reduce((acc, exam) => {
+        const key = `${exam.date} ${exam.time}`;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(exam);
+        return acc;
+    }, {} as Record<string, ExamSlot[]>);
+
+    const sortedSessionKeys = Object.keys(examSlotsByTime).sort((a, b) => 
+        new Date(a).getTime() - new Date(b).getTime()
+    );
+
+    const generatedPlans: Record<string, { seatPlan: SeatPlan; invigilatorAssignments: InvigilatorAssignment[] }> = {};
+    const sessionSummaries: Record<string, SessionAllotmentSummary> = {};
+
+    for (const key of sortedSessionKeys) {
+        const concurrentExams = examSlotsByTime[key];
+        if (!concurrentExams || concurrentExams.length === 0) continue;
+
+        const { plan, updatedStudents } = generateSeatPlan(masterStudents, usableClassrooms, concurrentExams, blockPriority);
+        masterStudents = updatedStudents;
+
+        const { assignments, updatedInvigilators } = assignInvigilators(masterInvigilators, plan, concurrentExams[0], reservedCount);
+        masterInvigilators = updatedInvigilators;
+
+        generatedPlans[key] = { seatPlan: plan, invigilatorAssignments: assignments };
+        sessionSummaries[key] = extractSessionRoomSummary(key, plan, assignments, usableClassrooms);
+    }
+
+    return {
+        fullAllotment: generatedPlans,
+        updatedStudents: masterStudents,
+        updatedInvigilators: masterInvigilators,
+        sessionSummaries
+    };
+}
+

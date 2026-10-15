@@ -336,7 +336,7 @@ export default function ManualAllotmentPage() {
                 fullAllotment[sessionKey].invigilatorAssignments.push(asg);
                 
                 // Add mock seat to ensure classroom exists in SeatPlan for legacy reports
-                if (asg.classroom && !fullAllotment[sessionKey].seatPlan.assignments.some((s: any) => s.classroom.id === asg.classroom.id)) {
+                if (asg.classroom && !fullAllotment[sessionKey].seatPlan.assignments.some((s: any) => s.classroom?.id === asg.classroom!.id)) {
                     fullAllotment[sessionKey].seatPlan.assignments.push({
                         classroom: asg.classroom,
                         seatNumber: 1

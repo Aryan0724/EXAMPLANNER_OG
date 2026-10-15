@@ -36,10 +36,10 @@ export default function InvigilatorHistoryPage() {
     Object.values(fullAllotment).forEach(({ invigilatorAssignments, seatPlan }) => {
       invigilatorAssignments.forEach(assignment => {
         if (assignment.invigilator.id === invigilatorId) {
-          const examsInRoom = [...new Set(seatPlan.assignments
-            .filter(sa => sa.classroom.id === assignment.classroom.id && sa.student)
+          const examsInRoom = assignment.classroom ? [...new Set(seatPlan.assignments
+            .filter(sa => sa.classroom?.id === assignment.classroom?.id && sa.student)
             .map(sa => `${sa.student!.exam.subjectName} (${sa.student!.exam.subjectCode})`))
-          ].join(', ');
+          ].join(', ') : 'Reserved / Standby';
 
           duties.push({
             date: assignment.exam.date,

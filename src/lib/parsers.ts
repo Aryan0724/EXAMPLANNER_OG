@@ -97,27 +97,53 @@ export const parsePasteBatches = (text: string): StudentBatchInput[] => {
     for (const line of lines) {
         const trimmed = line.trim();
         // Skip empty lines, separator lines, and header lines
-        if (!trimmed || trimmed.match(/^\|?\s*[-]+\s*\|/) || (trimmed.toLowerCase().includes('course') && trimmed.toLowerCase().includes('total'))) continue;
+        if (!trimmed || trimmed.match(/^\|?\s*[-]+\s*\|/) || (trimmed.toLowerCase().includes('course') && (trimmed.toLowerCase().includes('count') || trimmed.toLowerCase().includes('total')))) continue;
 
-        // Remove outer pipes if present and split
-        const content = trimmed.replace(/^\|/, '').replace(/\|$/, '');
-        const cols = content.split('|').map(c => c.trim());
+        // 1. Check for Key-Value format: "B.Tech CSE Sem 3: 120" or "BTech Sem 1 = 150"
+        const kvMatch = trimmed.match(/^([^:=]+?)(?:\s*[-–]\s*|\s+)?(?:sem(?:ester)?\s*([0-9ivx]+))?\s*[:=]\s*(\d+)/i);
+        if (kvMatch) {
+            const courseRaw = kvMatch[1].trim();
+            const semRaw = kvMatch[2] || '1';
+            const count = parseInt(kvMatch[3]);
+            if (count > 0) {
+                batches.push({
+                    course: courseRaw,
+                    department: courseRaw.split('(')[0].trim(),
+                    semester: romanToNum(semRaw),
+                    count
+                });
+                continue;
+            }
+        }
 
-        if (cols.length >= 4) {
-            // Expected: | Course | Dept/Department | Sem | Count/Total Students |
-            // Example: | B.Com (H) | Department of Commerce | II | 58 |
-            const course = cols[0];
-            let department = cols[1];
+        // 2. Delimited formats: Pipe, Tab, or Comma
+        let cols: string[] = [];
+        if (trimmed.includes('|')) {
+            const content = trimmed.replace(/^\|/, '').replace(/\|$/, '');
+            cols = content.split('|').map(c => c.trim());
+        } else if (trimmed.includes('\t')) {
+            cols = trimmed.split('\t').map(c => c.trim());
+        } else if (trimmed.includes(',')) {
+            cols = trimmed.split(',').map(c => c.trim());
+        }
 
-            // Clean up department name (remove "Department of ")
-            if (department.toLowerCase().startsWith('department of ')) {
-                department = department.substring(14).trim();
+        if (cols.length >= 3) {
+            // Can be: [Course, Dept, Sem, Count] OR [Course, Sem, Count]
+            let course = cols[0];
+            let department = course.split('(')[0].trim();
+            let semester = 1;
+            let count = 0;
+
+            if (cols.length >= 4) {
+                department = cols[1].replace(/^department of /i, '').trim();
+                semester = romanToNum(cols[2]);
+                count = parseInt(cols[3].replace(/\D/g, '')) || 0;
+            } else {
+                semester = romanToNum(cols[1]);
+                count = parseInt(cols[2].replace(/\D/g, '')) || 0;
             }
 
-            const semester = romanToNum(cols[2]);
-            const count = parseInt(cols[3].replace(/\D/g, '')) || 0;
-
-            if (course && department && count > 0) {
+            if (course && count > 0) {
                 batches.push({
                     course,
                     department,

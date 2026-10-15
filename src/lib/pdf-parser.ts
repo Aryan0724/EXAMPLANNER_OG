@@ -14,24 +14,26 @@ export async function parseExamPDF(file: File): Promise<ExamSlot[]> {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         
-        // Group items by their vertical position (Y-coordinate) to rebuild rows
-        const items = textContent.items as any[];
-        const rowsMap = new Map<number, any[]>();
+        const items = (textContent.items as any[]).filter(it => 'transform' in it);
         
-        items.forEach(item => {
-            // Some items might not have transform if they are not text? 
-            // Usually item is TextItem
-            if ('transform' in item) {
-                const y = Math.round(item.transform[5]); // Y coordinate
-                if (!rowsMap.has(y)) rowsMap.set(y, []);
-                rowsMap.get(y)!.push(item);
+        // Group items by vertical position with a 4px tolerance to prevent split lines
+        const rows: { y: number; items: any[] }[] = [];
+        items.sort((a, b) => b.transform[5] - a.transform[5]);
+
+        items.forEach(it => {
+            const y = it.transform[5];
+            const existingRow = rows.find(r => Math.abs(r.y - y) <= 4);
+            if (existingRow) {
+                existingRow.items.push(it);
+            } else {
+                rows.push({ y, items: [it] });
             }
         });
 
-        // Sort rows by Y coordinate (top to bottom) and then sort items in row by X coordinate
-        const sortedYs = Array.from(rowsMap.keys()).sort((a, b) => b - a);
-        sortedYs.forEach(y => {
-            const rowItems = rowsMap.get(y)!.sort((a, b) => a.transform[4] - b.transform[4]);
+        // Sort rows top-to-bottom and items left-to-right
+        rows.sort((a, b) => b.y - a.y);
+        rows.forEach(r => {
+            const rowItems = r.items.sort((a, b) => a.transform[4] - b.transform[4]);
             const rowText = rowItems.map(item => item.str).join(' ').trim();
             
             // Skip headers and noise
@@ -46,6 +48,7 @@ export async function parseExamPDF(file: File): Promise<ExamSlot[]> {
     }
 
     const exams: ExamSlot[] = [];
+    const romanMap: Record<string, number> = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10 };
     
     // Pattern Discovery from University PDF:
     // Date (DD-MM-YYYY) | Day | Time (HH:MM AM - HH:MM PM) | Course | Sem | Subject Name | Code
@@ -67,22 +70,20 @@ export async function parseExamPDF(file: File): Promise<ExamSlot[]> {
         
         // Handle rows that might have merged text
         // Remaining format: Course | Sem | Subject Name | Code
-        // Example: B Sc (H) Maths 1 Professional Communication MAEC101
-        
         const parts = afterTime.split(/\s+/);
         if (parts.length < 3) return; // Need at least Sem, Subject, Code
 
         // Usually the last part is the Code
         const subjectCode = parts[parts.length - 1];
         
-        // Find Semester (Usually a small number like 1, 3, 5)
-        let semIdx = parts.findIndex(p => p.match(/^\d+$/));
+        // Find Semester (numeric or Roman numeral)
+        let semIdx = parts.findIndex(p => p.match(/^(\d+|I|II|III|IV|V|VI|VII|VIII|IX|X)$/i));
         if (semIdx === -1) {
-            // If sem is missing or merged, default to 1
             semIdx = 0; 
         }
 
-        const semester = parseInt(parts[semIdx]) || 1;
+        const semRaw = parts[semIdx].toUpperCase();
+        const semester = romanMap[semRaw] || parseInt(parts[semIdx]) || 1;
         const course = parts.slice(0, semIdx).join(' ') || "Imported Course";
         const subjectName = parts.slice(semIdx + 1, parts.length - 1).join(' ') || "Imported Subject";
 

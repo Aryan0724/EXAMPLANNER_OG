@@ -23,7 +23,7 @@ export interface Student {
   course: string;
   semester: number;
   section: string;
-  group?: 'A' | 'B'; // For subject cycles like Physics/Chemistry
+  group?: 'A' | 'B' | 'All' | string; // For subject cycles or groupings
   ineligibilityRecords: IneligibilityRecord[];
   unavailableSlots: AvailabilitySlot[];
   seatAssignment: SeatAssignment | null; // Persisted seat
@@ -79,7 +79,7 @@ export interface ExamSlot {
   subjectName: string;
   subjectCode: string;
   duration: number; // in minutes
-  group?: 'A' | 'B'; // For group-specific exams
+  group?: 'A' | 'B' | 'All' | string; // For group-specific exams
   shift?: number; // 1, 2, 3, or 4
   type?: 'Theory' | 'Practical';
   mode?: 'Offline' | 'Online';
@@ -103,3 +103,35 @@ export interface InvigilatorAssignment {
   invigilator: Invigilator;
   isReserved?: boolean;
 }
+
+export interface RoomBatchDistribution {
+  course: string;
+  semester: number;
+  subjectCode: string;
+  subjectName: string;
+  studentCount: number;
+  rollNoRange?: string;
+}
+
+export interface BatchRoomAllocation {
+  roomId: string;
+  roomNo: string;
+  building: string;
+  capacity: number;
+  allocatedCount: number;
+  occupancyPercent: number;
+  batches: RoomBatchDistribution[];
+  invigilators: Invigilator[];
+}
+
+export interface SessionAllotmentSummary {
+  sessionKey: string;
+  date: string;
+  time: string;
+  shift: string;
+  totalStudents: number;
+  totalRooms: number;
+  rooms: BatchRoomAllocation[];
+  reservedInvigilators: Invigilator[];
+}
+
