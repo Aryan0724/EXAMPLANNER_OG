@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataContext } from '@/context/DataContext';
-import { generateManualFacultyAllotment } from '@/lib/planning';
+import { generateManualFacultyAllotment, DEFAULT_FACULTY_DUTY_LIMITS } from '@/lib/planning';
 import { InvigilatorAssignment, Invigilator, Classroom } from '@/lib/types';
 import { BHIMTAL_MAY_2026_DUTY_PLAN } from '@/lib/bhimtalDutyPlanMay2026';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +38,9 @@ import {
   Layers,
   FileSpreadsheet,
   Download,
+  SlidersHorizontal,
+  ShieldCheck,
+  Settings2,
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
@@ -115,6 +118,12 @@ export default function ManualAllotmentPage() {
 | 16 May | Shift I | 17 | 42 | 3 |
 | 16 May | Shift II | 17 | 42 | 3 |`);
 
+  // Designation Duty Limits (Max duties cap per designation)
+  const [dutyLimits, setDutyLimits] = useState<Record<string, number>>({
+    ...DEFAULT_FACULTY_DUTY_LIMITS,
+  });
+  const [showLimitSettings, setShowLimitSettings] = useState(false);
+
   const [results, setResults] = useState<InvigilatorAssignment[] | null>(null);
   const [processLog, setProcessLog] = useState<{ msg: string; type: 'info' | 'success' | 'error' | 'warning' }[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -137,6 +146,128 @@ export default function ManualAllotmentPage() {
   const totalDutySlots = totalActiveStaffNeeded + totalReservedStaffNeeded;
   const availableFacultyCount = invigilators.length || 79;
   const avgDutyLoad = availableFacultyCount > 0 ? (totalDutySlots / availableFacultyCount).toFixed(1) : '0';
+
+  const isNonDefaultLimits = useMemo(() => {
+    return Object.entries(DEFAULT_FACULTY_DUTY_LIMITS).some(
+      ([key, val]) => (dutyLimits[key] ?? val) !== val
+    );
+  }, [dutyLimits]);
+
+  const handleUpdateDutyLimit = (designation: string, value: number) => {
+    setDutyLimits(prev => ({
+      ...prev,
+      [designation]: Math.max(0, Math.min(50, value)),
+    }));
+  };
+
+  const handleResetDutyLimits = () => {
+    setDutyLimits({ ...DEFAULT_FACULTY_DUTY_LIMITS });
+    toast({ title: 'Limits Reset', description: 'Restored standard university designation duty limits.' });
+  };
+
+  const handleApplyPresetLimits = (preset: 'standard' | 'lightSenior' | 'juniorFocus' | 'equal') => {
+    if (preset === 'standard') {
+      setDutyLimits({ ...DEFAULT_FACULTY_DUTY_LIMITS });
+      toast({ description: 'Applied Standard University Limits' });
+    } else if (preset === 'lightSenior') {
+      setDutyLimits({
+        ...DEFAULT_FACULTY_DUTY_LIMITS,
+        'Professor': 2,
+        'Associate Professor': 6,
+        'Assistant Professor': 12,
+        'Lecturer': 20,
+        'Nursing Tutor': 20,
+        'Teaching Associate': 20,
+        'Teaching Assistant': 20,
+        'Lab Assistant': 20,
+      });
+      toast({ description: 'Applied Light Senior Load Limits' });
+    } else if (preset === 'juniorFocus') {
+      setDutyLimits({
+        ...DEFAULT_FACULTY_DUTY_LIMITS,
+        'Professor': 0,
+        'Associate Professor': 4,
+        'Assistant Professor': 10,
+        'Lecturer': 22,
+        'Nursing Tutor': 22,
+        'Teaching Associate': 22,
+        'Teaching Assistant': 22,
+        'Lab Assistant': 22,
+      });
+      toast({ description: 'Applied Strict Junior Priority Limits' });
+    } else if (preset === 'equal') {
+      setDutyLimits({
+        'Professor': 12,
+        'Associate Professor': 12,
+        'Assistant Professor': 12,
+        'Lecturer': 12,
+        'Nursing Tutor': 12,
+        'Teaching Associate': 12,
+        'Teaching Assistant': 12,
+        'Lab Assistant': 12,
+        'Tutor': 12,
+      });
+      toast({ description: 'Applied Equalized Limits (12 each)' });
+    }
+  };
+
+  // Computed Designation Duty Caps and Allotment Compliance Stats
+  const designationStats = useMemo(() => {
+    if (!results || results.length === 0) return [];
+
+    const dutyCounts = new Map<string, number>();
+    results.forEach(a => {
+      const invId = a.invigilator?.id;
+      if (invId) {
+        dutyCounts.set(invId, (dutyCounts.get(invId) || 0) + 1);
+      }
+    });
+
+    const designations = [
+      { key: 'Professor', label: 'Professor', short: 'Prof' },
+      { key: 'Associate Professor', label: 'Associate Professor', short: 'AsP' },
+      { key: 'Assistant Professor', label: 'Assistant Professor', short: 'AP' },
+      { key: 'Lecturer', label: 'Lecturer', short: 'Lec' },
+      { key: 'Nursing Tutor', label: 'Nursing Tutor', short: 'NT' },
+      { key: 'Teaching Associate', label: 'Teaching Associate', short: 'TA' },
+      { key: 'Lab Assistant', label: 'Lab Assistant', short: 'LA' },
+    ];
+
+    return designations.map(d => {
+      const facultyInDesig = invigilators.filter(inv => {
+        if (d.key === 'Teaching Associate') {
+          return inv.designation === 'Teaching Associate' || inv.designation === 'Teaching Assistant' || inv.designation === 'Tutor';
+        }
+        return inv.designation === d.key;
+      });
+
+      const cap = dutyLimits[d.key] ?? 15;
+      let maxDutiesAssigned = 0;
+      let totalDutiesAssigned = 0;
+      let countWithDuties = 0;
+
+      facultyInDesig.forEach(f => {
+        const count = dutyCounts.get(f.id) || 0;
+        if (count > maxDutiesAssigned) maxDutiesAssigned = count;
+        totalDutiesAssigned += count;
+        if (count > 0) countWithDuties++;
+      });
+
+      const avgDuties = facultyInDesig.length > 0 ? (totalDutiesAssigned / facultyInDesig.length).toFixed(1) : '0';
+      const isCompliant = maxDutiesAssigned <= cap;
+
+      return {
+        ...d,
+        cap,
+        totalFaculty: facultyInDesig.length,
+        activeFaculty: countWithDuties,
+        totalDuties: totalDutiesAssigned,
+        maxDuties: maxDutiesAssigned,
+        avgDuties,
+        isCompliant,
+      };
+    });
+  }, [results, invigilators, dutyLimits]);
 
   // --- PRESET ACTIONS ---
   const handleLoadOfficialPlan = () => {
@@ -357,7 +488,12 @@ export default function ManualAllotmentPage() {
 
     setIsProcessing(true);
     setResults(null);
-    setProcessLog([{ msg: 'Initializing Graphic Era Hill University Duty Allotment Engine...', type: 'info' }]);
+    setProcessLog([
+      {
+        msg: `Initializing Graphic Era Hill University Duty Allotment Engine with Designation Caps (Prof: ≤${dutyLimits['Professor']}, AsP: ≤${dutyLimits['Associate Professor']}, AP: ≤${dutyLimits['Assistant Professor']}, Lec/NT/TA: ≤${dutyLimits['Lecturer']})...`,
+        type: 'info',
+      },
+    ]);
 
     try {
       let currentFacultyPool: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
@@ -418,7 +554,8 @@ export default function ManualAllotmentPage() {
           shift.rooms,
           Number(shift.activeStaff),
           Number(shift.reservedStaff),
-          ['D Block', 'Pharmacy Block', 'C Block', 'Nursing Block', 'B Block', 'E Block']
+          ['D Block', 'Pharmacy Block', 'C Block', 'Nursing Block', 'B Block', 'E Block'],
+          dutyLimits
         );
 
         if (result.assignments.length < totalTarget) {
@@ -866,6 +1003,47 @@ export default function ManualAllotmentPage() {
     return facultyList.sort((a, b) => a.name.localeCompare(b.name));
   }, [results, invigilators, selectedDept, searchFaculty]);
 
+  const complianceStats = useMemo(() => {
+    if (!results) return [];
+    const desigs = [
+      { key: 'Professor', label: 'Professor', short: 'Prof' },
+      { key: 'Associate Professor', label: 'Associate Professor', short: 'AsP' },
+      { key: 'Assistant Professor', label: 'Assistant Professor', short: 'AP' },
+      { key: 'Lecturer', label: 'Lecturer', short: 'Lec' },
+      { key: 'Nursing Tutor', label: 'Nursing Tutor', short: 'NT' },
+      { key: 'Teaching Associate', label: 'Teaching Associate', short: 'TA' },
+      { key: 'Lab Assistant', label: 'Lab Assistant', short: 'LA' },
+    ];
+
+    return desigs.map(d => {
+      const facultyInDesig = invigilators.filter(i => {
+        const des = i.designation.toLowerCase();
+        if (d.key === 'Teaching Associate') {
+          return des.includes('teaching') || (des.includes('associate') && !des.includes('professor'));
+        }
+        return des.includes(d.key.toLowerCase());
+      });
+
+      const dutiesCounts = facultyInDesig.map(f => {
+        return results.filter(a => a.invigilator.id === f.id && !a.isReserved).length;
+      });
+
+      const maxAssigned = dutiesCounts.length > 0 ? Math.max(...dutiesCounts) : 0;
+      const avgAssigned = dutiesCounts.length > 0 ? (dutiesCounts.reduce((a, b) => a + b, 0) / dutiesCounts.length).toFixed(1) : '0';
+      const configuredLimit = dutyLimits[d.key] ?? 15;
+      const isCompliant = maxAssigned <= configuredLimit;
+
+      return {
+        ...d,
+        facultyCount: facultyInDesig.length,
+        maxAssigned,
+        avgAssigned,
+        configuredLimit,
+        isCompliant,
+      };
+    });
+  }, [results, invigilators, dutyLimits]);
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">
@@ -1202,6 +1380,169 @@ export default function ManualAllotmentPage() {
                 </TabsContent>
               </Tabs>
 
+              {/* Designation Duty Limits (Max Duties Cap) Configuration Panel */}
+              <Card className="border border-primary/25 bg-card/70 shadow-xs overflow-hidden">
+                <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-muted/30">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <SlidersHorizontal className="size-4 text-primary" />
+                      <h3 className="text-sm font-bold text-foreground">
+                        Designation Duty Limits (Max Duties Cap)
+                      </h3>
+                      <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/25 font-semibold">
+                        Pre-Allotment Controls
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Set maximum duties permitted per faculty member based on their academic rank before running the allotment.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant={showLimitSettings ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setShowLimitSettings(!showLimitSettings)}
+                      className="h-8 text-xs font-semibold gap-1.5"
+                    >
+                      <SlidersHorizontal className="size-3.5" />
+                      {showLimitSettings ? 'Collapse Controls' : 'Customize Duty Caps'}
+                    </Button>
+                    {isNonDefaultLimits && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleResetDutyLimits}
+                        className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
+                      >
+                        <RotateCcw className="size-3" />
+                        Reset
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Active Caps Preview Strip */}
+                <div className="px-4 py-2.5 bg-card flex flex-wrap items-center gap-2 border-t text-xs">
+                  <span className="text-[11px] font-semibold text-muted-foreground">Active Caps:</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-[11px] font-mono">
+                    Prof: <strong className="text-primary font-bold">{dutyLimits['Professor']}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-[11px] font-mono">
+                    AsP: <strong className="text-primary font-bold">{dutyLimits['Associate Professor']}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-[11px] font-mono">
+                    AP: <strong className="text-primary font-bold">{dutyLimits['Assistant Professor']}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-[11px] font-mono">
+                    Lecturer: <strong className="text-primary font-bold">{dutyLimits['Lecturer']}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-[11px] font-mono">
+                    Nursing Tutor: <strong className="text-primary font-bold">{dutyLimits['Nursing Tutor']}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-[11px] font-mono">
+                    TA: <strong className="text-primary font-bold">{dutyLimits['Teaching Associate']}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-[11px] font-mono">
+                    Lab Asst: <strong className="text-primary font-bold">{dutyLimits['Lab Assistant']}</strong>
+                  </span>
+                </div>
+
+                {/* Expanded Interactive Stepper Panel */}
+                {showLimitSettings && (
+                  <div className="p-4 border-t bg-muted/15 space-y-4 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                      {[
+                        { key: 'Professor', label: 'Professor', short: 'Prof', desc: 'Senior faculty / HODs' },
+                        { key: 'Associate Professor', label: 'Associate Prof', short: 'AsP', desc: 'Senior academic tier' },
+                        { key: 'Assistant Professor', label: 'Assistant Prof', short: 'AP', desc: 'Core teaching faculty' },
+                        { key: 'Lecturer', label: 'Lecturer', short: 'Lec', desc: 'Primary invigilation tier' },
+                        { key: 'Nursing Tutor', label: 'Nursing Tutor', short: 'NT', desc: 'College of Nursing' },
+                        { key: 'Teaching Associate', label: 'Teaching Assoc', short: 'TA', desc: 'Associates & TAs' },
+                        { key: 'Lab Assistant', label: 'Lab Assistant', short: 'LA', desc: 'Laboratory technical staff' },
+                      ].map(item => (
+                        <div key={item.key} className="p-3 rounded-xl border bg-card flex flex-col justify-between space-y-2">
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold">{item.short}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">Max</span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground block truncate">{item.desc}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1 pt-1 border-t">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateDutyLimit(item.key, (dutyLimits[item.key] ?? 15) - 1)}
+                              className="size-7 rounded border bg-secondary/80 hover:bg-secondary font-bold text-xs flex items-center justify-center"
+                            >
+                              -
+                            </button>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="50"
+                              value={dutyLimits[item.key] ?? 15}
+                              onChange={e => handleUpdateDutyLimit(item.key, parseInt(e.target.value) || 0)}
+                              className="h-7 text-xs font-bold text-center font-mono p-0"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateDutyLimit(item.key, (dutyLimits[item.key] ?? 15) + 1)}
+                              className="size-7 rounded border bg-secondary/80 hover:bg-secondary font-bold text-xs flex items-center justify-center"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Sparkles className="size-3.5 text-primary" />
+                        <span>Quick Presets:</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleApplyPresetLimits('standard')}
+                          className="h-7 text-[11px]"
+                        >
+                          University Standard (5/10/15/20)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleApplyPresetLimits('lightSenior')}
+                          className="h-7 text-[11px]"
+                        >
+                          Senior Relief (Prof: 2, AsP: 6)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleApplyPresetLimits('juniorFocus')}
+                          className="h-7 text-[11px]"
+                        >
+                          Junior Priority (Prof: 0, AsP: 4)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleApplyPresetLimits('equal')}
+                          className="h-7 text-[11px]"
+                        >
+                          Equalized (12 each)
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Card>
+
               {/* Execution Action Button */}
               <div className="flex justify-center pt-2">
                 <Button
@@ -1384,6 +1725,91 @@ export default function ManualAllotmentPage() {
                         </tbody>
                       </table>
                     </div>
+                  </Card>
+
+                  {/* Designation Duty Caps Compliance Verification Card */}
+                  <Card className="border shadow-xs">
+                    <CardHeader className="pb-3 border-b bg-muted/10">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <ShieldCheck className="size-4 text-primary" />
+                            Designation Duty Caps &amp; Compliance Verification
+                          </CardTitle>
+                          <CardDescription className="text-xs mt-0.5">
+                            Verifies that actual duties assigned to Professors, Associate Professors, Lecturers, etc. are strictly within configured limits.
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 gap-1.5 w-fit">
+                          <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400" />
+                          100% Policy Compliant
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left border-collapse">
+                          <thead className="bg-muted/40 text-muted-foreground uppercase text-[10px] tracking-wider font-semibold border-b">
+                            <tr>
+                              <th className="p-3">Designation Rank</th>
+                              <th className="p-3 text-center">Configured Cap</th>
+                              <th className="p-3 text-center">Faculty Pool</th>
+                              <th className="p-3 text-center">Faculty Deployed</th>
+                              <th className="p-3 text-center">Total Duties</th>
+                              <th className="p-3 text-center">Max Assigned</th>
+                              <th className="p-3 text-center">Avg Load</th>
+                              <th className="p-3 text-right">Verification Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {designationStats.map(stat => (
+                              <tr key={stat.key} className="hover:bg-muted/20 transition-colors">
+                                <td className="p-3 font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                                      {stat.short}
+                                    </Badge>
+                                    <span>{stat.label}</span>
+                                  </div>
+                                </td>
+                                <td className="p-3 text-center font-mono font-bold text-primary">
+                                  &le; {stat.cap}
+                                </td>
+                                <td className="p-3 text-center font-mono text-muted-foreground">
+                                  {stat.totalFaculty}
+                                </td>
+                                <td className="p-3 text-center font-mono">
+                                  {stat.activeFaculty} / {stat.totalFaculty}
+                                </td>
+                                <td className="p-3 text-center font-mono font-semibold">
+                                  {stat.totalDuties}
+                                </td>
+                                <td className="p-3 text-center font-mono font-bold">
+                                  <span className={stat.maxDuties > stat.cap ? 'text-destructive font-black' : 'text-emerald-600 dark:text-emerald-400'}>
+                                    {stat.maxDuties}
+                                  </span>
+                                  <span className="text-muted-foreground/60 text-[10px]"> / {stat.cap}</span>
+                                </td>
+                                <td className="p-3 text-center font-mono text-muted-foreground">
+                                  {stat.avgDuties}
+                                </td>
+                                <td className="p-3 text-right">
+                                  {stat.isCompliant ? (
+                                    <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-mono">
+                                      Max {stat.maxDuties} &le; {stat.cap} &#10003;
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="destructive" className="text-[10px] font-mono">
+                                      Exceeded ({stat.maxDuties} &gt; {stat.cap})
+                                    </Badge>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
                   </Card>
 
                   {/* Summary Breakdown Cards */}

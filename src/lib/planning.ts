@@ -532,6 +532,18 @@ export function assignInvigilators(
  * This is used when the user wants to bypass student-based logic and just say
  * "I need X rooms and Y invigilators".
  */
+export const DEFAULT_FACULTY_DUTY_LIMITS: Record<string, number> = {
+    'Professor': 5,
+    'Associate Professor': 10,
+    'Assistant Professor': 15,
+    'Lecturer': 20,
+    'Nursing Tutor': 20,
+    'Teaching Associate': 20,
+    'Teaching Assistant': 20,
+    'Tutor': 20,
+    'Lab Assistant': 20
+};
+
 export function generateManualFacultyAllotment(
     invigilators: Invigilator[],
     classrooms: Classroom[],
@@ -539,7 +551,8 @@ export function generateManualFacultyAllotment(
     roomCount: number,
     activeStaffCount: number,
     reservedStaffCount: number,
-    blockPriority: string[] = []
+    blockPriority: string[] = [],
+    customDutyLimits?: Record<string, number>
 ): { assignments: InvigilatorAssignment[], updatedInvigilators: Invigilator[] } {
     const invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
     const assignments: InvigilatorAssignment[] = [];
@@ -556,16 +569,9 @@ export function generateManualFacultyAllotment(
     };
     const getPriority = (designation: string) => DESIGNATION_PRIORITY[designation] || 10;
     
-    const DUTY_LIMITS: Record<string, number> = { 
-        'Professor': 5, 
-        'Associate Professor': 10, 
-        'Assistant Professor': 15, 
-        'Lecturer': 20,
-        'Nursing Tutor': 20,
-        'Teaching Associate': 20,
-        'Teaching Assistant': 20,
-        'Tutor': 20, 
-        'Lab Assistant': 20 
+    const DUTY_LIMITS: Record<string, number> = {
+        ...DEFAULT_FACULTY_DUTY_LIMITS,
+        ...(customDutyLimits || {})
     };
     const getTotalDuties = (inv: Invigilator) => inv.assignedDuties ? inv.assignedDuties.reduce((sum, duty) => sum + duty.count, 0) : 0;
 
@@ -633,8 +639,13 @@ export function generateManualFacultyAllotment(
     const performSelection = (room: Classroom | null, isReserved: boolean = false) => {
         if (availablePool.length === 0) return null;
 
-        // PASS 1: The "Universal Law" - Strictly NO back-to-back duties and Respect Daily Limits
+        // PASS 1: The "Universal Law" - Strictly Respect Designation Duty Limits, Daily Limits & NO back-to-back duties
         const nonConsecutiveCandidates = availablePool.filter(inv => {
+            // 0. Max Designation Duty Limit Check
+            const limit = DUTY_LIMITS[inv.designation] ?? 15;
+            const currentDuties = getTotalDuties(inv);
+            if (currentDuties >= limit) return false;
+
             // 1. Daily Session Limit Check
             const dutiesToday = inv.assignedDuties?.find(d => d.date === currentDate)?.count || 0;
             const maxSessions = inv.maxDailySessions || (isJunior(inv.designation) ? 2 : 1);
@@ -660,11 +671,15 @@ export function generateManualFacultyAllotment(
         let poolToUse = nonConsecutiveCandidates;
         let isFallback = false;
 
-        // PASS 2: Emergency Fallback - ONLY allow 001 + 01 (Mid + Reg) for Juniors
+        // PASS 2: Emergency Fallback - ONLY allow 001 + 01 (Mid + Reg) for Juniors within limits
         if (poolToUse.length === 0) {
             const juniorCandidates = availablePool.filter(inv => {
                 if (!isJunior(inv.designation)) return false;
                 
+                // Check overall designation limit
+                const limit = DUTY_LIMITS[inv.designation] ?? 20;
+                if (getTotalDuties(inv) >= limit) return false;
+
                 // Still check daily limits
                 const dutiesToday = inv.assignedDuties?.find(d => d.date === currentDate)?.count || 0;
                 if (dutiesToday >= 2) return false;
