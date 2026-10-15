@@ -111,6 +111,21 @@ export function generateSeatPlan(
         studentPools.get(key)!.push(student);
     });
 
+    // If only one subject pool exists in this slot, split into two alternating sub-streams
+    // (Stream A and Stream B) so left and right sides of benches alternate cleanly.
+    if (studentPools.size === 1) {
+        const [singleKey, singleList] = Array.from(studentPools.entries())[0];
+        const oddList: (Student & { exam: ExamSlot })[] = [];
+        const evenList: (Student & { exam: ExamSlot })[] = [];
+        singleList.forEach((s, idx) => {
+            if (idx % 2 === 0) oddList.push(s);
+            else evenList.push(s);
+        });
+        studentPools.clear();
+        studentPools.set(`${singleKey}-A`, oddList);
+        studentPools.set(`${singleKey}-B`, evenList);
+    }
+
     // Sort pools by size (Descending)
     // We want to burn down the largest courses first using the largest rooms
     let sortedPoolKeys = Array.from(studentPools.keys()).sort((a, b) =>
@@ -260,82 +275,65 @@ export function assignInvigilators(
 
     const invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
 
-    const DESIGNATION_PRIORITY: Record<string, number> = {
-        'Lecturer': 1,
-        'Nursing Tutor': 1,
-        'Teaching Associate': 1,
-        'Teaching Assistant': 1,
-        'Assistant Professor': 2,
-        'Associate Professor': 3,
-        'Professor': 4,
-        'Lab Assistant': 5
+    // Proportional target duty weights (higher designation = lesser duties, but non-zero)
+    const TIER_TARGET_WEIGHTS: Record<string, number> = {
+        'Professor': 3,
+        'Associate Professor': 6,
+        'Assistant Professor': 9,
+        'Lecturer': 11,
+        'Nursing Tutor': 11,
+        'Teaching Associate': 11,
+        'Teaching Assistant': 11,
+        'Tutor': 11,
+        'Lab Assistant': 8
     };
 
-    const getPriority = (designation: string) => DESIGNATION_PRIORITY[designation] || 10;
+    const SENIOR_DESIGNATIONS = new Set([
+        'Professor',
+        'Associate Professor'
+    ]);
 
     const DUTY_LIMITS: Record<string, number> = {
-        'Professor': 5,
+        'Professor': 6,
         'Associate Professor': 10,
-        'Assistant Professor': 15,
-        'Lecturer': 20,
-        'Nursing Tutor': 20,
-        'Teaching Associate': 20,
-        'Teaching Assistant': 20,
-        'Tutor': 20,
-        'Lab Assistant': 20
+        'Assistant Professor': 16,
+        'Lecturer': 18,
+        'Nursing Tutor': 18,
+        'Teaching Associate': 18,
+        'Teaching Assistant': 18,
+        'Tutor': 18,
+        'Lab Assistant': 14
     };
 
-    const getTotalDuties = (inv: Invigilator) =>
+    const getTotalDuties = (inv: Invigilator): number =>
         inv.assignedDuties ? inv.assignedDuties.reduce((sum, duty) => sum + duty.count, 0) : 0;
 
-    const isUnderLimit = (inv: Invigilator) => {
-        const currentCount = getTotalDuties(inv);
-        const limit = DUTY_LIMITS[inv.designation] || 10;
-        return currentCount < limit;
+    const getDutiesToday = (inv: Invigilator, date: string): number => {
+        if (!inv.assignedDuties) return 0;
+        const d = inv.assignedDuties.find(entry => entry.date === date);
+        return d ? d.count : 0;
     };
 
-    // Filter available candidates
+    // Filter available candidates not marked unavailable for this exam slot
     let validInvigilators = invigilatorMasterList.filter((i: Invigilator) =>
         i.isAvailable &&
-        i.unavailableSlots && !i.unavailableSlots.some(slot => slot.slotId === exam.id) &&
-        isUnderLimit(i)
+        (!i.unavailableSlots || !i.unavailableSlots.some(slot => slot.slotId === exam.id)) &&
+        getTotalDuties(i) < (DUTY_LIMITS[i.designation] || 16)
     );
 
-    // Fallback if short on staff
-    if (validInvigilators.length < 10) {
+    // Fallback if staffing is tight
+    if (validInvigilators.length < 8) {
         validInvigilators = invigilatorMasterList.filter((i: Invigilator) =>
             i.isAvailable &&
-            i.unavailableSlots && !i.unavailableSlots.some(slot => slot.slotId === exam.id)
+            (!i.unavailableSlots || !i.unavailableSlots.some(slot => slot.slotId === exam.id))
         );
     }
 
-    // Split into categories based on strict priority
-    // Priority 1: Lec, NT, TA
-    // Priority 2: AP
-    // Priority 3: AsP
-    // Priority 4: Others
-    
-    validInvigilators.sort((a, b) => {
-        const pA = getPriority(a.designation);
-        const pB = getPriority(b.designation);
-        if (pA !== pB) return pA - pB;
-        
-        // Secondary: Load balance (those with fewer duties first)
-        const dA = getTotalDuties(a);
-        const dB = getTotalDuties(b);
-        if (dA !== dB) return dA - dB;
-        
-        return Math.random() - 0.5;
-    });
-
-    let availablePool = [...validInvigilators];
-
-    // The availablePool is already sorted by strict priority.
-
-
+    const availablePool = [...validInvigilators];
     const assignments: InvigilatorAssignment[] = [];
+    const assignedInSession = new Set<string>();
 
-    // Derive Classrooms and Student Counts from SeatPlan
+    // Derive active Classrooms and Student Counts from SeatPlan
     const roomStudentCounts = new Map<string, number>();
     const classroomMap = new Map<string, Classroom>();
 
@@ -351,127 +349,178 @@ export function assignInvigilators(
 
     const classroomsInUse = Array.from(classroomMap.values());
 
+    // Clean department string helper
+    const cleanDept = (s: string) => s ? s.toLowerCase().replace(/department of|school of/g, '').trim() : '';
+    const examDeptClean = cleanDept(exam.department);
+
+    // Scoring function that strictly guarantees fair division of labor:
+    const scoreCandidate = (
+        inv: Invigilator,
+        role: 'SENIOR' | 'CO_INVIGILATOR' | 'RESERVE',
+        roomAssigned: Invigilator[]
+    ): number => {
+        const total = getTotalDuties(inv);
+        const today = getDutiesToday(inv, exam.date);
+        const target = TIER_TARGET_WEIGHTS[inv.designation] || 9;
+
+        // 1. FATIGUE FACTOR: 0 duties today strongly preferred over 1 duty today
+        let score = today * 100000;
+
+        // 2. EQUAL DIVISION OF LABOUR (Primary Sort within pool):
+        // Total duties * 10000 guarantees someone with k duties ALWAYS beats someone with k+1 duties!
+        score += total * 10000;
+
+        // 3. PROPORTIONAL LOAD RATIO:
+        // Spreads duties according to rank-based target weights
+        score += (total / target) * 1000;
+
+        // 4. DEPARTMENT INTEGRITY / CONFLICT OF INTEREST:
+        // Faculty should not invigilate rooms where their own department core exam is taking place
+        if (examDeptClean && cleanDept(inv.department) === examDeptClean) {
+            score += 2500;
+        }
+
+        // 5. GENDER DIVERSITY:
+        // Encourage male + female pairing in every room
+        if (roomAssigned.length > 0) {
+            const existingGenders = new Set(roomAssigned.map(r => r.gender));
+            if (!existingGenders.has(inv.gender)) {
+                score -= 400;
+            }
+        }
+
+        // 6. Tie-breaker jitter
+        score += ((inv.id.charCodeAt(inv.id.length - 1) || 0) % 11) * 3 + Math.random() * 2;
+
+        return score;
+    };
+
+    // Helper to select and pop the best candidate from a candidate list
+    const selectBestCandidate = (
+        candidateList: Invigilator[],
+        role: 'SENIOR' | 'CO_INVIGILATOR' | 'RESERVE',
+        roomAssigned: Invigilator[]
+    ): Invigilator | null => {
+        const filtered = candidateList.filter(inv => !assignedInSession.has(inv.id));
+        if (filtered.length === 0) return null;
+
+        const scored = filtered.map(inv => ({
+            inv,
+            score: scoreCandidate(inv, role, roomAssigned)
+        }));
+
+        scored.sort((a, b) => a.score - b.score);
+        return scored[0].inv;
+    };
+
+    // Staff each active room
     for (const room of classroomsInUse) {
         const studentCount = roomStudentCounts.get(room.id) || 0;
-        let requiredInvigilators = 1;
-        if (studentCount < 20) {
+        if (studentCount <= 0) continue;
+
+        // Standard rooms (up to 70 students): 2 invigilators (Senior + Junior)
+        // Large examination halls (> 70 students, like D103/D104 with 120 seats): 3 invigilators
+        let requiredInvigilators = 2;
+        if (studentCount < 18) {
             requiredInvigilators = 1;
-        } else if (studentCount < 60) {
-            requiredInvigilators = 2;
-        } else if (studentCount < 90) {
+        } else if (studentCount > 70) {
             requiredInvigilators = 3;
-        } else if (studentCount < 120) {
-            requiredInvigilators = 4;
-        } else {
-            requiredInvigilators = Math.ceil(studentCount / 30); // Fallback for very large halls
         }
 
         const sessionRoomAssignments: Invigilator[] = [];
 
-        for (let i = 0; i < requiredInvigilators; i++) {
-            // Check if we already have a Lab Assistant in this room
-            const hasLabAssistant = sessionRoomAssignments.some(inv => inv.designation === 'Lab Assistant');
+        for (let pos = 0; pos < requiredInvigilators; pos++) {
+            let chosen: Invigilator | null = null;
 
-            // Filter candidates not already assigned in this slot
-            const candidates = availablePool.filter(inv =>
-                !assignments.some(a => a.invigilator.id === inv.id) &&
-                !sessionRoomAssignments.some(sra => sra.id === inv.id) &&
-                !(hasLabAssistant && inv.designation === 'Lab Assistant') // Strict Rule: Only 1 Lab Assistant
-            );
+            if (pos === 0) {
+                // POSITION 1: Room Senior / Lead Invigilator
+                // Try from Professors / Associate Professors first
+                const seniorCandidates = availablePool.filter(inv =>
+                    SENIOR_DESIGNATIONS.has(inv.designation) && !assignedInSession.has(inv.id)
+                );
 
-            if (candidates.length === 0) break;
-
-            const scoredCandidates = candidates.map(inv => {
-                const currentDuties = getTotalDuties(inv);
-                const limit = DUTY_LIMITS[inv.designation] || 10;
-                const priority = getPriority(inv.designation);
-
-                // 1. Priority score (Weighting priority extremely high)
-                let score = priority * 100000;
-
-                // 2. Load Balance score
-                const loadRatio = (currentDuties) / limit;
-                score += loadRatio * 10000;
-
-                // 3. Gender Diversity Priority
-                if (sessionRoomAssignments.length > 0) {
-                    const existingGenders = new Set(sessionRoomAssignments.map(r => r.gender));
-                    if (!existingGenders.has(inv.gender)) {
-                        score -= 5000; 
-                    }
+                if (seniorCandidates.length > 0) {
+                    chosen = selectBestCandidate(seniorCandidates, 'SENIOR', sessionRoomAssignments);
                 }
 
-                score += Math.random() * 10; // Jitter
+                // Fallback if senior pool exhausted: pick lowest-duty Assistant Professor
+                if (!chosen) {
+                    const fallbackCandidates = availablePool.filter(inv => !assignedInSession.has(inv.id));
+                    chosen = selectBestCandidate(fallbackCandidates, 'SENIOR', sessionRoomAssignments);
+                }
+            } else {
+                // POSITION 2 & 3: Co-Invigilators
+                // Filter out a second Lab Assistant if one is already in this room
+                const hasLabAssistant = sessionRoomAssignments.some(inv => inv.designation === 'Lab Assistant');
+                const coInvigilatorCandidates = availablePool.filter(inv =>
+                    !assignedInSession.has(inv.id) &&
+                    !(hasLabAssistant && inv.designation === 'Lab Assistant')
+                );
 
-                return { inv, score };
-            });
+                chosen = selectBestCandidate(coInvigilatorCandidates, 'CO_INVIGILATOR', sessionRoomAssignments);
+            }
 
-            scoredCandidates.sort((a, b) => a.score - b.score);
-            const winner = scoredCandidates[0].inv;
+            if (!chosen) break;
 
-            sessionRoomAssignments.push(winner);
+            sessionRoomAssignments.push(chosen);
+            assignedInSession.add(chosen.id);
+
             assignments.push({
                 exam,
                 classroom: room,
-                invigilator: winner,
+                invigilator: chosen,
             });
 
-            // Update state for loop consistency
-            const invRecord = invigilatorMasterList.find(im => im.id === winner.id);
+            // Update master record for atomic duty count tracking
+            const invRecord = invigilatorMasterList.find(im => im.id === chosen!.id);
             if (invRecord) {
                 let dutyRecord = invRecord.assignedDuties.find(d => d.date === exam.date);
                 if (dutyRecord) dutyRecord.count++;
                 else invRecord.assignedDuties.push({ date: exam.date, count: 1 });
+
+                invRecord.lastAssignedSlotId = exam.id;
+                invRecord.lastAssignedDate = exam.date;
+                invRecord.lastAssignedShift = String(exam.shift || exam.time);
             }
 
-            const poolIdx = availablePool.findIndex(p => p.id === winner.id);
-            if (poolIdx !== -1) availablePool[poolIdx] = JSON.parse(JSON.stringify(invRecord));
+            // Sync available pool copy
+            const poolIdx = availablePool.findIndex(p => p.id === chosen!.id);
+            if (poolIdx !== -1 && invRecord) {
+                availablePool[poolIdx] = JSON.parse(JSON.stringify(invRecord));
+            }
         }
     }
 
-    // --- RESERVED INVIGILATORS ALLOCATION ---
+    // RESERVED / STANDBY INVIGILATORS ALLOCATION
     if (reservedCount > 0) {
         for (let i = 0; i < reservedCount; i++) {
-            // Find best remaining candidates
-            const candidates = availablePool.filter(inv =>
-                !assignments.some(a => a.invigilator.id === inv.id)
-            );
+            const reserveCandidates = availablePool.filter(inv => !assignedInSession.has(inv.id));
+            const winner = selectBestCandidate(reserveCandidates, 'RESERVE', []);
+            if (!winner) break;
 
-            if (candidates.length === 0) break;
-
-            const scoredCandidates = candidates.map(inv => {
-                const priority = getPriority(inv.designation);
-                let score = priority * 100000;
-                
-                const currentDuties = getTotalDuties(inv);
-                const limit = DUTY_LIMITS[inv.designation] || 10;
-                const loadRatio = (currentDuties) / limit;
-                score += loadRatio * 10000;
-
-                score += Math.random() * 50; // Jitter
-                return { inv, score };
-            });
-
-            scoredCandidates.sort((a, b) => a.score - b.score);
-            const winner = scoredCandidates[0].inv;
-
+            assignedInSession.add(winner.id);
             assignments.push({
                 exam,
-                classroom: null, // Reserved staff don't have a specific room
+                classroom: null, // Reserved / Standby
                 invigilator: winner,
                 isReserved: true
             });
 
-            // Update state
             const invRecord = invigilatorMasterList.find(im => im.id === winner.id);
             if (invRecord) {
                 let dutyRecord = invRecord.assignedDuties.find(d => d.date === exam.date);
                 if (dutyRecord) dutyRecord.count++;
                 else invRecord.assignedDuties.push({ date: exam.date, count: 1 });
+
+                invRecord.lastAssignedSlotId = exam.id;
+                invRecord.lastAssignedDate = exam.date;
+                invRecord.lastAssignedShift = String(exam.shift || exam.time);
             }
 
             const poolIdx = availablePool.findIndex(p => p.id === winner.id);
-            if (poolIdx !== -1) availablePool[poolIdx] = JSON.parse(JSON.stringify(invRecord));
+            if (poolIdx !== -1 && invRecord) {
+                availablePool[poolIdx] = JSON.parse(JSON.stringify(invRecord));
+            }
         }
     }
 
