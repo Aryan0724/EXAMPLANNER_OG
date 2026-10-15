@@ -247,182 +247,304 @@ export function DashboardClient() {
 
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-primary to-purple-700 p-8 text-white shadow-2xl">
-                <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
-                <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl"></div>
-                
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                    <div className="space-y-4 max-w-2xl">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider">
-                            <Sparkles className="h-3 w-3" /> System Ready
+        <div className="space-y-8 max-w-7xl mx-auto pb-12 animate-in fade-in duration-500">
+            {/* Header / Institutional Banner */}
+            <div className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 md:p-8 shadow-xs relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="space-y-2 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary">
+                            <span className="size-2 rounded-full bg-primary animate-pulse" />
+                            GEHU Bhimtal Examination Division
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Smart Exam Planner</h1>
-                        <p className="text-lg text-indigo-100/90 font-medium leading-relaxed">
-                            Initialize your entire examination schedule, student batches, and invigilation roles in minutes using our AI-powered setup wizard.
+                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
+                            Examination Command Center
+                        </h1>
+                        <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+                            Centralized platform for multi-shift faculty duty allotment, student seating plans, and official university examination reporting.
                         </p>
-                        <div className="flex flex-wrap gap-4 pt-4">
-                            <Button 
-                                size="lg" 
-                                onClick={() => setIsCustomMockDialogOpen(true)}
-                                className="bg-white text-primary hover:bg-indigo-50 font-bold px-8 h-14 rounded-2xl shadow-xl shadow-black/20 group"
-                            >
-                                <Sparkles className="mr-2 h-5 w-5 text-primary group-hover:rotate-12 transition-transform" />
-                                Launch Setup Wizard
-                                <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                            </Button>
-                            <Button 
-                                size="lg" 
-                                variant="outline" 
-                                onClick={() => setIsImportDialogOpen(true)}
-                                className="bg-white/10 border-white/20 hover:bg-white/20 text-white font-bold h-14 rounded-2xl backdrop-blur-sm"
-                            >
-                                <FileUp className="mr-2 h-5 w-5" />
-                                Bulk Import
-                            </Button>
-                        </div>
                     </div>
-                    <div className="hidden lg:block">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-indigo-400 blur-2xl opacity-20 animate-pulse"></div>
-                            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl relative z-10">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                                        <p className="text-[10px] text-indigo-200 font-bold uppercase">Accuracy</p>
-                                        <p className="text-2xl font-bold">99.8%</p>
-                                    </div>
-                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                                        <p className="text-[10px] text-indigo-200 font-bold uppercase">Setup Time</p>
-                                        <p className="text-2xl font-bold">&lt; 3m</p>
-                                    </div>
-                                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10 col-span-2">
-                                        <div className="flex justify-between items-end">
-                                            <div>
-                                                <p className="text-[10px] text-indigo-200 font-bold uppercase">Active Engine</p>
-                                                <p className="text-sm font-bold">PDF V4.0 Parser</p>
-                                            </div>
-                                            <div className="flex gap-1">
-                                                <div className="h-1 w-4 bg-white/20 rounded-full"></div>
-                                                <div className="h-1 w-4 bg-white/60 rounded-full"></div>
-                                                <div className="h-1 w-4 bg-white/20 rounded-full"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+
+                    <div className="flex flex-wrap md:flex-col items-start md:items-end gap-2.5 shrink-0">
+                        <div className="px-3 py-1.5 rounded-lg bg-secondary/80 border text-xs flex items-center gap-2">
+                            <span className="text-muted-foreground font-medium">Session:</span>
+                            <span className="font-bold text-foreground">End Term (Even Sem) May 2026</span>
+                        </div>
+                        <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+                            <span className="size-2 rounded-full bg-emerald-500" />
+                            <span className="font-semibold">Faculty Pool: {invigilators.length} Active</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Metric Statistics Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {stats.map((stat) => (
-                    <Card key={stat.title}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                            <stat.icon className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stat.value}</div>
-                            <Link href={stat.href} className="text-xs text-muted-foreground flex items-center gap-1 hover:underline">
-                                View all <ArrowRight className="h-3 w-3" />
-                            </Link>
-                        </CardContent>
-                    </Card>
+                    <Link
+                        key={stat.title}
+                        href={stat.href}
+                        className="group p-5 rounded-xl border bg-card/80 hover:bg-card hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between"
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                {stat.title}
+                            </span>
+                            <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                <stat.icon className="size-4" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-baseline justify-between">
+                            <span className="text-3xl font-extrabold text-foreground tracking-tight">
+                                {stat.value}
+                            </span>
+                            <span className="text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                View <ArrowRight className="size-3" />
+                            </span>
+                        </div>
+                    </Link>
                 ))}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Core Actions</CardTitle>
-                        <CardDescription>Manage your data and generate examination plans.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex flex-col gap-4 p-4 rounded-xl bg-secondary/20 border border-secondary shadow-inner">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <h4 className="text-sm font-semibold">Reserved Staff Per Session</h4>
-                                    <p className="text-xs text-muted-foreground italic">Standby staff for emergency faculty absences</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <input 
-                                        type="number" 
-                                        value={reservedCount}
-                                        onChange={(e) => setReservedCount(parseInt(e.target.value) || 0)}
-                                        className="w-16 px-2 py-1 bg-background border border-input rounded-md text-sm text-center font-bold focus:ring-2 focus:ring-primary/20 outline-none"
-                                        min="0"
-                                        max="20"
-                                    />
-                                    <div className="flex flex-col">
-                                        <button onClick={() => setReservedCount(prev => Math.min(20, prev + 1))} className="text-[10px] hover:text-primary">▲</button>
-                                        <button onClick={() => setReservedCount(prev => Math.max(0, prev - 1))} className="text-[10px] hover:text-primary">▼</button>
-                                    </div>
-                                </div>
+            {/* Primary Operations Hub */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Pillar 1: Faculty Shift Allotment */}
+                <Card className="border-primary/25 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                                Day & Shift Duty Engine
                             </div>
-                            <Button className="w-full bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-700 shadow-lg shadow-indigo-500/20 py-6 text-lg font-bold" onClick={handleGenerateAll} disabled={isGenerating || examSchedule.length === 0}>
-                                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                Generate Full Allotment
-                            </Button>
-                            <Button variant="outline" onClick={() => setIsPriorityDialogOpen(true)} disabled={classrooms.length === 0}>
-                                <Building className="mr-2 h-4 w-4" />
-                                Configure Rooms
-                            </Button>
+                            <span className="text-xs text-muted-foreground font-mono">Official Format</span>
                         </div>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                            <Button className="w-full" variant="outline" onClick={() => setIsImportDialogOpen(true)}>
-                                <FileUp className="mr-2 h-4 w-4" />
-                                Import CSV
+                        <CardTitle className="text-xl font-bold mt-2">Faculty Shift Allotment</CardTitle>
+                        <CardDescription className="text-xs leading-relaxed">
+                            Specify faculty counts needed per day and shift. The engine assigns duties fairly across the faculty pool (prioritizing junior staff and preventing consecutive shifts) and outputs the official university Duty Chart.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-2">
+                        <div className="p-3.5 rounded-xl bg-secondary/50 border text-xs space-y-2">
+                            <div className="flex justify-between items-center text-muted-foreground">
+                                <span>Active Invigilator Pool:</span>
+                                <span className="font-bold text-foreground">{invigilators.length} Members</span>
+                            </div>
+                            <div className="flex justify-between items-center text-muted-foreground">
+                                <span>Official Template:</span>
+                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">GEHU Bhimtal Duty Chart (.xlsx)</span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <Button
+                                onClick={() => router.push('/manual-allotment')}
+                                className="flex-1 h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-xs gap-2"
+                            >
+                                <UserCheck className="size-4" />
+                                Open Faculty Allotment
                             </Button>
-                            <Button className="w-full h-10 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200" variant="outline" onClick={() => setIsCustomMockDialogOpen(true)}>
-                                <Sparkles className="mr-2 h-4 w-4" />
-                                Setup Wizard
+                            <Button
+                                variant="outline"
+                                onClick={() => router.push('/manual-allotment')}
+                                className="h-11 font-medium gap-2 border-primary/20 hover:bg-primary/5"
+                            >
+                                Configure Shifts
                             </Button>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button className="w-full" variant="destructive">
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Clear All Data
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This action cannot be undone. This will permanently delete all student, classroom, invigilator, and schedule data from the application.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleClearAllData}>Yes, clear all data</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Report Generation</CardTitle>
-                        <CardDescription>Export detailed reports from generated allotment data.</CardDescription>
+
+                {/* Pillar 2: Student Seating & Room Allotment */}
+                <Card className="border shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
+                                Automated Seating
+                            </div>
+                            <span className="text-xs text-muted-foreground font-mono">Bench Grid</span>
+                        </div>
+                        <CardTitle className="text-xl font-bold mt-2">Student Seating & Room Plan</CardTitle>
+                        <CardDescription className="text-xs leading-relaxed">
+                            Generate automated seating arrangements for students across examination rooms, applying subject interleaving, capacity optimization, and room block priority rules.
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-1 gap-4">
-                        <Button onClick={handleExportMasterReport} disabled={!fullAllotment}>
-                            <FileDown className="mr-2 h-4 w-4" />
-                            Generate Master Report (Excel)
-                        </Button>
-                        <Button onClick={handleExportDutyRoster} disabled={!fullAllotment}>
-                            <FileDown className="mr-2 h-4 w-4" />
-                            Generate Duty Roster (Excel)
-                        </Button>
-                        <Button variant="secondary" onClick={handleExportSessionRoster} disabled={!fullAllotment}>
-                            <FileDown className="mr-2 h-4 w-4" />
-                            Generate Session-wise Roster (Photo Format)
-                        </Button>
+                    <CardContent className="space-y-4 pt-2">
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 border text-xs">
+                            <div className="space-y-0.5">
+                                <span className="font-semibold text-foreground">Standby Staff / Session</span>
+                                <p className="text-[11px] text-muted-foreground">Emergency reserve invigilators</p>
+                            </div>
+                            <div className="flex items-center gap-2 bg-background border px-2 py-1 rounded-lg">
+                                <button
+                                    onClick={() => setReservedCount(prev => Math.max(0, prev - 1))}
+                                    className="text-xs font-bold px-1 hover:text-primary"
+                                    aria-label="Decrease reserved staff"
+                                >
+                                    -
+                                </button>
+                                <span className="font-mono font-bold px-1.5 text-sm">{reservedCount}</span>
+                                <button
+                                    onClick={() => setReservedCount(prev => Math.min(20, prev + 1))}
+                                    className="text-xs font-bold px-1 hover:text-primary"
+                                    aria-label="Increase reserved staff"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <Button
+                                onClick={handleGenerateAll}
+                                disabled={isGenerating || examSchedule.length === 0}
+                                className="flex-1 h-11 font-semibold gap-2 shadow-xs"
+                            >
+                                {isGenerating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                                {isGenerating ? 'Generating...' : 'Run Seating Engine'}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => router.push('/allotment')}
+                                className="h-11 font-medium gap-2"
+                            >
+                                View Seating Grid
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
 
+            {/* Reports & Official Exports Section */}
+            <Card className="border shadow-xs">
+                <CardHeader className="pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <CardTitle className="text-lg font-bold">University Examination Reports</CardTitle>
+                            <CardDescription className="text-xs">
+                                Download official Excel and photo-format reports tailored for GEHU examination administration.
+                            </CardDescription>
+                        </div>
+                        {fullAllotment ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                <span className="size-1.5 rounded-full bg-emerald-500" />
+                                Allotment Ready for Export
+                            </span>
+                        ) : (
+                            <span className="text-xs text-muted-foreground italic">
+                                Run allotment to export reports
+                            </span>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={handleExportMasterReport}
+                            disabled={!fullAllotment}
+                            className="h-12 justify-start px-4 text-xs font-semibold hover:border-primary/50 transition-colors"
+                        >
+                            <FileDown className="mr-2.5 size-4 text-primary" />
+                            <div className="text-left">
+                                <div className="font-semibold">Master Seating Report</div>
+                                <div className="text-[10px] text-muted-foreground font-normal">Session-wise Excel</div>
+                            </div>
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            onClick={handleExportDutyRoster}
+                            disabled={!fullAllotment}
+                            className="h-12 justify-start px-4 text-xs font-semibold hover:border-primary/50 transition-colors"
+                        >
+                            <FileDown className="mr-2.5 size-4 text-primary" />
+                            <div className="text-left">
+                                <div className="font-semibold">Invigilator Duty Roster</div>
+                                <div className="text-[10px] text-muted-foreground font-normal">Department summary</div>
+                            </div>
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            onClick={handleExportSessionRoster}
+                            disabled={!fullAllotment}
+                            className="h-12 justify-start px-4 text-xs font-semibold hover:border-primary/50 transition-colors"
+                        >
+                            <FileDown className="mr-2.5 size-4 text-primary" />
+                            <div className="text-left">
+                                <div className="font-semibold">Session Roster (Photo Format)</div>
+                                <div className="text-[10px] text-muted-foreground font-normal">Classroom sheets</div>
+                            </div>
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Decluttered System Tools & Settings Bar */}
+            <div className="p-4 rounded-xl border bg-muted/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                    <Database className="size-4 text-primary" />
+                    <span>Database & Environment Tools:</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsPriorityDialogOpen(true)}
+                        disabled={classrooms.length === 0}
+                        className="h-8 text-xs font-medium gap-1.5"
+                    >
+                        <Building className="size-3.5" />
+                        Room Priorities
+                    </Button>
+
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsImportDialogOpen(true)}
+                        className="h-8 text-xs font-medium gap-1.5"
+                    >
+                        <FileUp className="size-3.5" />
+                        Bulk CSV Import
+                    </Button>
+
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsCustomMockDialogOpen(true)}
+                        className="h-8 text-xs font-medium gap-1.5 text-primary border-primary/20 hover:bg-primary/5"
+                    >
+                        <Sparkles className="size-3.5" />
+                        Setup Wizard
+                    </Button>
+
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive gap-1.5">
+                                <Trash2 className="size-3.5" />
+                                Clear Data
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Clear all local data?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will reset all students, classrooms, invigilators, and schedule data from the current browser session.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleClearAllData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Yes, Clear All
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            </div>
+
+            {/* Dialogs */}
             <BlockPriorityDialog
                 isOpen={isPriorityDialogOpen}
                 onClose={() => setIsPriorityDialogOpen(false)}
