@@ -132,6 +132,11 @@ export default function ManualAllotmentPage() {
   const [searchFaculty, setSearchFaculty] = useState('');
   const [selectedDept, setSelectedDept] = useState('ALL');
 
+  // View mode for results: 'matrix' (Duty Chart) or 'classroom' (Classroom Allotment Sheet)
+  const [resultsViewMode, setResultsViewMode] = useState<'matrix' | 'classroom'>('matrix');
+  // Selected session for classroom allotment preview
+  const [selectedSessionKey, setSelectedSessionKey] = useState<string>('');
+
   // Computed summary metrics
   const totalDaysCount = days.length;
   const totalShiftsCount = days.reduce((acc, d) => acc + d.shifts.length, 0);
@@ -539,12 +544,20 @@ export default function ManualAllotmentPage() {
         );
 
         const examObj = baseExam
-          ? { ...baseExam, id: `${baseExam.id}-${isMid ? 'Mid' : 'Reg'}`, manualShiftIndex: shift.shiftIndex }
+          ? {
+              ...baseExam,
+              id: `${baseExam.id}-${isMid ? 'Mid' : 'Reg'}`,
+              manualShiftIndex: shift.shiftIndex,
+              shiftName: shift.name,
+              timeRange: shift.timeRange,
+            }
           : ({
               id: `MAN-${fullDate}-${shift.name.replace(/\s+/g, '-')}-${isMid ? 'Mid' : 'Reg'}`,
               date: fullDate,
               time: shift.time || (shift.shiftIndex === 0 ? '09:30' : '13:30'),
               manualShiftIndex: shift.shiftIndex,
+              shiftName: shift.name,
+              timeRange: shift.timeRange,
             } as any);
 
         const result = generateManualFacultyAllotment(
@@ -554,7 +567,7 @@ export default function ManualAllotmentPage() {
           shift.rooms,
           Number(shift.activeStaff),
           Number(shift.reservedStaff),
-          ['D Block', 'Pharmacy Block', 'C Block', 'Nursing Block', 'B Block', 'E Block'],
+          ['Academic Block A', 'Block A', 'Academic Block C', 'Block C', 'Academic Block D', 'Block D', 'Academic Block E', 'Block E', 'Pharmacy Block', 'Nursing Block'],
           dutyLimits
         );
 
@@ -903,6 +916,358 @@ export default function ManualAllotmentPage() {
     }
   };
 
+  // --- OFFICIAL CLASSROOM ALLOTMENT EXCEL GENERATOR (Matches Official Template) ---
+  const formatBuildingName = (building: string | undefined): string => {
+    if (!building) return 'Block';
+    const cleaned = building.replace(/Academic\s+/i, '').trim();
+    if (/^[A-Za-z]\s+Block$/i.test(cleaned)) {
+      return `Block ${cleaned.charAt(0).toUpperCase()}`;
+    }
+    return cleaned;
+  };
+
+  const formatDateToDDMMYYYY = (isoDate: string): string => {
+    try {
+      const parts = isoDate.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      const d = new Date(isoDate);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return isoDate;
+    }
+  };
+
+  const formatTiming = (timeRange?: string, time?: string): string => {
+    if (!timeRange) return time ? `Timing ${time}` : 'Timing 9:30 AM to 12:30 PM';
+    if (timeRange.toLowerCase().includes('to')) {
+      return timeRange.startsWith('Timing') ? timeRange : `Timing ${timeRange}`;
+    }
+    const parts = timeRange.split('-');
+    if (parts.length === 2) {
+      const t1 = parts[0].replace(/([0-9]{1,2}:[0-9]{2})\s*([AP]M)/i, '$1 $2').trim();
+      const t2 = parts[1].replace(/([0-9]{1,2}:[0-9]{2})\s*([AP]M)/i, '$1 $2').trim();
+      return `Timing ${t1} to ${t2}`;
+    }
+    return `Timing ${timeRange}`;
+  };
+
+  const generateClassroomAllotmentExcel = async (
+    resultsToExport: InvigilatorAssignment[],
+    targetSessionKey?: string
+  ) => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Graphic Era Hill University Exam Cell';
+    workbook.created = new Date();
+
+    const sessionMap = new Map<string, {
+      sessionKey: string;
+      date: string;
+      shiftIndex: number;
+      shiftName: string;
+      timeRange: string;
+      time: string;
+      activeAssignments: InvigilatorAssignment[];
+      reservedAssignments: InvigilatorAssignment[];
+    }>();
+
+    resultsToExport.forEach(asg => {
+      const date = asg.exam.date;
+      const shiftIdx = (asg.exam as any).manualShiftIndex ?? 0;
+      const shiftName = (asg.exam as any).shiftName || `Shift ${shiftIdx + 1}`;
+      const timeRange = (asg.exam as any).timeRange || (shiftIdx === 0 ? '09:30AM-12:30PM' : '01:30PM-04:30PM');
+      const time = asg.exam.time || (shiftIdx === 0 ? '09:30' : '13:30');
+      const sessionKey = `${date}_S${shiftIdx}`;
+
+      if (!sessionMap.has(sessionKey)) {
+        sessionMap.set(sessionKey, {
+          sessionKey,
+          date,
+          shiftIndex: shiftIdx,
+          shiftName,
+          timeRange,
+          time,
+          activeAssignments: [],
+          reservedAssignments: [],
+        });
+      }
+
+      const sess = sessionMap.get(sessionKey)!;
+      if (asg.isReserved || !asg.classroom) {
+        sess.reservedAssignments.push(asg);
+      } else {
+        sess.activeAssignments.push(asg);
+      }
+    });
+
+    const sessions = Array.from(sessionMap.values()).sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.shiftIndex - b.shiftIndex;
+    });
+
+    const sessionsToGenerate = targetSessionKey
+      ? sessions.filter(s => s.sessionKey === targetSessionKey)
+      : sessions;
+
+    const thinBorder: Partial<ExcelJS.Borders> = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } },
+    };
+
+    sessionsToGenerate.forEach(session => {
+      const dObj = new Date(session.date);
+      const dayStr = dObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      const tabName = `${dayStr} (Shift ${session.shiftIndex + 1})`.substring(0, 31).replace(/[\\/*?:[\]]/g, '');
+      const worksheet = workbook.addWorksheet(tabName);
+
+      worksheet.pageSetup = {
+        orientation: 'portrait',
+        paperSize: 9,
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: {
+          left: 0.35,
+          right: 0.35,
+          top: 0.45,
+          bottom: 0.45,
+          header: 0.2,
+          footer: 0.2,
+        },
+      };
+
+      worksheet.columns = [
+        { key: 'srNo', width: 7 },
+        { key: 'name', width: 34 },
+        { key: 'room', width: 18 },
+        { key: 'sign', width: 14 },
+        { key: 'issued', width: 11 },
+        { key: 'used', width: 11 },
+        { key: 'returned', width: 12 },
+      ];
+
+      // Row 2: Top Meta Header
+      const formattedDate = formatDateToDDMMYYYY(session.date);
+      const shiftDisplay = `Shift ${session.shiftIndex + 1}`;
+      const timingDisplay = formatTiming(session.timeRange, session.time);
+
+      worksheet.getRow(2).height = 28;
+
+      worksheet.mergeCells('A2:B2');
+      const dateCell = worksheet.getCell('A2');
+      dateCell.value = `Date: ${formattedDate}`;
+      dateCell.font = { name: 'Arial', size: 13, bold: true };
+      dateCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+      worksheet.mergeCells('C2:D2');
+      const shiftCell = worksheet.getCell('C2');
+      shiftCell.value = shiftDisplay;
+      shiftCell.font = { name: 'Arial', size: 14, bold: true };
+      shiftCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      worksheet.mergeCells('E2:G2');
+      const timingCell = worksheet.getCell('E2');
+      timingCell.value = timingDisplay;
+      timingCell.font = { name: 'Arial', size: 13, bold: true };
+      timingCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+      worksheet.getRow(3).height = 8;
+
+      // Table Header Rows 4 and 5
+      worksheet.getRow(4).height = 24;
+      worksheet.getRow(5).height = 20;
+
+      worksheet.mergeCells('A4:A5');
+      worksheet.getCell('A4').value = 'Sr. No.';
+
+      worksheet.mergeCells('B4:B5');
+      worksheet.getCell('B4').value = 'Name of Invigilators';
+
+      worksheet.mergeCells('C4:C5');
+      worksheet.getCell('C4').value = 'Class Room/\nLecture Theater';
+
+      worksheet.mergeCells('D4:D5');
+      worksheet.getCell('D4').value = 'Sign.';
+
+      worksheet.mergeCells('E4:G4');
+      worksheet.getCell('E4').value = 'Number of Answer Scripts';
+
+      worksheet.getCell('E5').value = 'Issued';
+      worksheet.getCell('F5').value = 'Used';
+      worksheet.getCell('G5').value = 'Returned';
+
+      for (let r = 4; r <= 5; r++) {
+        for (let c = 1; c <= 7; c++) {
+          const cell = worksheet.getCell(r, c);
+          cell.font = { name: 'Arial', size: 10, bold: true };
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+          cell.border = thinBorder;
+        }
+      }
+
+      // Group active assignments by room
+      const roomMap = new Map<string, { room: Classroom; invigilators: Invigilator[] }>();
+      session.activeAssignments.forEach(asg => {
+        if (!asg.classroom) return;
+        const roomKey = asg.classroom.id;
+        if (!roomMap.has(roomKey)) {
+          roomMap.set(roomKey, { room: asg.classroom, invigilators: [] });
+        }
+        roomMap.get(roomKey)!.invigilators.push(asg.invigilator);
+      });
+
+      const sortedRooms = Array.from(roomMap.values()).sort((a, b) => {
+        const bComp = a.room.building.localeCompare(b.room.building);
+        if (bComp !== 0) return bComp;
+        return a.room.roomNo.localeCompare(b.room.roomNo);
+      });
+
+      let currentRow = 6;
+      let srCounter = 1;
+
+      sortedRooms.forEach(group => {
+        const room = group.room;
+        const invs = group.invigilators;
+        const count = invs.length;
+        const startR = currentRow;
+        const endR = startR + count - 1;
+
+        invs.forEach((inv, iIdx) => {
+          const r = startR + iIdx;
+          worksheet.getRow(r).height = 28;
+
+          const cSr = worksheet.getCell(r, 1);
+          cSr.value = srCounter++;
+          cSr.font = { name: 'Arial', size: 10 };
+          cSr.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          const cName = worksheet.getCell(r, 2);
+          cName.value = inv.name;
+          cName.font = { name: 'Arial', size: 10.5 };
+          cName.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+
+          const cSign = worksheet.getCell(r, 4);
+          cSign.value = '';
+          cSign.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          for (let c = 1; c <= 7; c++) {
+            worksheet.getCell(r, c).border = thinBorder;
+          }
+        });
+
+        const buildingLabel = formatBuildingName(room.building);
+        const roomCellText = `${buildingLabel}\n${room.roomNo}`;
+
+        if (count > 1) {
+          worksheet.mergeCells(startR, 3, endR, 3);
+          worksheet.mergeCells(startR, 5, endR, 5);
+          worksheet.mergeCells(startR, 6, endR, 6);
+          worksheet.mergeCells(startR, 7, endR, 7);
+        }
+
+        const cRoom = worksheet.getCell(startR, 3);
+        cRoom.value = roomCellText;
+        cRoom.font = { name: 'Arial', size: 10, bold: true };
+        cRoom.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+        [5, 6, 7].forEach(c => {
+          worksheet.getCell(startR, c).alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+
+        currentRow = endR + 1;
+      });
+
+      // Reserved staff
+      if (session.reservedAssignments.length > 0) {
+        const resCount = session.reservedAssignments.length;
+        const startR = currentRow;
+        const endR = startR + resCount - 1;
+
+        session.reservedAssignments.forEach((asg, iIdx) => {
+          const r = startR + iIdx;
+          worksheet.getRow(r).height = 28;
+
+          const cSr = worksheet.getCell(r, 1);
+          cSr.value = srCounter++;
+          cSr.font = { name: 'Arial', size: 10 };
+          cSr.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          const cName = worksheet.getCell(r, 2);
+          cName.value = asg.invigilator.name;
+          cName.font = { name: 'Arial', size: 10.5 };
+          cName.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+
+          const cSign = worksheet.getCell(r, 4);
+          cSign.value = '';
+          cSign.alignment = { horizontal: 'center', vertical: 'middle' };
+
+          for (let c = 1; c <= 7; c++) {
+            worksheet.getCell(r, c).border = thinBorder;
+          }
+        });
+
+        if (resCount > 1) {
+          worksheet.mergeCells(startR, 3, endR, 3);
+          worksheet.mergeCells(startR, 5, endR, 5);
+          worksheet.mergeCells(startR, 6, endR, 6);
+          worksheet.mergeCells(startR, 7, endR, 7);
+        }
+
+        const cRes = worksheet.getCell(startR, 3);
+        cRes.value = 'Control Room\n(Reserved Staff)';
+        cRes.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF555555' } };
+        cRes.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+        currentRow = endR + 1;
+      }
+
+      // Footer signature row
+      currentRow += 2;
+      worksheet.mergeCells(currentRow, 1, currentRow, 3);
+      const signLeft = worksheet.getCell(currentRow, 1);
+      signLeft.value = 'Prepared By: Examination Cell';
+      signLeft.font = { name: 'Arial', size: 10, bold: true };
+      signLeft.alignment = { horizontal: 'left' };
+
+      worksheet.mergeCells(currentRow, 5, currentRow, 7);
+      const signRight = worksheet.getCell(currentRow, 5);
+      signRight.value = 'Center Superintendent (GEHU)';
+      signRight.font = { name: 'Arial', size: 10, bold: true };
+      signRight.alignment = { horizontal: 'right' };
+    });
+
+    return await workbook.xlsx.writeBuffer();
+  };
+
+  const handleDownloadClassroomAllotment = async (sessionKey?: string) => {
+    if (!results) return;
+    setIsProcessing(true);
+    try {
+      const buffer = await generateClassroomAllotmentExcel(results, sessionKey);
+      const today = new Date().toISOString().split('T')[0];
+      const filename = sessionKey
+        ? `Classroom_Allotment_${sessionKey}_${today}.xlsx`
+        : `Classroom_Allotment_All_Shifts_${today}.xlsx`;
+      saveAs(new Blob([buffer]), filename);
+      toast({
+        title: 'Classroom Allotment Exported',
+        description: sessionKey
+          ? `Classroom allotment sheet for shift downloaded successfully.`
+          : `Official multi-shift classroom allotment workbook downloaded successfully.`,
+      });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: err.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleDownloadAllReports = async () => {
     if (!results) return;
     setIsProcessing(true);
@@ -941,17 +1306,21 @@ export default function ManualAllotmentPage() {
       const detailedBuf = await generateDetailedExcel(results);
       zip.file('1_Official_University_Duty_Chart.xlsx', detailedBuf);
 
-      // 2. Master Report
+      // 2. Classroom Allotment Sheets
+      const classroomBuf = await generateClassroomAllotmentExcel(results);
+      zip.file('2_Classroom_Allotment_Sheets.xlsx', classroomBuf);
+
+      // 3. Master Report
       const masterBuf = await generateMasterReport(fullAllotment, [], classrooms, invigilators, true);
-      zip.file('2_Exam_Master_Report.xlsx', masterBuf);
+      zip.file('3_Exam_Master_Report.xlsx', masterBuf);
 
-      // 3. Duty Roster
+      // 4. Duty Roster
       const rosterBuf = await generateInvigilatorDutyRoster(fullAllotment, invigilators, true);
-      zip.file('3_Invigilator_Duty_Roster.xlsx', rosterBuf);
+      zip.file('4_Invigilator_Duty_Roster.xlsx', rosterBuf);
 
-      // 4. Visual Seat Plan
+      // 5. Visual Seat Plan
       const visualBuf = await generateVisualSeatPlanExcel(fullAllotment, classrooms, true);
-      zip.file('4_Visual_Seat_Plans.xlsx', visualBuf);
+      zip.file('5_Visual_Seat_Plans.xlsx', visualBuf);
 
       const content = await zip.generateAsync({ type: 'blob' });
       saveAs(content, `GEHU_Bhimtal_Exam_Package_${today}.zip`);
@@ -1043,6 +1412,81 @@ export default function ManualAllotmentPage() {
       };
     });
   }, [results, invigilators, dutyLimits]);
+
+  // Computed Session Allotment Data for Classroom Allotment Sheet
+  const allotmentSessions = useMemo(() => {
+    if (!results || results.length === 0) return [];
+
+    const map = new Map<string, {
+      sessionKey: string;
+      date: string;
+      shiftIndex: number;
+      shiftName: string;
+      timeRange: string;
+      time: string;
+      activeAssignments: InvigilatorAssignment[];
+      reservedAssignments: InvigilatorAssignment[];
+    }>();
+
+    results.forEach(asg => {
+      const date = asg.exam.date;
+      const shiftIdx = (asg.exam as any).manualShiftIndex ?? 0;
+      const shiftName = (asg.exam as any).shiftName || `Shift ${shiftIdx + 1}`;
+      const timeRange = (asg.exam as any).timeRange || (shiftIdx === 0 ? '09:30AM-12:30PM' : '01:30PM-04:30PM');
+      const time = asg.exam.time || (shiftIdx === 0 ? '09:30' : '13:30');
+      const sessionKey = `${date}_S${shiftIdx}`;
+
+      if (!map.has(sessionKey)) {
+        map.set(sessionKey, {
+          sessionKey,
+          date,
+          shiftIndex: shiftIdx,
+          shiftName,
+          timeRange,
+          time,
+          activeAssignments: [],
+          reservedAssignments: [],
+        });
+      }
+
+      const sess = map.get(sessionKey)!;
+      if (asg.isReserved || !asg.classroom) {
+        sess.reservedAssignments.push(asg);
+      } else {
+        sess.activeAssignments.push(asg);
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.shiftIndex - b.shiftIndex;
+    });
+  }, [results]);
+
+  const activeSessionData = useMemo(() => {
+    if (!allotmentSessions.length) return null;
+    return allotmentSessions.find(s => s.sessionKey === selectedSessionKey) || allotmentSessions[0];
+  }, [allotmentSessions, selectedSessionKey]);
+
+  const activeSessionRoomGroups = useMemo(() => {
+    if (!activeSessionData) return [];
+    const roomMap = new Map<string, { room: Classroom; invigilators: Invigilator[] }>();
+
+    activeSessionData.activeAssignments.forEach(asg => {
+      if (!asg.classroom) return;
+      const roomKey = asg.classroom.id;
+      if (!roomMap.has(roomKey)) {
+        roomMap.set(roomKey, { room: asg.classroom, invigilators: [] });
+      }
+      roomMap.get(roomKey)!.invigilators.push(asg.invigilator);
+    });
+
+    return Array.from(roomMap.values()).sort((a, b) => {
+      const bComp = a.room.building.localeCompare(b.room.building);
+      if (bComp !== 0) return bComp;
+      return a.room.roomNo.localeCompare(b.room.roomNo);
+    });
+  }, [activeSessionData]);
 
   return (
     <SidebarProvider>
@@ -1570,162 +2014,405 @@ export default function ManualAllotmentPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         onClick={handleDownloadDutyChart}
+                        disabled={isProcessing}
                         className="h-9 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
                       >
                         <Download className="size-3.5" />
                         Download Duty Chart Excel
                       </Button>
+                      <Button
+                        onClick={() => handleDownloadClassroomAllotment()}
+                        disabled={isProcessing}
+                        className="h-9 text-xs font-semibold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                      >
+                        <Building className="size-3.5" />
+                        Download Classroom Allotment Excel
+                      </Button>
+                      <Button
+                        onClick={handleDownloadAllReports}
+                        disabled={isProcessing}
+                        variant="outline"
+                        className="h-9 text-xs font-semibold gap-1.5 shadow-xs"
+                      >
+                        <Package className="size-3.5" />
+                        Download All (ZIP)
+                      </Button>
                     </div>
                   </div>
 
-                  {/* Filter Toolbar */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl border bg-card/60">
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
-                        <Input
-                          placeholder="Search faculty name..."
-                          value={searchFaculty}
-                          onChange={e => setSearchFaculty(e.target.value)}
-                          className="h-8 pl-8 text-xs"
-                        />
-                      </div>
-                      <Select value={selectedDept} onValueChange={setSelectedDept}>
-                        <SelectTrigger className="h-8 text-xs w-48">
-                          <SelectValue placeholder="All Departments" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departmentsList.map(dept => (
-                            <SelectItem key={dept} value={dept} className="text-xs">
-                              {dept === 'ALL' ? 'All Departments' : dept}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {/* View Mode Switcher */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
+                    <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-lg border text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setResultsViewMode('matrix')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all ${
+                          resultsViewMode === 'matrix'
+                            ? 'bg-background text-foreground shadow-xs font-bold'
+                            : 'text-muted-foreground hover:text-foreground font-medium'
+                        }`}
+                      >
+                        <Layers className="size-3.5 text-primary" />
+                        Faculty Duty Chart Matrix
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setResultsViewMode('classroom')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all ${
+                          resultsViewMode === 'classroom'
+                            ? 'bg-background text-foreground shadow-xs font-bold'
+                            : 'text-muted-foreground hover:text-foreground font-medium'
+                        }`}
+                      >
+                        <Building className="size-3.5 text-blue-600 dark:text-blue-400" />
+                        Classroom Allotment Sheet (Shift Roster)
+                      </button>
                     </div>
 
-                    <div className="text-xs text-muted-foreground">
-                      Showing <span className="font-bold text-foreground">{filteredFacultyResults.length}</span> faculty members
-                    </div>
-                  </div>
-
-                  {/* Duty Chart Grid Matrix */}
-                  <Card className="border shadow-xs overflow-hidden">
-                    <div className="overflow-x-auto max-h-[500px]">
-                      <table className="w-full text-xs text-left border-collapse">
-                        <thead className="sticky top-0 bg-secondary/95 backdrop-blur-md z-10 text-[11px] uppercase tracking-wider font-bold">
-                          <tr className="border-b">
-                            <th className="p-3 w-12 text-center border-r">Sr.</th>
-                            <th className="p-3 min-w-[200px] border-r">Name of Invigilator</th>
-                            <th className="p-3 w-20 text-center border-r">Desig</th>
-                            <th className="p-3 w-20 text-center border-r">Dept</th>
-                            {uniqueDatesList.map(date => (
-                              <th
-                                key={date}
-                                colSpan={uniqueShiftsList.length}
-                                className="p-2 text-center border-r bg-muted/60"
-                              >
-                                {new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                              </th>
+                    {resultsViewMode === 'classroom' && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground font-medium">Session:</span>
+                        <Select
+                          value={selectedSessionKey || (allotmentSessions[0]?.sessionKey ?? '')}
+                          onValueChange={setSelectedSessionKey}
+                        >
+                          <SelectTrigger className="h-8 text-xs min-w-[260px] bg-background">
+                            <SelectValue placeholder="Select Session" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allotmentSessions.map(s => (
+                              <SelectItem key={s.sessionKey} value={s.sessionKey} className="text-xs">
+                                {formatDateToDDMMYYYY(s.date)} — Shift {s.shiftIndex + 1} ({s.timeRange})
+                              </SelectItem>
                             ))}
-                            <th className="p-3 w-20 text-center bg-primary/10 text-primary">Total</th>
-                          </tr>
-                          <tr className="border-b text-[10px]">
-                            <th className="p-1 border-r"></th>
-                            <th className="p-1 border-r"></th>
-                            <th className="p-1 border-r"></th>
-                            <th className="p-1 border-r"></th>
-                            {uniqueDatesList.map(date =>
-                              uniqueShiftsList.map(shift => (
-                                <th
-                                  key={`${date}-${shift.id}`}
-                                  className={`p-1 text-center border-r font-mono ${
-                                    shift.id === 0 ? 'bg-amber-100/70 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200' : 'bg-emerald-100/70 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200'
-                                  }`}
-                                >
-                                  {shift.label}
-                                </th>
-                              ))
-                            )}
-                            <th className="p-1 text-center bg-primary/15 text-primary">Duty</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {filteredFacultyResults.map((inv, idx) => {
-                            let total = 0;
-                            return (
-                              <tr key={inv.id} className="hover:bg-muted/30 transition-colors">
-                                <td className="p-2 text-center font-mono border-r text-muted-foreground">{idx + 1}</td>
-                                <td className="p-2 font-semibold border-r text-foreground">{inv.name}</td>
-                                <td className="p-2 text-center border-r">
-                                  <span className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">
-                                    {inv.designation.includes('Assistant')
-                                      ? 'AP'
-                                      : inv.designation.includes('Associate')
-                                      ? 'AsP'
-                                      : inv.designation.includes('Lecturer')
-                                      ? 'Lec'
-                                      : inv.designation.includes('Tutor')
-                                      ? 'NT'
-                                      : inv.designation.includes('Professor')
-                                      ? 'Prof'
-                                      : 'TA'}
-                                  </span>
-                                </td>
-                                <td className="p-2 text-center border-r font-mono text-[10px] text-muted-foreground">
-                                  {inv.department.substring(0, 3).toUpperCase()}
-                                </td>
-                                {uniqueDatesList.map(date =>
-                                  uniqueShiftsList.map(shift => {
-                                    const asgs = results.filter(a => {
-                                      if (a.invigilator.id !== inv.id || a.exam.date !== date) return false;
-                                      return ((a.exam as any).manualShiftIndex ?? 0) === shift.id;
-                                    });
+                          </SelectContent>
+                        </Select>
 
-                                    const isAssigned = asgs.length > 0;
-                                    const isReserved = asgs.some(a => a.isReserved);
-                                    const isMid = asgs.some(a => a.exam.id.toLowerCase().includes('mid'));
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDownloadClassroomAllotment(selectedSessionKey || allotmentSessions[0]?.sessionKey)}
+                          className="h-8 text-xs gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 font-semibold"
+                        >
+                          <FileSpreadsheet className="size-3.5 text-blue-600" />
+                          Export This Shift (.xlsx)
+                        </Button>
+                      </div>
+                    )}
+                  </div>
 
-                                    if (isAssigned && !isReserved) total++;
+                  {/* Mode 1: Faculty Duty Chart Matrix */}
+                  {resultsViewMode === 'matrix' && (
+                    <div className="space-y-4">
+                      {/* Filter Toolbar */}
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl border bg-card/60">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <div className="relative w-full sm:w-64">
+                            <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+                            <Input
+                              placeholder="Search faculty name..."
+                              value={searchFaculty}
+                              onChange={e => setSearchFaculty(e.target.value)}
+                              className="h-8 pl-8 text-xs"
+                            />
+                          </div>
+                          <Select value={selectedDept} onValueChange={setSelectedDept}>
+                            <SelectTrigger className="h-8 text-xs w-48">
+                              <SelectValue placeholder="All Departments" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {departmentsList.map(dept => (
+                                <SelectItem key={dept} value={dept} className="text-xs">
+                                  {dept === 'ALL' ? 'All Departments' : dept}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                                    return (
-                                      <td key={`${date}-${shift.id}`} className="p-1.5 text-center border-r font-mono">
-                                        {isAssigned ? (
-                                          isReserved ? (
-                                            <span className="px-1 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 text-[9px] font-bold">
-                                              RES
-                                            </span>
-                                          ) : (
-                                            <span
-                                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                                isMid
-                                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                              }`}
-                                            >
-                                              {isMid ? '001' : '01'}
-                                            </span>
-                                          )
-                                        ) : (
-                                          <span className="text-muted-foreground/30">-</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })
-                                )}
-                                <td className="p-2 text-center font-bold font-mono text-primary bg-primary/5">
-                                  {total}
-                                </td>
+                        <div className="text-xs text-muted-foreground">
+                          Showing <span className="font-bold text-foreground">{filteredFacultyResults.length}</span> faculty members
+                        </div>
+                      </div>
+
+                      {/* Duty Chart Grid Matrix */}
+                      <Card className="border shadow-xs overflow-hidden">
+                        <div className="overflow-x-auto max-h-[500px]">
+                          <table className="w-full text-xs text-left border-collapse">
+                            <thead className="sticky top-0 bg-secondary/95 backdrop-blur-md z-10 text-[11px] uppercase tracking-wider font-bold">
+                              <tr className="border-b">
+                                <th className="p-3 w-12 text-center border-r">Sr.</th>
+                                <th className="p-3 min-w-[200px] border-r">Name of Invigilator</th>
+                                <th className="p-3 w-20 text-center border-r">Desig</th>
+                                <th className="p-3 w-20 text-center border-r">Dept</th>
+                                {uniqueDatesList.map(date => (
+                                  <th
+                                    key={date}
+                                    colSpan={uniqueShiftsList.length}
+                                    className="p-2 text-center border-r bg-muted/60"
+                                  >
+                                    {new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                  </th>
+                                ))}
+                                <th className="p-3 w-20 text-center bg-primary/10 text-primary">Total</th>
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                              <tr className="border-b text-[10px]">
+                                <th className="p-1 border-r"></th>
+                                <th className="p-1 border-r"></th>
+                                <th className="p-1 border-r"></th>
+                                <th className="p-1 border-r"></th>
+                                {uniqueDatesList.map(date =>
+                                  uniqueShiftsList.map(shift => (
+                                    <th
+                                      key={`${date}-${shift.id}`}
+                                      className={`p-1 text-center border-r font-mono ${
+                                        shift.id === 0 ? 'bg-amber-100/70 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200' : 'bg-emerald-100/70 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200'
+                                      }`}
+                                    >
+                                      {shift.label}
+                                    </th>
+                                  ))
+                                )}
+                                <th className="p-1 text-center bg-primary/15 text-primary">Duty</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {filteredFacultyResults.map((inv, idx) => {
+                                let total = 0;
+                                return (
+                                  <tr key={inv.id} className="hover:bg-muted/30 transition-colors">
+                                    <td className="p-2 text-center font-mono border-r text-muted-foreground">{idx + 1}</td>
+                                    <td className="p-2 font-semibold border-r text-foreground">{inv.name}</td>
+                                    <td className="p-2 text-center border-r">
+                                      <span className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">
+                                        {inv.designation.includes('Assistant')
+                                          ? 'AP'
+                                          : inv.designation.includes('Associate')
+                                          ? 'AsP'
+                                          : inv.designation.includes('Lecturer')
+                                          ? 'Lec'
+                                          : inv.designation.includes('Tutor')
+                                          ? 'NT'
+                                          : inv.designation.includes('Professor')
+                                          ? 'Prof'
+                                          : 'TA'}
+                                      </span>
+                                    </td>
+                                    <td className="p-2 text-center border-r font-mono text-[10px] text-muted-foreground">
+                                      {inv.department.substring(0, 3).toUpperCase()}
+                                    </td>
+                                    {uniqueDatesList.map(date =>
+                                      uniqueShiftsList.map(shift => {
+                                        const asgs = results.filter(a => {
+                                          if (a.invigilator.id !== inv.id || a.exam.date !== date) return false;
+                                          return ((a.exam as any).manualShiftIndex ?? 0) === shift.id;
+                                        });
+
+                                        const isAssigned = asgs.length > 0;
+                                        const isReserved = asgs.some(a => a.isReserved);
+                                        const isMid = asgs.some(a => a.exam.id.toLowerCase().includes('mid'));
+
+                                        if (isAssigned && !isReserved) total++;
+
+                                        return (
+                                          <td key={`${date}-${shift.id}`} className="p-1.5 text-center border-r font-mono">
+                                            {isAssigned ? (
+                                              isReserved ? (
+                                                <span className="px-1 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 text-[9px] font-bold">
+                                                  RES
+                                                </span>
+                                              ) : (
+                                                <span
+                                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                                    isMid
+                                                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                                  }`}
+                                                >
+                                                  {isMid ? '001' : '01'}
+                                                </span>
+                                              )
+                                            ) : (
+                                              <span className="text-muted-foreground/30">-</span>
+                                            )}
+                                          </td>
+                                        );
+                                      })
+                                    )}
+                                    <td className="p-2 text-center font-bold font-mono text-primary bg-primary/5">
+                                      {total}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </Card>
                     </div>
-                  </Card>
+                  )}
+
+                  {/* Mode 2: Classroom Allotment Sheet (Matches Official GEHU Bhimtal Template) */}
+                  {resultsViewMode === 'classroom' && activeSessionData && (
+                    <div className="space-y-4">
+                      {/* Notice Banner */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-blue-50/70 border border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-900/50 dark:text-blue-200 text-xs">
+                        <div className="flex items-center gap-2">
+                          <Info className="size-4 text-blue-600 shrink-0" />
+                          <span>
+                            Official Control Room Attendance &amp; Answer Script Accounting Roster for <strong>{formatDateToDDMMYYYY(activeSessionData.date)} — Shift {activeSessionData.shiftIndex + 1}</strong> ({activeSessionData.activeAssignments.length} active invigilators, {activeSessionData.reservedAssignments.length} standby).
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDownloadClassroomAllotment(activeSessionData.sessionKey)}
+                          className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white shrink-0 gap-1.5 shadow-xs"
+                        >
+                          <Download className="size-3" />
+                          Download This Shift (.xlsx)
+                        </Button>
+                      </div>
+
+                      {/* Paper-styled Roster Container */}
+                      <Card className="p-6 md:p-8 bg-card border-2 shadow-md max-w-4xl mx-auto overflow-hidden">
+                        {/* Meta Header matching reference photo */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pb-4 border-b font-bold text-sm sm:text-base tracking-wide text-foreground">
+                          <div>
+                            <span className="font-extrabold">Date:</span> {formatDateToDDMMYYYY(activeSessionData.date)}
+                          </div>
+                          <div className="text-base sm:text-lg font-black text-primary uppercase">
+                            Shift {activeSessionData.shiftIndex + 1}
+                          </div>
+                          <div>
+                            {formatTiming(activeSessionData.timeRange, activeSessionData.time)}
+                          </div>
+                        </div>
+
+                        {/* Official Format Table */}
+                        <div className="overflow-x-auto mt-4">
+                          <table className="w-full text-xs text-left border-collapse border border-foreground/40 font-sans">
+                            <thead>
+                              <tr className="border-b border-foreground/40 bg-muted/40 font-bold">
+                                <th rowSpan={2} className="border border-foreground/40 p-2 text-center w-12">
+                                  Sr. No.
+                                </th>
+                                <th rowSpan={2} className="border border-foreground/40 p-2 text-left min-w-[200px] pl-3">
+                                  Name of Invigilators
+                                </th>
+                                <th rowSpan={2} className="border border-foreground/40 p-2 text-center w-36 whitespace-pre-line leading-tight">
+                                  Class Room/<br />Lecture Theater
+                                </th>
+                                <th rowSpan={2} className="border border-foreground/40 p-2 text-center w-24">
+                                  Sign.
+                                </th>
+                                <th colSpan={3} className="border border-foreground/40 p-1.5 text-center font-bold">
+                                  Number of Answer Scripts
+                                </th>
+                              </tr>
+                              <tr className="border-b border-foreground/40 bg-muted/40 font-bold">
+                                <th className="border border-foreground/40 p-1 text-center w-16 text-[11px]">Issued</th>
+                                <th className="border border-foreground/40 p-1 text-center w-16 text-[11px]">Used</th>
+                                <th className="border border-foreground/40 p-1 text-center w-20 text-[11px]">Returned</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(() => {
+                                let srCounter = 1;
+                                return (
+                                  <>
+                                    {activeSessionRoomGroups.map(group => {
+                                      const buildingText = formatBuildingName(group.room.building);
+                                      const span = group.invigilators.length;
+                                      return group.invigilators.map((inv, invIdx) => {
+                                        const currentSr = srCounter++;
+                                        const isFirst = invIdx === 0;
+                                        return (
+                                          <tr key={inv.id} className="border-b border-foreground/30 hover:bg-muted/15">
+                                            <td className="border border-foreground/30 p-2.5 text-center font-mono">
+                                              {currentSr}
+                                            </td>
+                                            <td className="border border-foreground/30 p-2.5 pl-3 font-medium">
+                                              {inv.name}
+                                            </td>
+                                            {isFirst && (
+                                              <td
+                                                rowSpan={span}
+                                                className="border border-foreground/30 p-2 text-center font-bold align-middle bg-muted/10 leading-snug whitespace-pre-line font-mono"
+                                              >
+                                                {buildingText}
+                                                <br />
+                                                <span className="text-primary font-black">{group.room.roomNo}</span>
+                                              </td>
+                                            )}
+                                            <td className="border border-foreground/30 p-2 text-center"></td>
+                                            {isFirst && (
+                                              <>
+                                                <td rowSpan={span} className="border border-foreground/30 p-2 text-center align-middle bg-muted/5"></td>
+                                                <td rowSpan={span} className="border border-foreground/30 p-2 text-center align-middle bg-muted/5"></td>
+                                                <td rowSpan={span} className="border border-foreground/30 p-2 text-center align-middle bg-muted/5"></td>
+                                              </>
+                                            )}
+                                          </tr>
+                                        );
+                                      });
+                                    })}
+
+                                    {activeSessionData.reservedAssignments.length > 0 &&
+                                      activeSessionData.reservedAssignments.map((asg, rIdx) => {
+                                        const currentSr = srCounter++;
+                                        const isFirst = rIdx === 0;
+                                        const resSpan = activeSessionData.reservedAssignments.length;
+                                        return (
+                                          <tr key={asg.invigilator.id} className="border-b border-foreground/30 bg-muted/10">
+                                            <td className="border border-foreground/30 p-2.5 text-center font-mono text-muted-foreground">
+                                              {currentSr}
+                                            </td>
+                                            <td className="border border-foreground/30 p-2.5 pl-3 font-medium">
+                                              {asg.invigilator.name}
+                                              <Badge variant="outline" className="ml-2 text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                                                Standby
+                                              </Badge>
+                                            </td>
+                                            {isFirst && (
+                                              <td
+                                                rowSpan={resSpan}
+                                                className="border border-foreground/30 p-2 text-center font-bold align-middle bg-muted/20 text-muted-foreground text-[11px] leading-snug"
+                                              >
+                                                Control Room
+                                                <br />
+                                                (Reserved Staff)
+                                              </td>
+                                            )}
+                                            <td className="border border-foreground/30 p-2 text-center"></td>
+                                            {isFirst && (
+                                              <>
+                                                <td rowSpan={resSpan} className="border border-foreground/30 p-2 text-center align-middle bg-muted/5"></td>
+                                                <td rowSpan={resSpan} className="border border-foreground/30 p-2 text-center align-middle bg-muted/5"></td>
+                                                <td rowSpan={resSpan} className="border border-foreground/30 p-2 text-center align-middle bg-muted/5"></td>
+                                              </>
+                                            )}
+                                          </tr>
+                                        );
+                                      })}
+                                  </>
+                                );
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Signatures Footer */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 text-xs font-bold text-muted-foreground">
+                          <div>Prepared By: Examination Cell</div>
+                          <div>Verified By: Assistant Superintendent</div>
+                          <div>Center Superintendent (GEHU, Bhimtal)</div>
+                        </div>
+                      </Card>
+                    </div>
+                  )}
 
                   {/* Designation Duty Caps Compliance Verification Card */}
                   <Card className="border shadow-xs">

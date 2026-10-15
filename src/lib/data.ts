@@ -167,6 +167,8 @@ export const generateMockStudents = (studentsPerCourse = 100): Student[] => {
 
 export const generateMockClassrooms = (): Classroom[] => {
   const customRooms = [
+    { roomNo: 'A007', capacity: 42, building: 'Academic Block A' },
+    { roomNo: 'A008', capacity: 42, building: 'Academic Block A' },
     { roomNo: 'C001', capacity: 42, building: 'Academic Block C' },
     { roomNo: 'C002', capacity: 42, building: 'Academic Block C' },
     { roomNo: 'C003', capacity: 42, building: 'Academic Block C' },
@@ -174,6 +176,7 @@ export const generateMockClassrooms = (): Classroom[] => {
     { roomNo: 'C102', capacity: 42, building: 'Academic Block C' },
     { roomNo: 'C104', capacity: 42, building: 'Academic Block C' },
     { roomNo: 'C202', capacity: 42, building: 'Academic Block C' },
+    { roomNo: 'C203', capacity: 42, building: 'Academic Block C' },
     { roomNo: 'C204', capacity: 42, building: 'Academic Block C' },
     { roomNo: 'C303', capacity: 42, building: 'Academic Block C' },
     { roomNo: 'C306', capacity: 42, building: 'Academic Block C' },
