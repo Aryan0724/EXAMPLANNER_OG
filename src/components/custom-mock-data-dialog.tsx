@@ -75,7 +75,8 @@ export function CustomMockDataDialog({
         setInvigilators,
         setExamSchedule,
         setStudents,
-        blockPriority
+        blockPriority,
+        facultyStudentRules
     } = useContext(DataContext);
 
     const { setFullAllotment } = useContext(AllotmentContext);
@@ -199,7 +200,13 @@ export function CustomMockDataDialog({
                 if (!concurrentExams || concurrentExams.length === 0) continue;
                 const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority);
                 studentMasterList = updatedStudents;
-                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], 2);
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(
+                    invigilatorMasterList,
+                    plan,
+                    concurrentExams[0],
+                    2,
+                    facultyStudentRules
+                );
                 invigilatorMasterList = updatedInvigilators;
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
@@ -417,7 +424,8 @@ export function CustomMockDataDialog({
                     invigilatorMasterList,
                     plan,
                     concurrentExams[0],
-                    2
+                    2,
+                    facultyStudentRules
                 );
                 invigilatorMasterList = updatedInvigilators;
 

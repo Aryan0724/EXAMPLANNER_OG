@@ -8,16 +8,17 @@ import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, Sparkles, Loader2, Search, PlusCircle, MoreHorizontal } from 'lucide-react';
+import { CalendarDays, Sparkles, Loader2, Search, PlusCircle, MoreHorizontal, UserCheck } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { COURSES, DEPARTMENTS } from '@/lib/data';
-import type { ExamSlot, InvigilatorAssignment, SeatPlan, Student, Classroom, Invigilator } from '@/lib/types';
+import type { ExamSlot, InvigilatorAssignment, SeatPlan, Student, Classroom, Invigilator, FacultyStudentRule } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
 import { ExamDialog } from '@/components/exam-dialog';
+import { FacultyAllocationDialog } from '@/components/faculty-allocation-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -28,11 +29,13 @@ export default function SchedulePage() {
         invigilators, setInvigilators,
         examSchedule, setExamSchedule,
         isHydrated,
-        reservedCount, setReservedCount
+        reservedCount, setReservedCount,
+        facultyStudentRules, setFacultyStudentRules
     } = useContext(DataContext);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [showFacultyDialog, setShowFacultyDialog] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedExam, setSelectedExam] = useState<ExamSlot | null>(null);
@@ -65,7 +68,7 @@ export default function SchedulePage() {
         );
     }
 
-    const handleGenerateAll = async () => {
+    const handleOpenGenerateDialog = () => {
         if (students.length === 0 || classrooms.length === 0 || invigilators.length === 0 || examSchedule.length === 0) {
             toast({
                 variant: 'destructive',
@@ -75,6 +78,17 @@ export default function SchedulePage() {
             return;
         }
 
+        setShowFacultyDialog(true);
+    };
+
+    const handleConfirmGeneration = (rules: FacultyStudentRule[], reserveCount: number) => {
+        setShowFacultyDialog(false);
+        setFacultyStudentRules(rules);
+        setReservedCount(reserveCount);
+        executeGenerateAll(rules, reserveCount);
+    };
+
+    const executeGenerateAll = async (rules: FacultyStudentRule[], reserveCount: number) => {
         setIsGenerating(true);
         toast({ title: 'Generating Full Allotment...', description: 'The algorithm is creating plans session by session. This may take some time.' });
 
@@ -119,10 +133,14 @@ export default function SchedulePage() {
                     });
                 }
 
-                // If no classrooms are used (e.g. no students eligible), we might still want to proceed or skip
-                // But assignInvigilators expects a valid SeatPlan.
-
-                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], reservedCount);
+                // Assign invigilators using configured faculty-to-student rules and reserve count
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(
+                    invigilatorMasterList,
+                    plan,
+                    concurrentExams[0],
+                    reserveCount,
+                    rules
+                );
                 invigilatorMasterList = updatedInvigilators;
 
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
@@ -134,7 +152,7 @@ export default function SchedulePage() {
 
             toast({
                 title: 'Generation Complete!',
-                description: 'Full allotment has been generated for all exam sessions and saved.',
+                description: `Full allotment generated for ${sortedSessionKeys.length} session(s) using configured faculty allocation rules.`,
                 action: <Button onClick={() => router.push('/allotment')}>View Allotment</Button>,
                 duration: 10000
             });
@@ -229,23 +247,24 @@ export default function SchedulePage() {
                                                 </div>
                                                 <CardDescription>View, manage, and generate allotments for the exam schedule.</CardDescription>
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <span className="text-[10px] uppercase font-bold text-muted-foreground mr-1">Reserved Staff</span>
-                                                    <Input 
-                                                        type="number" 
-                                                        value={reservedCount}
-                                                        onChange={(e) => setReservedCount(parseInt(e.target.value) || 0)}
-                                                        className="w-20 h-8 text-center font-bold"
-                                                        min="0"
-                                                        max="20"
-                                                    />
-                                                </div>
+                                            <div className="flex items-center gap-3">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => setShowFacultyDialog(true)}
+                                                    className="border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                                                >
+                                                    <UserCheck className="mr-2 h-4 w-4" />
+                                                    Faculty Ratio Rules
+                                                </Button>
                                                 <Button variant="outline" onClick={() => handleOpenDialog()}>
-                                                    <PlusCircle className="mr-2" />
+                                                    <PlusCircle className="mr-2 h-4 w-4" />
                                                     Add New Exam
                                                 </Button>
-                                                <Button onClick={handleGenerateAll} disabled={isGenerating || examSchedule.length === 0} className="bg-gradient-to-r from-primary to-indigo-600">
+                                                <Button
+                                                    onClick={handleOpenGenerateDialog}
+                                                    disabled={isGenerating || examSchedule.length === 0}
+                                                    className="bg-gradient-to-r from-primary to-indigo-600 font-semibold"
+                                                >
                                                     {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                                     Generate Full Allotment
                                                 </Button>
@@ -324,6 +343,15 @@ export default function SchedulePage() {
                     </SidebarInset>
                 </div>
             </SidebarProvider>
+            <FacultyAllocationDialog
+                isOpen={showFacultyDialog}
+                onClose={() => setShowFacultyDialog(false)}
+                onConfirm={handleConfirmGeneration}
+                initialRules={facultyStudentRules}
+                initialReserveCount={reservedCount}
+                title="Faculty Allocation Rules (Full Schedule)"
+                description="Configure how many invigilators/faculty to allot per classroom based on student count before generating the full examination schedule."
+            />
         </>
     );
 }

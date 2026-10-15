@@ -37,7 +37,8 @@ export function DashboardClient() {
         blockPriority, setBlockPriority,
         excludedBlocks, setExcludedBlocks,
         excludedRooms, setExcludedRooms,
-        reservedCount, setReservedCount
+        reservedCount, setReservedCount,
+        facultyStudentRules
     } = useContext(DataContext);
 
     const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
@@ -159,7 +160,13 @@ export function DashboardClient() {
 
                 const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority);
                 studentMasterList = updatedStudents;
-                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], reservedCount);
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(
+                    invigilatorMasterList,
+                    plan,
+                    concurrentExams[0],
+                    reservedCount,
+                    facultyStudentRules
+                );
                 invigilatorMasterList = updatedInvigilators;
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }
@@ -221,7 +228,13 @@ export function DashboardClient() {
                 if (!concurrentExams || concurrentExams.length === 0) continue;
                 const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority);
                 studentMasterList = updatedStudents;
-                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], reservedCount);
+                const { assignments: invigilatorAssignments, updatedInvigilators } = assignInvigilators(
+                    invigilatorMasterList,
+                    plan,
+                    concurrentExams[0],
+                    reservedCount,
+                    facultyStudentRules
+                );
                 invigilatorMasterList = updatedInvigilators;
                 generatedPlans[key] = { seatPlan: plan, invigilatorAssignments };
             }

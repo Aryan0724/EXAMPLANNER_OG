@@ -12,9 +12,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataContext } from '@/context/DataContext';
-import { generateManualFacultyAllotment, DEFAULT_FACULTY_DUTY_LIMITS } from '@/lib/planning';
-import { InvigilatorAssignment, Invigilator, Classroom } from '@/lib/types';
+import { generateManualFacultyAllotment, DEFAULT_FACULTY_DUTY_LIMITS, getRequiredFacultyCount } from '@/lib/planning';
+import { InvigilatorAssignment, Invigilator, Classroom, FacultyStudentRule, ExamSlot } from '@/lib/types';
 import { BHIMTAL_MAY_2026_DUTY_PLAN } from '@/lib/bhimtalDutyPlanMay2026';
+import { formatTimingDisplay, formatTimingRange } from '@/lib/timing';
+import { FacultyAllocationDialog } from '@/components/faculty-allocation-dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   CalendarDays,
@@ -104,10 +106,11 @@ const SHIFT_OPTIONS = [
 ];
 
 export default function ManualAllotmentPage() {
-  const { invigilators, classrooms, examSchedule: schedule } = useContext(DataContext);
+  const { invigilators, classrooms, examSchedule: schedule, students, facultyStudentRules, setFacultyStudentRules } = useContext(DataContext);
   const { toast } = useToast();
 
   const [days, setDays] = useState<DayItem[]>(DEFAULT_DAYS);
+  const [showFacultyRuleDialog, setShowFacultyRuleDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<'visual' | 'paste'>('visual');
   const [rawText, setRawText] = useState(`| Date | Shift | Rooms | Active | Reserved |
 | :--- | :--- | :--- | :--- | :--- |
@@ -273,6 +276,141 @@ export default function ManualAllotmentPage() {
       };
     });
   }, [results, invigilators, dutyLimits]);
+
+  // --- SYNC WITH REAL EXAM SCHEDULE ---
+  const handleSyncFromExamSchedule = () => {
+    if (!schedule || schedule.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Exam Schedule Found',
+        description: 'Please import or configure exams in the Exam Schedule page first.',
+      });
+      return;
+    }
+
+    // Group exams by date
+    const dateMap = new Map<string, ExamSlot[]>();
+    schedule.forEach(exam => {
+      if (!exam.date) return;
+      if (!dateMap.has(exam.date)) dateMap.set(exam.date, []);
+      dateMap.get(exam.date)!.push(exam);
+    });
+
+    const sortedDates = Array.from(dateMap.keys()).sort();
+    if (sortedDates.length === 0) {
+      toast({ variant: 'destructive', title: 'Invalid Schedule', description: 'No valid exam dates found in schedule.' });
+      return;
+    }
+
+    const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+
+    const newDays: DayItem[] = sortedDates.map((date, dIdx) => {
+      const examsOnDate = dateMap.get(date)!;
+      // Group by time on this date
+      const timeMap = new Map<string, ExamSlot[]>();
+      examsOnDate.forEach(e => {
+        const t = e.time || '09:30';
+        if (!timeMap.has(t)) timeMap.set(t, []);
+        timeMap.get(t)!.push(e);
+      });
+
+      const sortedTimes = Array.from(timeMap.keys()).sort();
+      const shifts: ShiftItem[] = sortedTimes.map((time, sIdx) => {
+        const slotExams = timeMap.get(time)!;
+        const repExam = slotExams[0];
+        const duration = repExam?.duration || 180;
+        const computedTimeRange = repExam?.timeRange || formatTimingRange(time, duration);
+
+        // Count student enrollment in this exam session
+        let studentCountInSlot = 0;
+        slotExams.forEach(e => {
+          const eligible = students.filter(
+            s => s.course === e.course && s.department === e.department && Number(s.semester) === Number(e.semester)
+          );
+          studentCountInSlot += eligible.length;
+        });
+
+        // Estimate rooms required (default ~35 students per room, or minimum 1)
+        const estRooms = Math.max(1, Math.ceil(studentCountInSlot > 0 ? studentCountInSlot / 35 : 17));
+        
+        // Use facultyStudentRules to estimate active faculty per room
+        let estActiveStaff = 0;
+        if (studentCountInSlot > 0) {
+          const avgPerRoom = Math.ceil(studentCountInSlot / estRooms);
+          const facultyPerRoom = getRequiredFacultyCount(avgPerRoom, facultyStudentRules);
+          estActiveStaff = estRooms * facultyPerRoom;
+        } else {
+          estActiveStaff = estRooms * 2;
+        }
+
+        const shiftName = repExam.shift ? `Shift ${repExam.shift}` : `Shift ${romanNumerals[sIdx] || sIdx + 1}`;
+
+        return {
+          id: `s-synced-${date}-${sIdx}`,
+          name: shiftName,
+          shiftIndex: sIdx,
+          time: time,
+          timeRange: computedTimeRange,
+          rooms: estRooms,
+          activeStaff: Math.max(2, estActiveStaff),
+          reservedStaff: 3,
+          note: `${slotExams.length} Exam(s)${studentCountInSlot > 0 ? ` • ${studentCountInSlot} Students` : ''}`,
+        };
+      });
+
+      const dObj = new Date(date);
+      const dayName = isNaN(dObj.getTime()) ? 'Exam Day' : dObj.toLocaleDateString('en-US', { weekday: 'long' });
+
+      return {
+        id: `day-synced-${dIdx}`,
+        date,
+        dayName,
+        shifts,
+      };
+    });
+
+    setDays(newDays);
+    setResults(null);
+    setProcessLog([]);
+    toast({
+      title: 'Schedule Synchronized!',
+      description: `Loaded ${newDays.length} days with real exam timings (${newDays.reduce((a, b) => a + b.shifts.length, 0)} shifts) directly from Exam Schedule.`,
+    });
+  };
+
+  const handleApplyFacultyRulesToShifts = (customRules?: FacultyStudentRule[]) => {
+    const rulesToUse = customRules || facultyStudentRules;
+    setDays(prevDays =>
+      prevDays.map(day => ({
+        ...day,
+        shifts: day.shifts.map(shift => {
+          const matchingExams = schedule.filter(e => e.date === day.date && e.time === shift.time);
+          let studentCount = 0;
+          matchingExams.forEach(e => {
+            const count = students.filter(
+              s => s.course === e.course && s.department === e.department && Number(s.semester) === Number(e.semester)
+            ).length;
+            studentCount += count;
+          });
+
+          const roomsCount = shift.rooms || 1;
+          const avgStudentsPerRoom = studentCount > 0 ? Math.ceil(studentCount / roomsCount) : 35;
+          const facultyPerRoom = getRequiredFacultyCount(avgStudentsPerRoom, rulesToUse);
+          const newActive = roomsCount * facultyPerRoom;
+
+          return {
+            ...shift,
+            activeStaff: Math.max(1, newActive),
+          };
+        }),
+      }))
+    );
+
+    toast({
+      title: 'Staffing Recalculated',
+      description: 'Updated active staff counts across all shifts according to faculty-to-student rules.',
+    });
+  };
 
   // --- PRESET ACTIONS ---
   const handleLoadOfficialPlan = () => {
@@ -539,25 +677,42 @@ export default function ManualAllotmentPage() {
           { msg: `Allotting ${dateStr} (${shift.name}): Target ${totalTarget} staff (${shift.activeStaff} Active, ${shift.reservedStaff} Standby)...`, type: 'info' },
         ]);
 
-        const baseExam = schedule.find(
-          e => e.date === fullDate && (shift.shiftIndex === 0 ? e.time.startsWith('09') : e.time.startsWith('13'))
-        );
+        // Dynamically find matching exam from real input schedule
+        let baseExam = schedule.find(e => e.date === fullDate && e.time === shift.time);
+        if (!baseExam) {
+          const examsOnDate = schedule.filter(e => e.date === fullDate);
+          const uniqueTimes = Array.from(new Set(examsOnDate.map(e => e.time))).sort();
+          if (uniqueTimes[shift.shiftIndex]) {
+            baseExam = examsOnDate.find(e => e.time === uniqueTimes[shift.shiftIndex]);
+          } else if (examsOnDate.length > 0) {
+            baseExam = examsOnDate[0];
+          }
+        }
+
+        const examTime = shift.time || baseExam?.time || (shift.shiftIndex === 0 ? '09:30' : '13:30');
+        const examDuration = baseExam?.duration || 180;
+        const computedRange = shift.timeRange && !shift.timeRange.includes('09:30AM-12:30PM')
+          ? shift.timeRange
+          : (baseExam?.timeRange || formatTimingRange(examTime, examDuration));
 
         const examObj = baseExam
           ? {
               ...baseExam,
+              time: examTime,
+              duration: examDuration,
               id: `${baseExam.id}-${isMid ? 'Mid' : 'Reg'}`,
               manualShiftIndex: shift.shiftIndex,
               shiftName: shift.name,
-              timeRange: shift.timeRange,
+              timeRange: computedRange,
             }
           : ({
               id: `MAN-${fullDate}-${shift.name.replace(/\s+/g, '-')}-${isMid ? 'Mid' : 'Reg'}`,
               date: fullDate,
-              time: shift.time || (shift.shiftIndex === 0 ? '09:30' : '13:30'),
+              time: examTime,
+              duration: examDuration,
               manualShiftIndex: shift.shiftIndex,
               shiftName: shift.name,
-              timeRange: shift.timeRange,
+              timeRange: computedRange,
             } as any);
 
         const result = generateManualFacultyAllotment(
@@ -619,15 +774,30 @@ export default function ManualAllotmentPage() {
     // Check if sessions include 4-shift model or 2-shift model
     const maxShiftIdx = Math.max(...resultsToExport.map(a => (a.exam as any).manualShiftIndex ?? 0), 1);
 
-    const shiftTimings = maxShiftIdx >= 2 ? [
-      { id: 'I', label: 'Shift I: 09:30AM-11:00AM', color: 'FFFF00' },
-      { id: 'II', label: 'Shift II: 11:30AM-01:00PM', color: '92D050' },
-      { id: 'III', label: 'Shift III: 01:30PM-03:00PM', color: '00B0F0' },
-      { id: 'IV', label: 'Shift IV: 03:30PM-05:00PM', color: 'FFC000' },
-    ] : [
-      { id: 'I', label: 'Shift I: 09:30AM-12:30PM', color: 'FFFF00' },
-      { id: 'II', label: 'Shift II: 01:30PM-04:30PM', color: '92D050' },
-    ];
+    // Derive shift timings dynamically from actual assigned exams
+    const shiftTimingMap = new Map<number, string>();
+    resultsToExport.forEach(asg => {
+      const sIdx = (asg.exam as any).manualShiftIndex ?? 0;
+      if (!shiftTimingMap.has(sIdx)) {
+        const time = asg.exam.time || (sIdx === 0 ? '09:30' : '13:30');
+        const duration = asg.exam.duration || 180;
+        const range = (asg.exam as any).timeRange || formatTimingRange(time, duration);
+        shiftTimingMap.set(sIdx, range.replace(/^Timing\s*/i, ''));
+      }
+    });
+
+    const shiftColors = ['FFFF00', '92D050', '00B0F0', 'FFC000', 'FCE4D6'];
+    const romanNumerals = ['I', 'II', 'III', 'IV', 'V'];
+
+    const shiftTimings = Array.from({ length: maxShiftIdx + 1 }).map((_, idx) => {
+      const customRange = shiftTimingMap.get(idx);
+      const defaultRange = idx === 0 ? '09:30AM-12:30PM' : '01:30PM-04:30PM';
+      return {
+        id: romanNumerals[idx] || `${idx + 1}`,
+        label: `Shift ${romanNumerals[idx] || idx + 1}: ${customRange || defaultRange}`,
+        color: shiftColors[idx % shiftColors.length],
+      };
+    });
 
     const numShifts = shiftTimings.length;
     const dateColStart = 5;
@@ -943,17 +1113,7 @@ export default function ManualAllotmentPage() {
   };
 
   const formatTiming = (timeRange?: string, time?: string): string => {
-    if (!timeRange) return time ? `Timing ${time}` : 'Timing 9:30 AM to 12:30 PM';
-    if (timeRange.toLowerCase().includes('to')) {
-      return timeRange.startsWith('Timing') ? timeRange : `Timing ${timeRange}`;
-    }
-    const parts = timeRange.split('-');
-    if (parts.length === 2) {
-      const t1 = parts[0].replace(/([0-9]{1,2}:[0-9]{2})\s*([AP]M)/i, '$1 $2').trim();
-      const t2 = parts[1].replace(/([0-9]{1,2}:[0-9]{2})\s*([AP]M)/i, '$1 $2').trim();
-      return `Timing ${t1} to ${t2}`;
-    }
-    return `Timing ${timeRange}`;
+    return formatTimingDisplay(timeRange, time);
   };
 
   const generateClassroomAllotmentExcel = async (
@@ -979,8 +1139,10 @@ export default function ManualAllotmentPage() {
       const date = asg.exam.date;
       const shiftIdx = (asg.exam as any).manualShiftIndex ?? 0;
       const shiftName = (asg.exam as any).shiftName || `Shift ${shiftIdx + 1}`;
-      const timeRange = (asg.exam as any).timeRange || (shiftIdx === 0 ? '09:30AM-12:30PM' : '01:30PM-04:30PM');
-      const time = asg.exam.time || (shiftIdx === 0 ? '09:30' : '13:30');
+      const examTime = asg.exam.time || (shiftIdx === 0 ? '09:30' : '13:30');
+      const examDuration = asg.exam.duration || 180;
+      const timeRange = (asg.exam as any).timeRange || formatTimingRange(examTime, examDuration);
+      const time = examTime;
       const sessionKey = `${date}_S${shiftIdx}`;
 
       if (!sessionMap.has(sessionKey)) {
@@ -1432,8 +1594,10 @@ export default function ManualAllotmentPage() {
       const date = asg.exam.date;
       const shiftIdx = (asg.exam as any).manualShiftIndex ?? 0;
       const shiftName = (asg.exam as any).shiftName || `Shift ${shiftIdx + 1}`;
-      const timeRange = (asg.exam as any).timeRange || (shiftIdx === 0 ? '09:30AM-12:30PM' : '01:30PM-04:30PM');
-      const time = asg.exam.time || (shiftIdx === 0 ? '09:30' : '13:30');
+      const examTime = asg.exam.time || (shiftIdx === 0 ? '09:30' : '13:30');
+      const examDuration = asg.exam.duration || 180;
+      const timeRange = (asg.exam as any).timeRange || formatTimingRange(examTime, examDuration);
+      const time = examTime;
       const sessionKey = `${date}_S${shiftIdx}`;
 
       if (!map.has(sessionKey)) {
@@ -1596,7 +1760,26 @@ export default function ManualAllotmentPage() {
                     </TabsTrigger>
                   </TabsList>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleSyncFromExamSchedule}
+                      className="h-8 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                      title="Load dates, shifts, and real exam timings directly from the imported Exam Schedule"
+                    >
+                      <CalendarCheck2 className="size-3.5" />
+                      Sync Real Schedule ({schedule?.length || 0} Exams)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFacultyRuleDialog(true)}
+                      className="h-8 text-xs font-semibold gap-1.5 border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                    >
+                      <SlidersHorizontal className="size-3.5" />
+                      Faculty-Student Ratio
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1683,42 +1866,84 @@ export default function ManualAllotmentPage() {
                                 key={shift.id}
                                 className="p-3.5 rounded-xl border bg-card flex flex-col justify-between space-y-3 relative group"
                               >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Select
-                                      value={shift.name}
-                                      onValueChange={val => {
-                                        const opt = SHIFT_OPTIONS.find(o => o.name === val) || SHIFT_OPTIONS[0];
-                                        handleUpdateShift(day.id, shift.id, {
-                                          name: val,
-                                          shiftIndex: opt.shiftIndex,
-                                          time: opt.time,
-                                          timeRange: opt.timeRange,
-                                        });
-                                      }}
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Select
+                                        value={shift.name}
+                                        onValueChange={val => {
+                                          const opt = SHIFT_OPTIONS.find(o => o.name === val) || SHIFT_OPTIONS[0];
+                                          handleUpdateShift(day.id, shift.id, {
+                                            name: val,
+                                            shiftIndex: opt.shiftIndex,
+                                          });
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-7 text-xs font-bold w-28">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {SHIFT_OPTIONS.map(opt => (
+                                            <SelectItem key={opt.name} value={opt.name} className="text-xs">
+                                              {opt.name}
+                                            </SelectItem>
+                                          ))}
+                                          <SelectItem value="Custom Shift" className="text-xs">Custom Shift</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Badge variant="outline" className="text-[10px] font-mono">
+                                        Shift #{shift.shiftIndex + 1}
+                                      </Badge>
+                                    </div>
+
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteShift(day.id, shift.id)}
+                                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                                     >
-                                      <SelectTrigger className="h-7 text-xs font-bold w-28">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {SHIFT_OPTIONS.map(opt => (
-                                          <SelectItem key={opt.name} value={opt.name} className="text-xs">
-                                            {opt.name} ({opt.timeRange})
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <span className="text-[11px] text-muted-foreground font-mono">{shift.timeRange}</span>
+                                      <Trash2 className="size-3" />
+                                    </Button>
                                   </div>
 
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleDeleteShift(day.id, shift.id)}
-                                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                                  >
-                                    <Trash2 className="size-3" />
-                                  </Button>
+                                  {/* Real Time & Time Range Inputs */}
+                                  <div className="grid grid-cols-2 gap-2 pt-1 border-t bg-muted/20 p-2 rounded-md">
+                                    <div>
+                                      <label className="text-[10px] font-semibold text-muted-foreground block mb-0.5">
+                                        Start Time (HH:MM)
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        placeholder="09:30"
+                                        value={shift.time || ''}
+                                        onChange={e => {
+                                          const t = e.target.value;
+                                          const autoRange = formatTimingRange(t, 180);
+                                          handleUpdateShift(day.id, shift.id, {
+                                            time: t,
+                                            timeRange: autoRange,
+                                          });
+                                        }}
+                                        className="h-7 text-xs font-mono font-bold"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] font-semibold text-muted-foreground block mb-0.5">
+                                        Timing Range (Official)
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        placeholder="09:30 AM to 12:30 PM"
+                                        value={shift.timeRange || ''}
+                                        onChange={e =>
+                                          handleUpdateShift(day.id, shift.id, {
+                                            timeRange: e.target.value,
+                                          })
+                                        }
+                                        className="h-7 text-xs font-mono font-semibold"
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-2 pt-1 border-t">
@@ -2584,6 +2809,19 @@ export default function ManualAllotmentPage() {
           </div>
         </SidebarInset>
       </div>
+
+      <FacultyAllocationDialog
+        isOpen={showFacultyRuleDialog}
+        onClose={() => setShowFacultyRuleDialog(false)}
+        initialRules={facultyStudentRules}
+        initialReserveCount={3}
+        confirmLabel="Save & Apply to Shifts"
+        onConfirm={(newRules) => {
+          setFacultyStudentRules(newRules);
+          setShowFacultyRuleDialog(false);
+          handleApplyFacultyRulesToShifts(newRules);
+        }}
+      />
     </SidebarProvider>
   );
 }

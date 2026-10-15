@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 import type { SeatPlan, InvigilatorAssignment, Student, Classroom, Invigilator, ExamSlot } from './types';
+import { formatTimingDisplay, formatTimingRange } from './timing';
 
 // Helper to get day name
 const getDayOfWeek = (date: string) => {
@@ -587,16 +588,6 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         return (h >= 11 && h <= 12) || h >= 15;
     });
 
-    const shiftTimings = hasIntermediateShifts ? [
-        { id: 'I', label: 'Shift I: 9:30AM-11:00AM', color: 'FFFF00' }, // Yellow
-        { id: 'II', label: 'Shift II: 11:30AM-1:00PM', color: '92D050' }, // Green
-        { id: 'III', label: 'Shift III: 1:30PM-3:00PM', color: '00B0F0' }, // Blue
-        { id: 'IV', label: 'Shift IV: 3:30PM-5:00PM', color: 'FFC000' }, // Orange
-    ] : [
-        { id: 'I', label: 'Shift I: 09:30AM-12:30PM', color: 'FFFF00' }, // Yellow
-        { id: 'II', label: 'Shift II: 01:30PM-04:30PM', color: '92D050' }, // Green
-    ];
-
     // Helper to get shift index from time
     const getShiftIndex = (time: string) => {
         const hour = parseInt(time.split(':')[0]);
@@ -609,6 +600,35 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
             return hour <= 11 ? 0 : 1;
         }
     };
+
+    // Dynamically derive shift timing labels from real exam inputs
+    const shiftTimingMap = new Map<number, string>();
+    sessionKeys.forEach(key => {
+        const time = key.split(' ')[1] || '';
+        const sData = fullAllotment[key];
+        const repExam = Array.isArray(sData?.seatPlan?.exam) ? sData.seatPlan.exam[0] : sData?.seatPlan?.exam;
+        const sIdx = getShiftIndex(time);
+        if (!shiftTimingMap.has(sIdx) && repExam) {
+            const range = (repExam as any).timeRange || formatTimingRange(repExam.time || time, repExam.duration || 180);
+            shiftTimingMap.set(sIdx, range.replace(/^Timing\s*/i, ''));
+        }
+    });
+
+    const shiftColors = ['FFFF00', '92D050', '00B0F0', 'FFC000'];
+    const romanNumerals = ['I', 'II', 'III', 'IV'];
+
+    const shiftTimings = Array.from({ length: hasIntermediateShifts ? 4 : 2 }).map((_, idx) => {
+        const customRange = shiftTimingMap.get(idx);
+        const defaultRange = hasIntermediateShifts
+            ? (idx === 0 ? '09:30AM-11:00AM' : idx === 1 ? '11:30AM-01:00PM' : idx === 2 ? '01:30PM-03:00PM' : '03:30PM-05:00PM')
+            : (idx === 0 ? '09:30AM-12:30PM' : '01:30PM-04:30PM');
+        const range = customRange || defaultRange;
+        return {
+            id: romanNumerals[idx] || `${idx + 1}`,
+            label: `Shift ${romanNumerals[idx] || idx + 1}: ${range}`,
+            color: shiftColors[idx % shiftColors.length]
+        };
+    });
 
     // Calculate columns: 4 fixed (Sr, Name, Desig, Dept) + (Dates * shiftsCount) + 1 (Total)
     const numShifts = shiftTimings.length;
@@ -907,19 +927,17 @@ function buildShiftWorksheet(worksheet: ExcelJS.Worksheet, sessionData: { seatPl
     else if (hour <= 14) shiftNum = 3;
     else shiftNum = 4;
 
-    // Calculate timing range string (e.g., 9:30 AM to 11:00 AM)
-    const [h, m] = time.split(':').map(Number);
-    const startDate = new Date();
-    startDate.setHours(h, m, 0);
-    const endDate = new Date(startDate.getTime() + (representativeExam.duration || 90) * 60000);
-    
-    const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    const timingRange = `${formatTime(startDate)} to ${formatTime(endDate)}`;
+    // Calculate timing range string dynamically from representative exam
+    const timingDisplay = formatTimingDisplay(
+        (representativeExam as any)?.timeRange,
+        time,
+        representativeExam?.duration || 180
+    );
 
     // 1. HEADER (Photo Style)
     worksheet.getCell('B2').value = `Date: ${date}`;
     worksheet.getCell('C2').value = `Shift ${shiftNum}`;
-    worksheet.getCell('E2').value = `Timing ${timingRange}`;
+    worksheet.getCell('E2').value = timingDisplay;
     [worksheet.getCell('B2'), worksheet.getCell('C2'), worksheet.getCell('E2')].forEach(c => {
         c.font = { bold: true, size: 11, name: 'Times New Roman' };
     });

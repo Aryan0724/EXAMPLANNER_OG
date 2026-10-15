@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator } from '@/lib/types';
+import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator, FacultyStudentRule } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateDetailedInvigilatorDutyChart } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
+import { FacultyAllocationDialog } from '@/components/faculty-allocation-dialog';
 type FullAllotment = Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }>;
 import { ExclusionReport } from '@/components/exclusion-report';
 
@@ -50,11 +51,12 @@ const getSlotOptions = (allotment: Record<string, any> | null, examSchedule: Exa
 export default function AllotmentPage() {
   const { toast } = useToast();
   const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
-  const { students, classrooms, invigilators, setInvigilators, examSchedule, isHydrated, reservedCount, setReservedCount } = useContext(DataContext);
+  const { students, classrooms, invigilators, setInvigilators, examSchedule, isHydrated, reservedCount, setReservedCount, facultyStudentRules, setFacultyStudentRules } = useContext(DataContext);
 
   const examSlotsByTime = useMemo(() => getExamSlotsByTime(examSchedule), [examSchedule]);
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showFacultyDialog, setShowFacultyDialog] = useState(false);
   const [slotOptions, setSlotOptions] = useState(() => getSlotOptions(fullAllotment, examSchedule));
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | undefined>(slotOptions[0]?.id);
 
@@ -132,7 +134,13 @@ export default function AllotmentPage() {
           return !inv.unavailableSlots.some(s => s.slotId === slotKey || sessionExamIds.has(s.slotId));
         });
 
-        const { assignments: repairedInvAsg } = assignInvigilators(sessionTargetPool, newSeatPlan, concurrentExams[0]);
+        const { assignments: repairedInvAsg } = assignInvigilators(
+          sessionTargetPool,
+          newSeatPlan,
+          concurrentExams[0],
+          reservedCount,
+          facultyStudentRules
+        );
 
         // Only update if we actually got assignments back
         if (repairedInvAsg.length > 0) {
@@ -298,7 +306,7 @@ export default function AllotmentPage() {
     }
   };
 
-  const handleGeneration = () => {
+  const handleOpenGenerationDialog = () => {
     if (!selectedSlotKey) {
       toast({
         variant: 'destructive',
@@ -308,13 +316,6 @@ export default function AllotmentPage() {
       return;
     }
 
-    if (fullAllotment) {
-      toast({
-        title: 'Already Generated',
-        description: 'A full allotment plan has been generated from the Schedule page. Select a slot to view.',
-      });
-      return;
-    }
     if (students.length === 0 || classrooms.length === 0 || invigilators.length === 0) {
       toast({
         variant: 'destructive',
@@ -324,10 +325,24 @@ export default function AllotmentPage() {
       return;
     }
 
+    setShowFacultyDialog(true);
+  };
+
+  const handleConfirmGeneration = (rules: FacultyStudentRule[], reserveCount: number) => {
+    setShowFacultyDialog(false);
+    setFacultyStudentRules(rules);
+    setReservedCount(reserveCount);
+    executeGeneration(rules, reserveCount);
+  };
+
+  const executeGeneration = (rules: FacultyStudentRule[], reserveCount: number) => {
     setIsGenerating(true);
     setTimeout(() => {
       const selectedExams = examSlotsByTime[selectedSlotKey!];
-      if (!selectedExams || selectedExams.length === 0) return;
+      if (!selectedExams || selectedExams.length === 0) {
+        setIsGenerating(false);
+        return;
+      }
 
       const { plan, updatedStudents } = generateSeatPlan(students, classrooms, selectedExams);
       setSeatPlan(plan);
@@ -346,7 +361,13 @@ export default function AllotmentPage() {
         return !inv.unavailableSlots.some(s => s.slotId === selectedSlotKey || sessionExamIds.has(s.slotId));
       });
 
-      const { assignments: newInvigilatorAssignments } = assignInvigilators(sessionTargetPool, plan, selectedExams[0], reservedCount);
+      const { assignments: newInvigilatorAssignments } = assignInvigilators(
+        sessionTargetPool,
+        plan,
+        selectedExams[0],
+        reserveCount,
+        rules
+      );
       setInvigilatorAssignments(newInvigilatorAssignments);
 
       // Create update for global context so dashboard reports work too
@@ -356,7 +377,6 @@ export default function AllotmentPage() {
       };
 
       // Update local state
-      // setFullAllotment is from context
       setFullAllotment((prev: any) => ({
         ...(prev || {}),
         [selectedSlotKey!]: newAllotmentEntry
@@ -365,9 +385,9 @@ export default function AllotmentPage() {
       setIsGenerating(false);
       toast({
         title: 'Generation Complete',
-        description: `Seat plan generated for ${selectedExams.length} concurrent exam(s). Global records updated.`,
+        description: `Seat plan generated for ${selectedExams.length} concurrent exam(s) with custom faculty allocation rules.`,
       });
-    }, 2000);
+    }, 1500);
   };
 
   const handlePrint = () => {
@@ -425,7 +445,7 @@ export default function AllotmentPage() {
       });
     } else {
       // No reserved staff available, generate NEW assignments for the whole slot (fallback)
-      const res = assignInvigilators(sessionTargetPool, seatPlan, representativeExam, reservedCount);
+      const res = assignInvigilators(sessionTargetPool, seatPlan, representativeExam, reservedCount, facultyStudentRules);
       newInvAsg = res.assignments;
     }
 
@@ -546,25 +566,25 @@ export default function AllotmentPage() {
                           Master Report
                         </Button>
                       </div>
-                      <div className="w-full sm:w-auto flex flex-col gap-2">
-                        <span className="text-xs font-medium text-muted-foreground uppercase ml-1">Reserved Staff</span>
-                        <input 
-                          type="number" 
-                          value={reservedCount}
-                          onChange={(e) => setReservedCount(parseInt(e.target.value) || 0)}
-                          className="w-20 px-3 py-2 bg-secondary/50 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                          min="0"
-                          max="20"
-                        />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowFacultyDialog(true)}
+                          className="h-9 text-xs font-semibold gap-1.5 border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                        >
+                          <UserCheck className="mr-1.5 h-4 w-4" />
+                          Faculty Ratio Rules
+                        </Button>
+                        <Button
+                          onClick={handleOpenGenerationDialog}
+                          disabled={isGenerating || !selectedSlotKey}
+                          className="h-9 font-semibold gap-1.5"
+                        >
+                          {isGenerating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
+                          Generate Plan
+                        </Button>
                       </div>
-                      <Button
-                        onClick={handleGeneration}
-                        disabled={isGenerating || !!(selectedSlotKey && fullAllotment && fullAllotment[selectedSlotKey]) || !selectedSlotKey}
-                        className="w-full sm:w-auto"
-                      >
-                        {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                        Generate Plan
-                      </Button>
                     </CardContent>
                   </Card>
 
@@ -833,6 +853,15 @@ export default function AllotmentPage() {
           </div>
         </div>
       )}
+      <FacultyAllocationDialog
+        isOpen={showFacultyDialog}
+        onClose={() => setShowFacultyDialog(false)}
+        onConfirm={handleConfirmGeneration}
+        initialRules={facultyStudentRules}
+        initialReserveCount={reservedCount}
+        title="Faculty Allocation Rules (Session)"
+        description="Configure how many invigilators/faculty to assign per classroom based on student count for this exam session."
+      />
     </>
   );
 }

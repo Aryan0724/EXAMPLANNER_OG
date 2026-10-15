@@ -83,7 +83,22 @@ export interface ExamSlot {
   shift?: number; // 1, 2, 3, or 4
   type?: 'Theory' | 'Practical';
   mode?: 'Offline' | 'Online';
+  timeRange?: string; // Optional timing range e.g. "09:30 AM to 12:30 PM"
 }
+
+export interface FacultyStudentRule {
+  id: string;
+  minStudents: number;
+  maxStudents: number;
+  facultyCount: number;
+}
+
+export const DEFAULT_FACULTY_STUDENT_RULES: FacultyStudentRule[] = [
+  { id: 'rule-1', minStudents: 0, maxStudents: 20, facultyCount: 1 },
+  { id: 'rule-2', minStudents: 21, maxStudents: 50, facultyCount: 2 },
+  { id: 'rule-3', minStudents: 51, maxStudents: 80, facultyCount: 3 },
+  { id: 'rule-4', minStudents: 81, maxStudents: 999, facultyCount: 4 },
+];
 
 export interface Seat {
   student: (Student & { exam: ExamSlot }) | null; // Null if empty

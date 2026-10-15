@@ -1,6 +1,28 @@
 
 
-import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat, BatchRoomAllocation, SessionAllotmentSummary, RoomBatchDistribution } from './types';
+import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat, BatchRoomAllocation, SessionAllotmentSummary, RoomBatchDistribution, FacultyStudentRule } from './types';
+import { DEFAULT_FACULTY_STUDENT_RULES } from './types';
+
+/**
+ * Calculates the required number of invigilators/faculty for a classroom based on student count
+ * and user-specified ranges (e.g. 0-20 students: 1, 21-50 students: 2, etc.)
+ */
+export function getRequiredFacultyCount(
+    studentCount: number,
+    rules: FacultyStudentRule[] = DEFAULT_FACULTY_STUDENT_RULES
+): number {
+    if (studentCount <= 0) return 0;
+
+    const activeRules = rules && rules.length > 0 ? rules : DEFAULT_FACULTY_STUDENT_RULES;
+    const matched = activeRules.find(r => studentCount >= r.minStudents && studentCount <= r.maxStudents);
+    if (matched) return Math.max(1, matched.facultyCount);
+
+    const sorted = [...activeRules].sort((a, b) => a.minStudents - b.minStudents);
+    if (studentCount < sorted[0].minStudents) return Math.max(1, sorted[0].facultyCount);
+    if (studentCount > sorted[sorted.length - 1].maxStudents) return Math.max(1, sorted[sorted.length - 1].facultyCount);
+
+    return 2;
+}
 
 function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Student[] {
     return allStudents.filter(s => {
@@ -258,7 +280,8 @@ export function assignInvigilators(
     invigilators: Invigilator[],
     seatPlan: SeatPlan,
     exam: ExamSlot,
-    reservedCount: number = 0
+    reservedCount: number = 0,
+    facultyStudentRules?: FacultyStudentRule[]
 ): { assignments: InvigilatorAssignment[], updatedInvigilators: Invigilator[] } {
     if (!invigilators || !Array.isArray(invigilators)) {
         console.error("assignInvigilators: invigilators is invalid", invigilators);
@@ -418,14 +441,8 @@ export function assignInvigilators(
         const studentCount = roomStudentCounts.get(room.id) || 0;
         if (studentCount <= 0) continue;
 
-        // Standard rooms (up to 70 students): 2 invigilators (Senior + Junior)
-        // Large examination halls (> 70 students, like D103/D104 with 120 seats): 3 invigilators
-        let requiredInvigilators = 2;
-        if (studentCount < 18) {
-            requiredInvigilators = 1;
-        } else if (studentCount > 70) {
-            requiredInvigilators = 3;
-        }
+        // Dynamically compute faculty requirement per room from user-configured student rules
+        const requiredInvigilators = getRequiredFacultyCount(studentCount, facultyStudentRules);
 
         const sessionRoomAssignments: Invigilator[] = [];
 
@@ -960,6 +977,7 @@ export function generateFullBatchAllotment(
         blockPriority?: string[];
         excludedBlocks?: string[];
         excludedRooms?: string[];
+        facultyStudentRules?: FacultyStudentRule[];
     }
 ): {
     fullAllotment: Record<string, { seatPlan: SeatPlan; invigilatorAssignments: InvigilatorAssignment[] }>;
@@ -1012,7 +1030,7 @@ export function generateFullBatchAllotment(
         const { plan, updatedStudents } = generateSeatPlan(masterStudents, usableClassrooms, concurrentExams, blockPriority);
         masterStudents = updatedStudents;
 
-        const { assignments, updatedInvigilators } = assignInvigilators(masterInvigilators, plan, concurrentExams[0], reservedCount);
+        const { assignments, updatedInvigilators } = assignInvigilators(masterInvigilators, plan, concurrentExams[0], reservedCount, options?.facultyStudentRules);
         masterInvigilators = updatedInvigilators;
 
         generatedPlans[key] = { seatPlan: plan, invigilatorAssignments: assignments };

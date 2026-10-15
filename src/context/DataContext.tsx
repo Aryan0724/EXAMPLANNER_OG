@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
-import { Student, Classroom, Invigilator, ExamSlot, createClassroom } from '@/lib/types';
+import { Student, Classroom, Invigilator, ExamSlot, createClassroom, FacultyStudentRule, DEFAULT_FACULTY_STUDENT_RULES } from '@/lib/types';
 import { generateMockStudents, generateMockClassrooms, generateMockInvigilators, generateMockExamSchedule, getBhimtalExamSchedule } from '@/lib/data';
 
 interface DataContextType {
@@ -22,6 +22,8 @@ interface DataContextType {
   isHydrated: boolean;
   reservedCount: number;
   setReservedCount: React.Dispatch<React.SetStateAction<number>>;
+  facultyStudentRules: FacultyStudentRule[];
+  setFacultyStudentRules: React.Dispatch<React.SetStateAction<FacultyStudentRule[]>>;
 }
 
 export const DataContext = createContext<DataContextType>({
@@ -42,6 +44,8 @@ export const DataContext = createContext<DataContextType>({
   isHydrated: false,
   reservedCount: 4,
   setReservedCount: () => { },
+  facultyStudentRules: DEFAULT_FACULTY_STUDENT_RULES,
+  setFacultyStudentRules: () => { },
 });
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
@@ -54,6 +58,29 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [excludedRooms, setExcludedRooms] = useState<string[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [reservedCount, setReservedCount] = useState(4);
+  const [facultyStudentRules, setFacultyStudentRulesState] = useState<FacultyStudentRule[]>(DEFAULT_FACULTY_STUDENT_RULES);
+
+  const setFacultyStudentRules = (valOrFn: React.SetStateAction<FacultyStudentRule[]>) => {
+    setFacultyStudentRulesState(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      try {
+        localStorage.setItem('gehu_faculty_student_rules', JSON.stringify(next));
+      } catch (err) {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('gehu_faculty_student_rules');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setFacultyStudentRulesState(parsed);
+        }
+      }
+    } catch (err) {}
+  }, []);
 
   useEffect(() => {
     // Load Bhimtal specific data by default
@@ -77,7 +104,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       excludedBlocks, setExcludedBlocks,
       excludedRooms, setExcludedRooms,
       isHydrated,
-      reservedCount, setReservedCount
+      reservedCount, setReservedCount,
+      facultyStudentRules, setFacultyStudentRules
     }}>
       {children}
     </DataContext.Provider>
