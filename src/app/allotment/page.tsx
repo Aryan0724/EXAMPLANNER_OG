@@ -21,6 +21,7 @@ import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Inv
 import { generateSeatPlan, assignInvigilators, extractSessionRoomSummary, generateFullBatchAllotment, generateStudentsFromBatches } from '@/lib/planning';
 import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateInvigilatorDutyRoster, generateDetailedInvigilatorDutyChart } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
+import { generateMockStudents, generateMockClassrooms, generateMockInvigilators, generateMockExamSchedule } from '@/lib/data';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
 import { ExclusionReport } from '@/components/exclusion-report';
@@ -73,9 +74,9 @@ export default function AllotmentPage() {
   } = useContext(DataContext);
 
   // ── Two Ways of Allotment Mode ──
-  // Mode 1: 'room-summary' = Room & Batch matching and university duty chart
-  // Mode 2: 'visual-seating' = Detailed desk-by-desk seating plan visualizer
-  const [allotmentMode, setAllotmentMode] = useState<'room-summary' | 'visual-seating'>('room-summary');
+  // Mode 1: 'visual-seating' = Detailed desk-by-desk seating plan visualizer (DEFAULT)
+  // Mode 2: 'room-summary' = Room & Batch matching and university duty chart
+  const [allotmentMode, setAllotmentMode] = useState<'visual-seating' | 'room-summary'>('visual-seating');
 
   const examSlotsByTime = useMemo(() => getExamSlotsByTime(examSchedule), [examSchedule]);
 
@@ -283,6 +284,70 @@ export default function AllotmentPage() {
     setShowExclusionReport(false);
   };
 
+  // ── 1-Click Flood Mock Data & Generate Allotment ──
+  const handleQuickFloodAndGenerate = async () => {
+    setIsGenerating(true);
+    toast({ title: '⚡ Flooding Mock Data...', description: 'Generating students, classrooms, invigilators & schedule.' });
+    await new Promise(resolve => setTimeout(resolve, 150));
+    try {
+      const freshStudents: Student[] = JSON.parse(JSON.stringify(generateMockStudents(200)));
+      const freshClassrooms = generateMockClassrooms();
+      const freshInvigilators: Invigilator[] = JSON.parse(JSON.stringify(generateMockInvigilators()));
+      const freshExams: ExamSlot[] = generateMockExamSchedule();
+
+      setStudents(freshStudents);
+      setClassrooms(freshClassrooms);
+      setInvigilators(freshInvigilators);
+      setExamSchedule(freshExams);
+
+      let studentMasterList: Student[] = JSON.parse(JSON.stringify(freshStudents));
+      let invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(freshInvigilators));
+      const classroomMasterList = JSON.parse(JSON.stringify(freshClassrooms));
+
+      const examSlotsMap = freshExams.reduce((acc, exam) => {
+        const key = `${exam.date} ${exam.time}`;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(exam);
+        return acc;
+      }, {} as Record<string, ExamSlot[]>);
+
+      const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
+      const sortedSessionKeys = Object.keys(examSlotsMap).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+      for (const key of sortedSessionKeys) {
+        const concurrentExams = examSlotsMap[key];
+        if (!concurrentExams || concurrentExams.length === 0) continue;
+        const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority);
+        studentMasterList = updatedStudents;
+        const { assignments: invAsg, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], reservedCount);
+        invigilatorMasterList = updatedInvigilators;
+        generatedPlans[key] = { seatPlan: plan, invigilatorAssignments: invAsg };
+      }
+
+      setStudents(studentMasterList);
+      setInvigilators(invigilatorMasterList);
+      setFullAllotment(generatedPlans);
+
+      const firstKey = sortedSessionKeys[0];
+      setSelectedSlotKey(firstKey);
+      if (generatedPlans[firstKey]) {
+        setSeatPlan(generatedPlans[firstKey].seatPlan);
+        setInvigilatorAssignments(generatedPlans[firstKey].invigilatorAssignments);
+        const firstRoom = generatedPlans[firstKey].seatPlan.assignments.find(a => a.classroom)?.classroom?.id;
+        if (firstRoom) setSelectedClassroomId(firstRoom);
+      }
+
+      toast({
+        title: '🎉 Allotment Ready!',
+        description: `Full seating and invigilation generated for ${sortedSessionKeys.length} session(s).`,
+      });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Generation Failed', description: e.message });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // ── University Excel Export Handlers ──
   const handleExportMasterReport = () => {
     if (!fullAllotment) return;
@@ -437,35 +502,45 @@ export default function AllotmentPage() {
                   {/* Two Ways of Allotment Toggle */}
                   <div className="inline-flex p-1 rounded-xl bg-muted/60 border border-border/40 gap-1">
                     <Button
-                      variant={allotmentMode === 'room-summary' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setAllotmentMode('room-summary')}
-                      className="font-bold text-xs rounded-lg h-9 shadow-none"
-                    >
-                      <Building2 className="mr-1.5 h-4 w-4" />
-                      Way 1: Room &amp; Batch Allotment (University Roster)
-                    </Button>
-                    <Button
                       variant={allotmentMode === 'visual-seating' ? 'default' : 'ghost'}
                       size="sm"
                       onClick={() => setAllotmentMode('visual-seating')}
                       className="font-bold text-xs rounded-lg h-9 shadow-none"
                     >
                       <LayoutGrid className="mr-1.5 h-4 w-4" />
-                      Way 2: Detailed Desk Seating Plan (Visualizer)
+                      Desk Seating Plan (Visualizer)
+                    </Button>
+                    <Button
+                      variant={allotmentMode === 'room-summary' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setAllotmentMode('room-summary')}
+                      className="font-bold text-xs rounded-lg h-9 shadow-none"
+                    >
+                      <Building2 className="mr-1.5 h-4 w-4" />
+                      Room &amp; Duty Roster (Table)
                     </Button>
                   </div>
 
                   {/* Actions & Adjust Batch Numbers */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button
+                      size="sm"
+                      onClick={handleQuickFloodAndGenerate}
+                      disabled={isGenerating}
+                      className="bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-bold text-xs shadow-sm h-9"
+                    >
+                      {isGenerating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Zap className="mr-1.5 h-3.5 w-3.5" />}
+                      Flood Mock Allotment
+                    </Button>
+
+                    <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setIsBatchAdjustDialogOpen(true)}
-                      className="text-xs font-bold border-primary/30 text-primary hover:bg-primary/5"
+                      className="text-xs font-bold border-primary/30 text-primary hover:bg-primary/5 h-9"
                     >
                       <Users className="mr-1.5 h-3.5 w-3.5" />
-                      Adjust Batch Student Numbers
+                      Adjust Batch Counts
                     </Button>
 
                     <Button
@@ -798,6 +873,29 @@ export default function AllotmentPage() {
                           Please select a classroom from the dropdown above to view its desk seating grid.
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Fallback when in visual mode and no seat plan exists */}
+                {allotmentMode === 'visual-seating' && !seatPlan && (
+                  <Card className="text-center py-16 shadow-sm border-dashed">
+                    <CardContent className="space-y-4">
+                      <LayoutGrid className="w-16 h-16 text-primary/40 mx-auto" />
+                      <div>
+                        <h3 className="text-lg font-bold text-foreground">No Allotment Generated for this Session</h3>
+                        <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                          Click below to flood mock data and generate the full desk seating plan across all classrooms, or pick a different session above.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleQuickFloodAndGenerate}
+                        disabled={isGenerating}
+                        className="bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-bold text-xs px-6 shadow-md"
+                      >
+                        {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-1.5 h-4 w-4" />}
+                        1-Click Flood Mock Data &amp; Generate Allotment
+                      </Button>
                     </CardContent>
                   </Card>
                 )}

@@ -10,10 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import {
     Sparkles, CheckCircle2, ArrowRight, Download, Search,
     Building2, Users, CalendarDays, FileSpreadsheet,
-    FileText, Check, RotateCcw, ClipboardPaste, BookOpen, Clock, ShieldCheck
+    FileText, Check, RotateCcw, ClipboardPaste, BookOpen, Clock, ShieldCheck,
+    Zap, Loader2
 } from 'lucide-react';
-import { ExamSlot, Student, Classroom, Invigilator } from '@/lib/types';
-import { generateMockClassrooms, generateMockInvigilators } from '@/lib/data';
+import { ExamSlot, Student, Classroom, Invigilator, SeatPlan, InvigilatorAssignment } from '@/lib/types';
+import { generateMockClassrooms, generateMockInvigilators, generateMockStudents, generateMockExamSchedule } from '@/lib/data';
+import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import {
     generateMasterReport,
     generateDetailedInvigilatorDutyChart,
@@ -40,7 +42,8 @@ interface CustomMockDataDialogProps {
 export function CustomMockDataDialog({
     isOpen,
     onClose,
-    onClearData
+    onClearData,
+    onFloodAndGenerate
 }: CustomMockDataDialogProps) {
     const { toast } = useToast();
     const router = useRouter();
@@ -50,7 +53,8 @@ export function CustomMockDataDialog({
         invigilators, setInvigilators,
         examSchedule, setExamSchedule,
         setStudents,
-        setReservedCount
+        setReservedCount,
+        blockPriority
     } = useContext(DataContext);
 
     const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
@@ -69,6 +73,7 @@ export function CustomMockDataDialog({
     // Paste box drawer toggle
     const [showPasteBox, setShowPasteBox] = useState(false);
     const [pasteText, setPasteText] = useState('');
+    const [isFlooding, setIsFlooding] = useState(false);
 
     // Mapping metrics
     const [mappingStats, setMappingStats] = useState<{
@@ -76,6 +81,72 @@ export function CustomMockDataDialog({
         totalDuties: number;
         totalRooms: number;
     } | null>(null);
+
+    // ── PRIMARY 1-CLICK FLOOD & GENERATE ──
+    const handleDirectFloodAndGenerate = async () => {
+        setIsFlooding(true);
+        if (onFloodAndGenerate) {
+            onFloodAndGenerate();
+            onClose();
+            setIsFlooding(false);
+            return;
+        }
+
+        toast({ title: '⚡ Flooding Mock Data...', description: 'Generating students, classrooms, invigilators & schedule.' });
+        await new Promise(resolve => setTimeout(resolve, 150));
+        try {
+            const freshStudents = generateMockStudents(200);
+            const freshClassrooms = generateMockClassrooms();
+            const freshInvigilators = generateMockInvigilators();
+            const freshExams = generateMockExamSchedule();
+
+            setStudents(freshStudents);
+            setClassrooms(freshClassrooms);
+            setInvigilators(freshInvigilators);
+            setExamSchedule(freshExams);
+            setReservedCount(3);
+
+            const examSlotsMap = freshExams.reduce((acc, exam) => {
+                const key = `${exam.date} ${exam.time}`;
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(exam);
+                return acc;
+            }, {} as Record<string, ExamSlot[]>);
+
+            const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
+            const sortedSessionKeys = Object.keys(examSlotsMap).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+            let studentMasterList: Student[] = JSON.parse(JSON.stringify(freshStudents));
+            let invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(freshInvigilators));
+            const classroomMasterList = JSON.parse(JSON.stringify(freshClassrooms));
+
+            for (const key of sortedSessionKeys) {
+                const concurrentExams = examSlotsMap[key];
+                if (!concurrentExams || concurrentExams.length === 0) continue;
+                const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority || ['Academic Block C', 'Academic Block D', 'Academic Block E']);
+                studentMasterList = updatedStudents;
+                const { assignments: invAsg, updatedInvigilators } = assignInvigilators(invigilatorMasterList, plan, concurrentExams[0], 3);
+                invigilatorMasterList = updatedInvigilators;
+                generatedPlans[key] = { seatPlan: plan, invigilatorAssignments: invAsg };
+            }
+
+            setStudents(studentMasterList);
+            setInvigilators(invigilatorMasterList);
+            setFullAllotment(generatedPlans);
+
+            toast({
+                title: "🎉 Allotment Ready!",
+                description: `Complete seating generated for ${sortedSessionKeys.length} session(s). Redirecting...`
+            });
+
+            onClose();
+            router.push('/allotment');
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'Generation Failed', description: e.message });
+        } finally {
+            setIsFlooding(false);
+        }
+    };
 
     // Flatten shifts for easy table viewing
     const flattenedShifts = useMemo(() => {
@@ -174,7 +245,6 @@ export function CustomMockDataDialog({
         setDutyPlan(prev => {
             const next = [...prev];
             lines.forEach(line => {
-                // Accepts: YYYY-MM-DD, Shift, Rooms, Invigilators
                 const parts = line.split(/[,\t]+/).map(s => s.trim());
                 if (parts.length >= 4) {
                     const [pDate, pShift, pRooms, pInvig] = parts;
@@ -311,7 +381,7 @@ export function CustomMockDataDialog({
                         </div>
                         <DialogTitle className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                             <Sparkles className="w-5 h-5 text-amber-400" />
-                            Examination Duty & Room Allotment Wizard
+                            Examination Duty &amp; Room Allotment Wizard
                         </DialogTitle>
                         <DialogDescription className="text-slate-400 text-xs mt-0.5">
                             Map the examination schedule directly with the Duty Required List to produce official college rosters.
@@ -328,7 +398,7 @@ export function CustomMockDataDialog({
                                     : 'text-slate-400 hover:text-slate-200'
                             }`}
                         >
-                            1. Duty List & Schedule
+                            1. Duty List &amp; Schedule
                         </button>
                         <button
                             onClick={() => {
@@ -344,6 +414,32 @@ export function CustomMockDataDialog({
                             2. College Format Output
                         </button>
                     </div>
+                </div>
+
+                {/* ── 1-CLICK FLOOD BANNER (ALWAYS PROMINENT AT TOP) ── */}
+                <div className="mx-5 mt-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-primary/20 to-indigo-600/20 border border-amber-500/40 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-black/20">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                            <Zap className="h-6 w-6 fill-amber-400 text-amber-400" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-white text-sm">One-Click Mock Allotment</span>
+                                <Badge className="bg-amber-500 text-slate-950 font-extrabold text-[10px] px-1.5 py-0">INSTANT</Badge>
+                            </div>
+                            <p className="text-xs text-slate-300 mt-0.5">
+                                Populate 200 students, 18 classrooms, invigilators &amp; schedule and open the live desk seating visualizer immediately!
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        onClick={handleDirectFloodAndGenerate}
+                        disabled={isFlooding}
+                        className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-extrabold text-xs px-6 h-10 shadow-md shrink-0"
+                    >
+                        {isFlooding ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Zap className="w-4 h-4 mr-1.5 fill-current" />}
+                        Flood &amp; Generate Allotment
+                    </Button>
                 </div>
 
                 {/* ── STEP 1: DUTY LIST & SCHEDULE ── */}
@@ -446,12 +542,12 @@ export function CustomMockDataDialog({
                         </div>
 
                         {/* Duty Required Table */}
-                        <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/60 max-h-[380px] overflow-y-auto">
+                        <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/60 max-h-[340px] overflow-y-auto">
                             <table className="w-full text-left text-xs border-collapse">
                                 <thead className="bg-slate-950 text-slate-400 font-semibold sticky top-0 border-b border-slate-800 z-10">
                                     <tr>
                                         <th className="py-2.5 px-3">Date of Examination</th>
-                                        <th className="py-2.5 px-3">Shift & Timing</th>
+                                        <th className="py-2.5 px-3">Shift &amp; Timing</th>
                                         <th className="py-2.5 px-3 text-center">No. of Rooms Req.</th>
                                         <th className="py-2.5 px-3 text-center">Total Invigilators Req.</th>
                                         <th className="py-2.5 px-3">Breakdown (Active + Relief + Reserve)</th>
@@ -552,7 +648,7 @@ export function CustomMockDataDialog({
                                     <Building2 className="w-3.5 h-3.5 text-emerald-400" /> Room Allocations
                                 </div>
                                 <div className="text-2xl font-bold text-emerald-400">{mappingStats?.totalRooms || 0}</div>
-                                <div className="text-[11px] text-slate-500 mt-0.5">Across Blocks C, D & E</div>
+                                <div className="text-[11px] text-slate-500 mt-0.5">Across Blocks C, D &amp; E</div>
                             </div>
                             <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl">
                                 <div className="text-xs text-slate-400 flex items-center gap-1.5 mb-1">
@@ -585,7 +681,7 @@ export function CustomMockDataDialog({
                                         </div>
                                         <h4 className="font-bold text-sm text-white">Official Duty Chart (Excel)</h4>
                                         <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                                            Official GEHU Bhimtal matrix with "No of Duty Required", colored shift headers, faculty codes & Superintendent signature block.
+                                            Official GEHU Bhimtal matrix with "No of Duty Required", colored shift headers, faculty codes &amp; Superintendent signature block.
                                         </p>
                                     </div>
                                     <Button
@@ -673,7 +769,7 @@ export function CustomMockDataDialog({
                                 className="bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-semibold text-xs px-5 shadow-lg shadow-indigo-900/30"
                             >
                                 <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                                Map Schedule & Generate Allotment
+                                Map Schedule &amp; Generate Allotment
                                 <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                             </Button>
                         ) : (
