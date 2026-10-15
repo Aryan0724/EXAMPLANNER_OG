@@ -58,7 +58,7 @@ export interface Invigilator {
   id: string;
   name: string;
   department: string;
-  designation: 'Professor' | 'Associate Professor' | 'Assistant Professor' | 'Tutor' | 'Lab Assistant';
+  designation: 'Professor' | 'Associate Professor' | 'Assistant Professor' | 'Tutor' | 'Lab Assistant' | 'Nursing Tutor' | 'Lecturer' | 'Teaching Assistant' | 'Teaching Associate' | string;
   gender: 'Male' | 'Female';
   isAvailable: boolean;
   maxDailySessions?: number;

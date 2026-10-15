@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Upload, FileUp, AlertCircle, CheckCircle2, Download } from 'lucide-react';
-import { Student, Classroom, Invigilator, ExamSlot } from '@/lib/types';
+import { Student, Classroom, createClassroom, Invigilator, ExamSlot } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { parsePasteSchedule } from '@/lib/parsers';
 
@@ -135,22 +135,36 @@ export function DataImportDialog({
                     rollNo: String(row.rollNo || row.RollNo),
                     course: normalizeText(row.course || row.Course),
                     department: normalizeText(row.department || row.Department),
-                    semester: Number(row.semester || row.Semester),
-                    section: row.section || row.Section
+                    semester: Number(row.semester || row.Semester) || 1,
+                    section: row.section || row.Section || 'A',
+                    ineligibilityRecords: [],
+                    unavailableSlots: [],
+                    seatAssignment: null,
+                    isDebarred: false
                 })).filter(s => s.name && s.rollNo);
 
                 if (students.length === 0) throw new Error("No valid student records found. Check headers: name, rollNo, course, department, semester");
                 onImportStudents(students);
                 count = students.length;
             } else if (activeTab === 'classrooms') {
-                const rooms: Classroom[] = data.map((row: any) => ({
-                    id: String(row.roomNo || row.id || Math.random().toString(36).substr(2, 9)),
-                    roomNo: String(row.roomNo || row.RoomNo),
-                    capacity: Number(row.capacity || row.Capacity),
-                    building: row.building || row.Block || row.Building,
-                    floor: Number(row.floor || row.Floor || 0),
-                    isExamReady: true
-                })).filter(r => r.roomNo && r.capacity);
+                const rooms: Classroom[] = data.map((row: any, idx: number) => {
+                    const capacity = Number(row.capacity || row.Capacity) || 42;
+                    const benchCount = Math.ceil(capacity / 2);
+                    const rowsCount = Math.ceil(Math.sqrt(benchCount));
+                    const columnsCount = Math.ceil(benchCount / rowsCount);
+                    const benchCapacities = Array(benchCount).fill(2);
+                    const building = row.building || row.Block || row.Building || 'Academic Block';
+                    return createClassroom({
+                        id: String(row.roomNo || row.id || `C-${idx + 1}`),
+                        roomNo: String(row.roomNo || row.RoomNo),
+                        building: building,
+                        rows: rowsCount,
+                        columns: columnsCount,
+                        benchCapacities: benchCapacities,
+                        unavailableSlots: [],
+                        departmentBlock: building
+                    });
+                }).filter(r => r.roomNo && r.capacity);
 
                 if (rooms.length === 0) throw new Error("No valid classrooms found. Check headers: roomNo, capacity, building");
                 onImportClassrooms(rooms);
@@ -160,10 +174,11 @@ export function DataImportDialog({
                     id: String(row.id || Math.random().toString(36).substr(2, 9)),
                     name: row.name || row.Name,
                     department: normalizeText(row.department || row.Department),
-                    email: row.email || row.Email || '',
                     designation: row.designation || row.Designation || 'Assistant Professor',
-                    assignedDuties: [],
-                    maxDuties: Number(row.maxDuties || 10)
+                    gender: (row.gender || row.Gender || 'Male') as 'Male' | 'Female',
+                    isAvailable: true,
+                    unavailableSlots: [],
+                    assignedDuties: []
                 })).filter(i => i.name);
 
                 if (invs.length === 0) throw new Error("No valid invigilators found. Check headers: name, department");
