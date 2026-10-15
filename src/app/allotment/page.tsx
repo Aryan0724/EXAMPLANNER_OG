@@ -19,7 +19,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator, SessionAllotmentSummary } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators, extractSessionRoomSummary, generateFullBatchAllotment, generateStudentsFromBatches } from '@/lib/planning';
-import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateInvigilatorDutyRoster } from '@/lib/report-generator';
+import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateInvigilatorDutyRoster, generateDetailedInvigilatorDutyChart } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
@@ -294,11 +294,11 @@ export default function AllotmentPage() {
     }
   };
 
-  const handleExportDutyRoster = () => {
+  const handleExportDutyRoster = async () => {
     if (!fullAllotment) return;
     try {
-      generateInvigilatorDutyRoster(fullAllotment, invigilators);
-      toast({ title: "Duty Roster Downloaded", description: "Invigilator shift roster exported as Excel." });
+      await generateDetailedInvigilatorDutyChart(fullAllotment, invigilators);
+      toast({ title: "Official Duty Chart Downloaded", description: "Exported university duty chart with 'No of Duty Required' and Superintendent signature." });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
     }

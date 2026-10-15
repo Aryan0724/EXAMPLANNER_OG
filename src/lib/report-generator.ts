@@ -580,26 +580,40 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     const uniqueDates = Array.from(new Set(sessionKeys.map(key => key.split(' ')[0]))).sort();
     
-    // Shifts: I (9:30-11:00), II (11:30-1:00), III (1:30-3:00), IV (3:30-5:00)
-    const shiftTimings = [
+    // Check if sessions are 2-shift model (e.g. End Term 09:30 & 13:30) or 4-shift model
+    const hasIntermediateShifts = sessionKeys.some(k => {
+        const time = k.split(' ')[1] || '';
+        const h = parseInt(time.split(':')[0]);
+        return (h >= 11 && h <= 12) || h >= 15;
+    });
+
+    const shiftTimings = hasIntermediateShifts ? [
         { id: 'I', label: 'Shift I: 9:30AM-11:00AM', color: 'FFFF00' }, // Yellow
         { id: 'II', label: 'Shift II: 11:30AM-1:00PM', color: '92D050' }, // Green
         { id: 'III', label: 'Shift III: 1:30PM-3:00PM', color: '00B0F0' }, // Blue
         { id: 'IV', label: 'Shift IV: 3:30PM-5:00PM', color: 'FFC000' }, // Orange
+    ] : [
+        { id: 'I', label: 'Shift I: 09:30AM-12:30PM', color: 'FFFF00' }, // Yellow
+        { id: 'II', label: 'Shift II: 01:30PM-04:30PM', color: '92D050' }, // Green
     ];
 
     // Helper to get shift index from time
     const getShiftIndex = (time: string) => {
         const hour = parseInt(time.split(':')[0]);
-        if (hour <= 10) return 0;
-        if (hour <= 12) return 1;
-        if (hour <= 14) return 2;
-        return 3;
+        if (hasIntermediateShifts) {
+            if (hour <= 10) return 0;
+            if (hour <= 12) return 1;
+            if (hour <= 14) return 2;
+            return 3;
+        } else {
+            return hour <= 11 ? 0 : 1;
+        }
     };
 
-    // Calculate columns: 4 fixed (Sr, Name, Desig, Dept) + (Dates * 4 shifts) + 1 (Total)
+    // Calculate columns: 4 fixed (Sr, Name, Desig, Dept) + (Dates * shiftsCount) + 1 (Total)
+    const numShifts = shiftTimings.length;
     const dateColStart = 5;
-    const totalCols = dateColStart + (uniqueDates.length * 4);
+    const totalCols = dateColStart + (uniqueDates.length * numShifts);
 
     // 2. HEADERS (Rows 1-3)
     worksheet.mergeCells(1, 1, 1, totalCols);
@@ -649,14 +663,16 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
 
     // Dynamic Date Headers
     uniqueDates.forEach((date, dateIdx) => {
-        const startCol = dateColStart + (dateIdx * 4);
-        worksheet.mergeCells(9, startCol, 9, startCol + 3);
+        const startCol = dateColStart + (dateIdx * numShifts);
+        if (numShifts > 1) {
+            worksheet.mergeCells(9, startCol, 9, startCol + numShifts - 1);
+        }
         const dateCell = worksheet.getCell(9, startCol);
         dateCell.value = date; // Format: YYYY-MM-DD
         dateCell.alignment = { horizontal: 'center' };
         dateCell.font = { bold: true };
 
-        // Sub-headers (I, II, III, IV)
+        // Sub-headers (I, II, etc.)
         shiftTimings.forEach((shift, shiftIdx) => {
             const cell = worksheet.getCell(10, startCol + shiftIdx);
             cell.value = shift.id;
@@ -684,7 +700,7 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     });
 
     uniqueDates.forEach((date, dateIdx) => {
-        const startCol = dateColStart + (dateIdx * 4);
+        const startCol = dateColStart + (dateIdx * numShifts);
         shiftTimings.forEach((_, shiftIdx) => {
             const count = shiftTotals.get(`${date}-${shiftIdx}`) || 0;
             const cell = worksheet.getCell(4, startCol + shiftIdx);
@@ -762,7 +778,7 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
 
         let total = 0;
         uniqueDates.forEach((date, dateIdx) => {
-            const startCol = dateColStart + (dateIdx * 4);
+            const startCol = dateColStart + (dateIdx * numShifts);
             shiftTimings.forEach((_, shiftIdx) => {
                 const val = invDutyMap.get(inv.id)?.get(`${date}-${shiftIdx}`);
                 if (val !== undefined) {
