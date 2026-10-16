@@ -52,7 +52,7 @@ function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Stu
             return false;
         }
 
-        if (Number(s.semester) !== Number(exam.semester)) {
+        if (exam.semester && Number(exam.semester) > 0 && Number(s.semester) !== Number(exam.semester)) {
             return false;
         }
 

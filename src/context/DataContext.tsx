@@ -34,6 +34,8 @@ interface DataContextType {
   setFacultyStudentRules: React.Dispatch<React.SetStateAction<FacultyStudentRule[]>>;
   resetClassroomsToOfficial: () => void;
   resetStudentsToOfficial: () => void;
+  clearExamSchedule: () => void;
+  loadSampleExamSchedule: () => void;
 }
 
 export const DataContext = createContext<DataContextType>({
@@ -58,13 +60,15 @@ export const DataContext = createContext<DataContextType>({
   setFacultyStudentRules: () => { },
   resetClassroomsToOfficial: () => { },
   resetStudentsToOfficial: () => { },
+  clearExamSchedule: () => { },
+  loadSampleExamSchedule: () => { },
 });
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [students, setStudentsState] = useState<Student[]>([]);
   const [classrooms, setClassroomsState] = useState<Classroom[]>([]);
   const [invigilators, setInvigilators] = useState<Invigilator[]>(generateMockInvigilators());
-  const [examSchedule, setExamSchedule] = useState<ExamSlot[]>([]);
+  const [examSchedule, setExamScheduleState] = useState<ExamSlot[]>([]);
   const [blockPriority, setBlockPriority] = useState<string[]>(['Admin Block A', 'Academic Block C', 'Academic Block D', 'Academic Block E']);
   const [excludedBlocks, setExcludedBlocks] = useState<string[]>([]);
   const [excludedRooms, setExcludedRooms] = useState<string[]>([]);
@@ -90,6 +94,29 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       } catch (err) {}
       return next;
     });
+  };
+
+  const setExamSchedule = (valOrFn: React.SetStateAction<ExamSlot[]>) => {
+    setExamScheduleState(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      try {
+        localStorage.setItem('gehu_exam_schedule', JSON.stringify(next));
+      } catch (err) {}
+      return next;
+    });
+  };
+
+  const clearExamSchedule = () => {
+    setExamScheduleState([]);
+    try {
+      localStorage.removeItem('gehu_exam_schedule');
+      localStorage.removeItem('gehu_full_allotment');
+    } catch (err) {}
+  };
+
+  const loadSampleExamSchedule = () => {
+    const sample = getBhimtalExamSchedule();
+    setExamSchedule(sample);
   };
 
   const setFacultyStudentRules = (valOrFn: React.SetStateAction<FacultyStudentRule[]>) => {
@@ -165,9 +192,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setStudentsState(initialStudents);
 
-    // 3. Initialize Faculty and Exam Schedule
+    // 3. Initialize Faculty (Invigilators)
     setInvigilators(generateMockInvigilators());
-    setExamSchedule(getBhimtalExamSchedule());
+
+    // 4. Initialize Exam Schedule:
+    // User requirement: It must NOT have already exam schedule there.
+    // Start empty ([]) unless the user has explicitly imported or created their own exam schedule.
+    let initialSchedule: ExamSlot[] = [];
+    try {
+      const savedSchedule = localStorage.getItem('gehu_exam_schedule');
+      if (savedSchedule) {
+        const parsed = JSON.parse(savedSchedule);
+        // If it was the old default mock schedule, discard it so user gets a fresh start
+        const isOldMock = Array.isArray(parsed) && parsed.some((e: any) => e.id?.startsWith('BE') && parsed.length >= 20);
+        if (Array.isArray(parsed) && !isOldMock) {
+          initialSchedule = parsed;
+        } else if (isOldMock) {
+          localStorage.removeItem('gehu_exam_schedule');
+        }
+      }
+    } catch (err) {}
+    setExamScheduleState(initialSchedule);
+
     setBlockPriority(['Admin Block A', 'Academic Block C', 'Academic Block D', 'Academic Block E']);
     setExcludedBlocks([]);
     setExcludedRooms([]);
@@ -187,7 +233,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       reservedCount, setReservedCount,
       facultyStudentRules, setFacultyStudentRules,
       resetClassroomsToOfficial,
-      resetStudentsToOfficial
+      resetStudentsToOfficial,
+      clearExamSchedule,
+      loadSampleExamSchedule
     }}>
       {children}
     </DataContext.Provider>
