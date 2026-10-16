@@ -135,7 +135,160 @@ const REAL_FACULTY: Omit<Invigilator, 'isAvailable' | 'unavailableSlots' | 'assi
   { id: 'TA114891', name: 'Mr. Aditya Gupta', department: 'Computer Science & Engineering', designation: 'Teaching Associate', gender: 'Male' },
 ];
 
-export const generateMockStudents = (studentsPerCourse = 100): Student[] => {
+export const FIRST_NAMES = [
+  'Aarav', 'Aditi', 'Akash', 'Ananya', 'Aryan', 'Ayush', 'Bhavya', 'Deepak',
+  'Divya', 'Gaurav', 'Ishita', 'Karan', 'Kavita', 'Manish', 'Neha', 'Nitin',
+  'Pooja', 'Pranav', 'Priya', 'Rahul', 'Rhea', 'Rohan', 'Rohit', 'Sakshi',
+  'Siddharth', 'Simran', 'Sneha', 'Tanvi', 'Varun', 'Vikas', 'Ankit', 'Kunal',
+  'Megha', 'Pankaj', 'Ritu', 'Sachin', 'Shreya', 'Tarun', 'Vandana', 'Yash'
+];
+
+export const LAST_NAMES = [
+  'Sharma', 'Verma', 'Gupta', 'Singh', 'Kumar', 'Joshi', 'Pant', 'Bisht',
+  'Pandey', 'Rawat', 'Tiwari', 'Bhatt', 'Mehta', 'Chauhan', 'Arya', 'Negi',
+  'Mishra', 'Chaudhary', 'Patel', 'Yadav'
+];
+
+export interface ClassroomSpec {
+  roomNo: string;
+  building: string;
+  rows: number;
+  columns: number;
+  totalSitting: number;
+}
+
+/**
+ * The official 18 university examination halls and classrooms
+ * Total capacity: Exactly 1,147 seats
+ */
+export const OFFICIAL_CLASSROOM_SPECS: ClassroomSpec[] = [
+  { roomNo: 'A007', building: 'Admin Block A', rows: 5, columns: 3, totalSitting: 30 },
+  { roomNo: 'A008', building: 'Admin Block A', rows: 6, columns: 3, totalSitting: 33 },
+  { roomNo: 'C001', building: 'Academic Block C', rows: 6, columns: 4, totalSitting: 43 },
+  { roomNo: 'C003', building: 'Academic Block C', rows: 6, columns: 4, totalSitting: 43 },
+  { roomNo: 'C102', building: 'Academic Block C', rows: 6, columns: 4, totalSitting: 42 },
+  { roomNo: 'C104', building: 'Academic Block C', rows: 6, columns: 4, totalSitting: 42 },
+  { roomNo: 'C202', building: 'Academic Block C', rows: 6, columns: 4, totalSitting: 32 },
+  { roomNo: 'C203', building: 'Academic Block C', rows: 9, columns: 4, totalSitting: 72 },
+  { roomNo: 'D003', building: 'Academic Block D', rows: 11, columns: 3, totalSitting: 66 },
+  { roomNo: 'D006', building: 'Academic Block D', rows: 10, columns: 3, totalSitting: 60 },
+  { roomNo: 'D103', building: 'Academic Block D', rows: 15, columns: 4, totalSitting: 120 },
+  { roomNo: 'D104', building: 'Academic Block D', rows: 15, columns: 4, totalSitting: 120 },
+  { roomNo: 'D106', building: 'Academic Block D', rows: 11, columns: 3, totalSitting: 66 },
+  { roomNo: 'D203', building: 'Academic Block D', rows: 11, columns: 7, totalSitting: 77 },
+  { roomNo: 'D204', building: 'Academic Block D', rows: 11, columns: 7, totalSitting: 77 },
+  { roomNo: 'D205', building: 'Academic Block D', rows: 12, columns: 3, totalSitting: 72 },
+  { roomNo: 'D206', building: 'Academic Block D', rows: 12, columns: 3, totalSitting: 72 },
+  { roomNo: 'E202', building: 'Academic Block E', rows: 8, columns: 5, totalSitting: 80 },
+];
+
+export function createClassroomFromSpec(spec: ClassroomSpec, id?: string): Classroom {
+  const benchCount = spec.rows * spec.columns;
+  const baseCapacity = Math.floor(spec.totalSitting / benchCount);
+  const remainder = spec.totalSitting % benchCount;
+
+  const benchCapacities: number[] = [];
+  for (let i = 0; i < benchCount; i++) {
+    benchCapacities.push(i < remainder ? baseCapacity + 1 : baseCapacity);
+  }
+
+  const roomId = id || `CR_${spec.roomNo.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+  return createClassroom({
+    id: roomId,
+    roomNo: spec.roomNo,
+    building: spec.building,
+    rows: spec.rows,
+    columns: spec.columns,
+    benchCapacities: benchCapacities,
+    unavailableSlots: [],
+    departmentBlock: spec.building,
+  });
+}
+
+export function generateOfficialClassrooms(): Classroom[] {
+  return OFFICIAL_CLASSROOM_SPECS.map((spec, index) =>
+    createClassroomFromSpec(spec, `C${String(index + 1).padStart(3, '0')}`)
+  );
+}
+
+export interface OfficialBatchSpec {
+  course: string;
+  batch: string;
+  semester: number;
+  totalStudents: number;
+  department: string;
+  code: string;
+}
+
+/**
+ * The official 16 student batches and cohorts
+ * Total students: Exactly 1,147 students
+ */
+export const OFFICIAL_STUDENT_BATCH_SPECS: OfficialBatchSpec[] = [
+  { course: 'B.Sc (Nursing)', batch: '2026–2030', semester: 1, totalStudents: 63, department: 'College of Nursing', code: 'NUR' },
+  { course: 'B.Tech CSE', batch: '2025–2029', semester: 3, totalStudents: 424, department: 'Computer Science and Engineering', code: 'CSE' },
+  { course: 'B.Tech ECE', batch: '2025–2029', semester: 3, totalStudents: 5, department: 'Electronics and Communication Engineering', code: 'ECE' },
+  { course: 'B.Tech ME', batch: '2025–2029', semester: 3, totalStudents: 14, department: 'Mechanical Engineering', code: 'ME' },
+  { course: 'B.Tech CE', batch: '2025–2029', semester: 3, totalStudents: 8, department: 'Civil Engineering', code: 'CE' },
+  { course: 'B.Pharma', batch: '2025–2029', semester: 3, totalStudents: 44, department: 'College of Pharmacy', code: 'PHARM' },
+  { course: 'BBA', batch: '2025–2028', semester: 3, totalStudents: 202, department: 'School of Management', code: 'BBA' },
+  { course: 'BCA', batch: '2025–2028', semester: 3, totalStudents: 80, department: 'Computer Applications', code: 'BCA' },
+  { course: 'B.Com(H)', batch: '2025–2028', semester: 3, totalStudents: 52, department: 'Commerce', code: 'BCOM' },
+  { course: 'BCA(Hons.) with AI&DS', batch: '2025–2028', semester: 3, totalStudents: 178, department: 'Computer Applications', code: 'BCAAI' },
+  { course: 'MCA', batch: '2025–2027', semester: 3, totalStudents: 35, department: 'Computer Applications', code: 'MCA' },
+  { course: 'MCA AI&DS', batch: '2025–2027', semester: 3, totalStudents: 37, department: 'Computer Applications', code: 'MCAAI' },
+  { course: 'M.Tech CSE', batch: '2025–2027', semester: 3, totalStudents: 1, department: 'Computer Science and Engineering', code: 'MTCSE' },
+  { course: 'Diploma CSE', batch: '2025–2028', semester: 3, totalStudents: 2, department: 'Computer Science and Engineering', code: 'DIPCSE' },
+  { course: 'Diploma ECE', batch: '2026–2028', semester: 3, totalStudents: 1, department: 'Electronics and Communication Engineering', code: 'DIPECE' },
+  { course: 'Diploma ME', batch: '2026–2028', semester: 3, totalStudents: 1, department: 'Mechanical Engineering', code: 'DIPME' },
+];
+
+export function generateOfficialStudents(): Student[] {
+  const students: Student[] = [];
+  const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+  OFFICIAL_STUDENT_BATCH_SPECS.forEach(batch => {
+    const matchYear = batch.batch.match(/20(\d{2})/);
+    const yr = matchYear ? matchYear[1] : '25';
+
+    for (let i = 1; i <= batch.totalStudents; i++) {
+      const padNum = String(i).padStart(3, '0');
+      const rollNo = `${yr}${batch.code}${padNum}`;
+      const firstName = FIRST_NAMES[(i + batch.semester * 7) % FIRST_NAMES.length];
+      const lastName = LAST_NAMES[(i * 3 + batch.totalStudents) % LAST_NAMES.length];
+
+      // Divide large batches into 60-70 student sections
+      const secIdx = Math.floor((i - 1) / 70);
+      const section = SECTIONS[Math.min(secIdx, SECTIONS.length - 1)];
+
+      students.push({
+        id: `S_${rollNo}`,
+        name: `${firstName} ${lastName}`,
+        rollNo: rollNo,
+        department: batch.department,
+        course: batch.course,
+        semester: batch.semester,
+        section: section,
+        group: undefined,
+        ineligibilityRecords: [],
+        unavailableSlots: [],
+        seatAssignment: null,
+        isDebarred: false,
+      });
+    }
+  });
+
+  return students;
+}
+
+export const generateMockStudents = (studentsPerCourse?: number): Student[] => {
+  // If count is not specified or standard 1,147 requested, return official student dataset
+  if (!studentsPerCourse || studentsPerCourse === 1147) {
+    return generateOfficialStudents();
+  }
+
+  // Fallback for custom scaled mock generation if specifically requested
   const students: Student[] = [];
   const year = '25';
   let globalStudentCounter = 0;
@@ -156,8 +309,7 @@ export const generateMockStudents = (studentsPerCourse = 100): Student[] => {
         ineligibilityRecords: [],
         unavailableSlots: [],
         seatAssignment: null,
-        isDebarred: Math.random() > 0.98,
-        debarmentReason: 'Disciplinary Action'
+        isDebarred: false
       });
       globalStudentCounter++;
     }
@@ -166,57 +318,7 @@ export const generateMockStudents = (studentsPerCourse = 100): Student[] => {
 };
 
 export const generateMockClassrooms = (): Classroom[] => {
-  const customRooms = [
-    { roomNo: 'A007', capacity: 42, building: 'Academic Block A' },
-    { roomNo: 'A008', capacity: 42, building: 'Academic Block A' },
-    { roomNo: 'C001', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C002', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C003', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C004', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C102', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C104', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C202', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C203', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C204', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C303', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'C306', capacity: 42, building: 'Academic Block C' },
-    { roomNo: 'D003', capacity: 66, building: 'Academic Block D' },
-    { roomNo: 'D006', capacity: 60, building: 'Academic Block D' },
-    { roomNo: 'D103', capacity: 120, building: 'Academic Block D' },
-    { roomNo: 'D104', capacity: 120, building: 'Academic Block D' },
-    { roomNo: 'E001', capacity: 42, building: 'Academic Block E' },
-    { roomNo: 'E003', capacity: 42, building: 'Academic Block E' },
-    { roomNo: 'E101', capacity: 42, building: 'Academic Block E' },
-    { roomNo: 'E103', capacity: 42, building: 'Academic Block E' },
-  ];
-  return customRooms.map((room, index) => {
-    const benchCount = Math.ceil(room.capacity / 2);
-    const rows = Math.ceil(Math.sqrt(benchCount));
-    const columns = Math.ceil(benchCount / rows);
-    const benchCapacities: number[] = [];
-    let remainingCapacity = room.capacity;
-    for (let i = 0; i < rows * columns; i++) {
-      if (remainingCapacity >= 2) {
-        benchCapacities.push(2);
-        remainingCapacity -= 2;
-      } else if (remainingCapacity === 1) {
-        benchCapacities.push(1);
-        remainingCapacity -= 1;
-      } else {
-        benchCapacities.push(0);
-      }
-    }
-    return createClassroom({
-      id: `C${String(index + 1).padStart(3, '0')}`,
-      roomNo: room.roomNo,
-      building: room.building,
-      rows: rows,
-      columns: columns,
-      benchCapacities: benchCapacities,
-      unavailableSlots: [],
-      departmentBlock: room.building,
-    });
-  });
+  return generateOfficialClassrooms();
 };
 
 export const generateMockInvigilators = (): Invigilator[] => {

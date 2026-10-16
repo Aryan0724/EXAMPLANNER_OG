@@ -2,6 +2,7 @@
 
 import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat, BatchRoomAllocation, SessionAllotmentSummary, RoomBatchDistribution, FacultyStudentRule } from './types';
 import { DEFAULT_FACULTY_STUDENT_RULES } from './types';
+import { isCourseMatch, canonicalizeCourse } from './course-utils';
 
 /**
  * Calculates the required number of invigilators/faculty for a classroom based on student count
@@ -28,12 +29,19 @@ function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Stu
     return allStudents.filter(s => {
         const normalize = (str: string) => str ? str.trim().toLowerCase() : '';
 
-        const courseMatch = normalize(s.course) === normalize(exam.course);
-        const cleanDept = (d: string) => normalize(d).replace('department of ', '').trim();
-        const deptMatch = cleanDept(s.department) === cleanDept(exam.department);
+        const courseMatch = isCourseMatch(s.course, exam.course) || normalize(s.course) === normalize(exam.course);
+        const cleanDept = (d: string) => normalize(d).replace(/department of |school of |college of /g, '').trim();
+
+        const examDeptClean = cleanDept(exam.department);
+        const studentDeptClean = cleanDept(s.department);
+        const deptMatch = !examDeptClean || 
+                          !studentDeptClean || 
+                          studentDeptClean === examDeptClean ||
+                          studentDeptClean.includes(examDeptClean) ||
+                          examDeptClean.includes(studentDeptClean) ||
+                          courseMatch;
 
         if (!courseMatch || !deptMatch) {
-            // console.log(`Mismatch: ${s.name} (${s.course}, ${s.department}) vs Exam (${exam.course}, ${exam.department})`);
             return false;
         }
 

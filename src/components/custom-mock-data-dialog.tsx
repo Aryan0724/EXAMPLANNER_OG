@@ -15,10 +15,11 @@ import {
     Zap, Loader2, Layers, AlertCircle
 } from 'lucide-react';
 import { ExamSlot, Student, Classroom, Invigilator, SeatPlan, InvigilatorAssignment } from '@/lib/types';
-import { generateMockClassrooms, generateMockInvigilators, generateMockStudents, generateMockExamSchedule } from '@/lib/data';
+import { generateMockClassrooms, generateMockInvigilators, generateMockStudents, generateMockExamSchedule, OFFICIAL_STUDENT_BATCH_SPECS } from '@/lib/data';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 import { parseExamPDF } from '@/lib/pdf-parser';
 import { parsePasteSchedule } from '@/lib/parsers';
+import { isCourseMatch } from '@/lib/course-utils';
 import { REVISED_NOV_2025_SCHEDULE, REVISED_NOV_2025_BATCHES } from '@/lib/revisedScheduleNov2025';
 import { BHIMTAL_MAY_2026_EXAM_SCHEDULE } from '@/lib/bhimtalDutyPlanMay2026';
 import { DataContext } from '@/context/DataContext';
@@ -113,11 +114,13 @@ export function CustomMockDataDialog({
             const key = `${courseName}__sem_${semesterNum}__dept_${deptName}`;
 
             if (!batchMap.has(key)) {
-                // If we already have a user-entered count, keep it; else check REVISED_NOV_2025_BATCHES, else 60
+                const official = OFFICIAL_STUDENT_BATCH_SPECS.find(
+                    b => isCourseMatch(b.course, courseName) && Number(b.semester) === semesterNum
+                );
                 const predefined = REVISED_NOV_2025_BATCHES.find(
                     b => b.course.toLowerCase() === courseName.toLowerCase() && Number(b.semester) === semesterNum
                 );
-                const initialCount = batchCounts[key] ?? (predefined ? predefined.count : 60);
+                const initialCount = batchCounts[key] ?? (official ? official.totalStudents : (predefined ? predefined.count : 60));
 
                 batchMap.set(key, {
                     id: key,

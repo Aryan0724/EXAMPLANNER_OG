@@ -125,14 +125,23 @@ const DebarmentStatusDialog = ({ isOpen, onClose, student, onSubmitDebarred, onR
 
 
 export default function StudentsPage() {
-  const { students, setStudents } = useContext(DataContext);
+  const { students, setStudents, resetStudentsToOfficial } = useContext(DataContext);
   const isLoading = !students;
 
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'debarred' | 'ineligible'>('all');
+  const [courseFilter, setCourseFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; student: Student | null }>({ isOpen: false, student: null });
+  const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
 
+  const availableCourses = useMemo(() => {
+    const map = new Map<string, number>();
+    (students || []).forEach(s => {
+      map.set(s.course, (map.get(s.course) || 0) + 1);
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [students]);
 
   const filteredStudents = useMemo(() => {
     let studentsToFilter = students || [];
@@ -143,17 +152,23 @@ export default function StudentsPage() {
       studentsToFilter = studentsToFilter.filter(s => s.ineligibilityRecords && s.ineligibilityRecords.length > 0);
     }
 
+    if (courseFilter !== 'all') {
+      studentsToFilter = studentsToFilter.filter(s => s.course === courseFilter);
+    }
+
     if (searchQuery) {
       const lowercasedQuery = searchQuery.toLowerCase();
       studentsToFilter = studentsToFilter.filter(student =>
         student.id.toLowerCase().includes(lowercasedQuery) ||
         student.rollNo.toLowerCase().includes(lowercasedQuery) ||
-        student.name.toLowerCase().includes(lowercasedQuery)
+        student.name.toLowerCase().includes(lowercasedQuery) ||
+        student.course.toLowerCase().includes(lowercasedQuery) ||
+        student.department.toLowerCase().includes(lowercasedQuery)
       );
     }
 
     return studentsToFilter;
-  }, [students, filter, searchQuery]);
+  }, [students, filter, courseFilter, searchQuery]);
 
   const totalPages = Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE);
   const startIndex = (currentPage - 1) * STUDENTS_PER_PAGE;
@@ -174,7 +189,16 @@ export default function StudentsPage() {
 
   const closeStatusDialog = () => {
     setDialogState({ isOpen: false, student: null });
-  }
+  };
+
+  const handleResetDefaults = () => {
+    resetStudentsToOfficial();
+    setIsResetAlertOpen(false);
+    toast({
+      title: 'Roster Reset Complete',
+      description: 'Restored the official 1,147 student cohort across all 16 degree programs.',
+    });
+  };
 
   const handleSubmitDebarred = (reason: string, isDebarred: boolean) => {
     if (!dialogState.student) return;
@@ -234,50 +258,143 @@ export default function StudentsPage() {
         onSubmitDebarred={handleSubmitDebarred}
         onRemoveIneligibility={handleRemoveIneligibility}
       />
+
+      {/* Reset Confirmation Alert */}
+      <Dialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset to Official Student Roster?</DialogTitle>
+            <DialogDescription>
+              This will restore exactly 1,147 mock students across the 16 degree programs (B.Tech CSE: 424, BBA: 202, BCA AI&DS: 178, BCA: 80, B.Sc Nursing: 63, etc.) matching the university cohort.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsResetAlertOpen(false)}>Cancel</Button>
+            <Button onClick={handleResetDefaults} className="bg-primary">
+              Restore Official 1,147 Students
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex min-h-screen">
         <MainSidebar />
         <SidebarInset>
           <div className="flex flex-col h-full">
             <MainHeader />
-            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+            <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-4">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Card className="bg-primary/5 border-primary/20">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold">{students.length}</div>
+                      <div className="text-xs text-muted-foreground font-medium">Total Registered Students</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-blue-500/5 border-blue-500/20">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-600">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{availableCourses.length}</div>
+                      <div className="text-xs text-muted-foreground font-medium">Academic Batches / Courses</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-emerald-500/5 border-emerald-500/20">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                        {students.filter(s => !s.isDebarred).length}
+                      </div>
+                      <div className="text-xs text-muted-foreground font-medium">Eligible for Exam Allotment</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
               <Card>
                 <CardHeader>
                   <div className="flex justify-between items-start flex-wrap gap-4">
                     <div>
                       <div className="flex items-center gap-2">
                         <Users className="h-6 w-6" />
-                        <CardTitle>Students</CardTitle>
+                        <CardTitle>Student Registry</CardTitle>
                       </div>
-                      <CardDescription>Manage student eligibility and debarment status.</CardDescription>
+                      <CardDescription>Official student cohort pre-configured for automated seat planning.</CardDescription>
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                      <div className="w-full sm:w-auto max-w-sm">
-                        <Input
-                          placeholder="Search students..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-8"
-                          icon={<Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant={filter === 'all' ? 'default' : 'outline'} onClick={() => setFilter('all')}>All</Button>
-                        <Button variant={filter === 'debarred' ? 'default' : 'outline'} onClick={() => setFilter('debarred')}>Debarred</Button>
-                        <Button variant={filter === 'ineligible' ? 'default' : 'outline'} onClick={() => setFilter('ineligible')}>Ineligible</Button>
-                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsResetAlertOpen(true)}
+                        className="h-9 text-xs font-semibold border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                      >
+                        Reset Official (1,147 Students)
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+                    <div className="w-full sm:w-64">
+                      <Input
+                        placeholder="Search roll no, name, course..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+
+                    <select
+                      value={courseFilter}
+                      onChange={(e) => {
+                        setCourseFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="h-9 text-xs rounded-md border border-input bg-background px-3 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-auto"
+                    >
+                      <option value="all">All Degree Courses ({students.length})</option>
+                      {availableCourses.map(([course, count]) => (
+                        <option key={course} value={course}>
+                          {course} ({count})
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="flex gap-1.5 ml-auto">
+                      <Button size="sm" variant={filter === 'all' ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setFilter('all')}>All</Button>
+                      <Button size="sm" variant={filter === 'debarred' ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setFilter('debarred')}>Debarred</Button>
+                      <Button size="sm" variant={filter === 'ineligible' ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => setFilter('ineligible')}>Ineligible</Button>
                     </div>
                   </div>
                 </CardHeader>
+
                 <CardContent>
-                  <div className="border rounded-md">
+                  <div className="border rounded-md overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>ID</TableHead>
+                          <TableHead className="w-20">ID</TableHead>
                           <TableHead>Roll No.</TableHead>
                           <TableHead>Name</TableHead>
-                          <TableHead>Department</TableHead>
                           <TableHead>Course</TableHead>
+                          <TableHead>Sem</TableHead>
+                          <TableHead>Sec</TableHead>
+                          <TableHead>Department</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right">Action</TableHead>
                         </TableRow>
@@ -285,33 +402,43 @@ export default function StudentsPage() {
                       <TableBody>
                         {isLoading && (
                           <TableRow>
-                            <TableCell colSpan={7} className="p-8 text-center">Loading students...</TableCell>
+                            <TableCell colSpan={9} className="p-8 text-center">Loading students...</TableCell>
                           </TableRow>
                         )}
                         {!isLoading && currentStudents.map((student) => (
-                          <TableRow key={student.id}>
-                            <TableCell className="font-medium">{student.id}</TableCell>
-                            <TableCell>{student.rollNo}</TableCell>
-                            <TableCell>{student.name}</TableCell>
-                            <TableCell>{student.department}</TableCell>
-                            <TableCell>{student.course}</TableCell>
+                          <TableRow key={student.id} className="hover:bg-muted/40">
+                            <TableCell className="font-mono text-xs text-muted-foreground">{student.id}</TableCell>
+                            <TableCell className="font-mono font-bold text-xs">{student.rollNo}</TableCell>
+                            <TableCell className="font-medium text-xs">{student.name}</TableCell>
+                            <TableCell className="font-semibold text-xs text-primary">{student.course}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                                Sem {student.semester}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                                Sec {student.section || 'A'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{student.department}</TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-1 items-start">
-                                {student.isDebarred && <Badge variant="destructive" title={student.debarmentReason}>Debarred</Badge>}
+                                {student.isDebarred && <Badge variant="destructive" className="text-[10px] px-1.5 py-0" title={student.debarmentReason}>Debarred</Badge>}
                                 {student.ineligibilityRecords && student.ineligibilityRecords.length > 0 && (
-                                  <Badge variant="secondary" title={student.ineligibilityRecords.map(r => `${r.subjectCode}: ${r.reason}`).join('\n')}>
-                                    Ineligible ({student.ineligibilityRecords.length} subjects)
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                    Ineligible ({student.ineligibilityRecords.length})
                                   </Badge>
                                 )}
                                 {!student.isDebarred && (!student.ineligibilityRecords || student.ineligibilityRecords.length === 0) && (
-                                  <Badge variant="outline">Eligible</Badge>
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20">Eligible</Badge>
                                 )}
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="outline" size="sm" onClick={() => openStatusDialog(student)}>
-                                <Ban className="mr-2 h-3 w-3" />
-                                Manage Status
+                              <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => openStatusDialog(student)}>
+                                <Ban className="mr-1.5 h-3 w-3" />
+                                Status
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -320,14 +447,14 @@ export default function StudentsPage() {
                     </Table>
                     {!isLoading && currentStudents.length === 0 && (
                       <div className="text-center text-muted-foreground py-8">
-                        No students found for this filter.
+                        No students found matching your criteria.
                       </div>
                     )}
                   </div>
                 </CardContent>
                 <CardFooter className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
-                    Showing {Math.min(startIndex + 1, filteredStudents.length)}-{Math.min(endIndex, filteredStudents.length)} of {filteredStudents.length} students.
+                    Showing {filteredStudents.length > 0 ? startIndex + 1 : 0}–{Math.min(endIndex, filteredStudents.length)} of {filteredStudents.length} students.
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -338,6 +465,9 @@ export default function StudentsPage() {
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Page {totalPages > 0 ? currentPage : 0} of {totalPages}
+                    </span>
                     <Button
                       variant="outline"
                       size="icon"

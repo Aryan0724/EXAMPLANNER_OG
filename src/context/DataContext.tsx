@@ -2,7 +2,15 @@
 
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { Student, Classroom, Invigilator, ExamSlot, createClassroom, FacultyStudentRule, DEFAULT_FACULTY_STUDENT_RULES } from '@/lib/types';
-import { generateMockStudents, generateMockClassrooms, generateMockInvigilators, generateMockExamSchedule, getBhimtalExamSchedule } from '@/lib/data';
+import { 
+  generateMockStudents, 
+  generateMockClassrooms, 
+  generateMockInvigilators, 
+  generateMockExamSchedule, 
+  getBhimtalExamSchedule,
+  generateOfficialClassrooms,
+  generateOfficialStudents 
+} from '@/lib/data';
 
 interface DataContextType {
   students: Student[];
@@ -24,6 +32,8 @@ interface DataContextType {
   setReservedCount: React.Dispatch<React.SetStateAction<number>>;
   facultyStudentRules: FacultyStudentRule[];
   setFacultyStudentRules: React.Dispatch<React.SetStateAction<FacultyStudentRule[]>>;
+  resetClassroomsToOfficial: () => void;
+  resetStudentsToOfficial: () => void;
 }
 
 export const DataContext = createContext<DataContextType>({
@@ -46,19 +56,41 @@ export const DataContext = createContext<DataContextType>({
   setReservedCount: () => { },
   facultyStudentRules: DEFAULT_FACULTY_STUDENT_RULES,
   setFacultyStudentRules: () => { },
+  resetClassroomsToOfficial: () => { },
+  resetStudentsToOfficial: () => { },
 });
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [students, setStudentsState] = useState<Student[]>([]);
+  const [classrooms, setClassroomsState] = useState<Classroom[]>([]);
   const [invigilators, setInvigilators] = useState<Invigilator[]>(generateMockInvigilators());
   const [examSchedule, setExamSchedule] = useState<ExamSlot[]>([]);
-  const [blockPriority, setBlockPriority] = useState<string[]>([]);
+  const [blockPriority, setBlockPriority] = useState<string[]>(['Admin Block A', 'Academic Block C', 'Academic Block D', 'Academic Block E']);
   const [excludedBlocks, setExcludedBlocks] = useState<string[]>([]);
   const [excludedRooms, setExcludedRooms] = useState<string[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [reservedCount, setReservedCount] = useState(4);
   const [facultyStudentRules, setFacultyStudentRulesState] = useState<FacultyStudentRule[]>(DEFAULT_FACULTY_STUDENT_RULES);
+
+  const setClassrooms = (valOrFn: React.SetStateAction<Classroom[]>) => {
+    setClassroomsState(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      try {
+        localStorage.setItem('gehu_classrooms', JSON.stringify(next));
+      } catch (err) {}
+      return next;
+    });
+  };
+
+  const setStudents = (valOrFn: React.SetStateAction<Student[]>) => {
+    setStudentsState(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      try {
+        localStorage.setItem('gehu_students', JSON.stringify(next));
+      } catch (err) {}
+      return next;
+    });
+  };
 
   const setFacultyStudentRules = (valOrFn: React.SetStateAction<FacultyStudentRule[]>) => {
     setFacultyStudentRulesState(prev => {
@@ -68,6 +100,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       } catch (err) {}
       return next;
     });
+  };
+
+  const resetClassroomsToOfficial = () => {
+    const official = generateOfficialClassrooms();
+    setClassrooms(official);
+  };
+
+  const resetStudentsToOfficial = () => {
+    const official = generateOfficialStudents();
+    setStudents(official);
   };
 
   useEffect(() => {
@@ -83,12 +125,50 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    // Load Bhimtal specific data by default
-    setStudents(generateMockStudents(60)); // 60 students per course for realistic testing
-    setClassrooms(generateMockClassrooms());
+    // 1. Initialize Classrooms (Official 18 rooms / 1,147 seats or saved user customizations)
+    let initialRooms: Classroom[] = [];
+    try {
+      const savedRooms = localStorage.getItem('gehu_classrooms');
+      if (savedRooms) {
+        const parsed = JSON.parse(savedRooms);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          initialRooms = parsed.map((r: any) => createClassroom(r));
+        }
+      }
+    } catch (err) {}
+
+    if (initialRooms.length === 0) {
+      initialRooms = generateOfficialClassrooms();
+      try {
+        localStorage.setItem('gehu_classrooms', JSON.stringify(initialRooms));
+      } catch (err) {}
+    }
+    setClassroomsState(initialRooms);
+
+    // 2. Initialize Students (Official 16 batches / 1,147 students or saved user data)
+    let initialStudents: Student[] = [];
+    try {
+      const savedStudents = localStorage.getItem('gehu_students');
+      if (savedStudents) {
+        const parsed = JSON.parse(savedStudents);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          initialStudents = parsed;
+        }
+      }
+    } catch (err) {}
+
+    if (initialStudents.length === 0) {
+      initialStudents = generateOfficialStudents();
+      try {
+        localStorage.setItem('gehu_students', JSON.stringify(initialStudents));
+      } catch (err) {}
+    }
+    setStudentsState(initialStudents);
+
+    // 3. Initialize Faculty and Exam Schedule
     setInvigilators(generateMockInvigilators());
     setExamSchedule(getBhimtalExamSchedule());
-    setBlockPriority(['Academic Block C', 'Academic Block D', 'Academic Block E']);
+    setBlockPriority(['Admin Block A', 'Academic Block C', 'Academic Block D', 'Academic Block E']);
     setExcludedBlocks([]);
     setExcludedRooms([]);
     setIsHydrated(true);
@@ -105,7 +185,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       excludedRooms, setExcludedRooms,
       isHydrated,
       reservedCount, setReservedCount,
-      facultyStudentRules, setFacultyStudentRules
+      facultyStudentRules, setFacultyStudentRules,
+      resetClassroomsToOfficial,
+      resetStudentsToOfficial
     }}>
       {children}
     </DataContext.Provider>

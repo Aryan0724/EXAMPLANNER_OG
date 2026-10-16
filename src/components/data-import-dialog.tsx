@@ -8,6 +8,7 @@ import { Upload, FileUp, AlertCircle, CheckCircle2, Download } from 'lucide-reac
 import { Student, Classroom, createClassroom, Invigilator, ExamSlot } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { parsePasteSchedule } from '@/lib/parsers';
+import { canonicalizeCourse } from '@/lib/course-utils';
 
 interface DataImportDialogProps {
     isOpen: boolean;
@@ -213,9 +214,9 @@ export function DataImportDialog({
                     id: String(row.id || Math.random().toString(36).substr(2, 9)),
                     date: parseExcelDate(row.date || row.Date),
                     time: parseExcelTime(row.time || row.Time),
-                    course: normalizeText(row.course || row.Course),
+                    course: canonicalizeCourse(normalizeText(row.course || row.Course)),
                     department: normalizeText(row.department || row.Department),
-                    semester: Number(row.semester || row.Semester),
+                    semester: Number(row.semester || row.Semester || row.Sem || 3),
                     subjectName: row.subjectName || row.SubjectName || row.Subject,
                     subjectCode: String(row.subjectCode || row.SubjectCode || row.Code || 'N/A').toUpperCase().trim(),
                     duration: Number(row.duration || 90),

@@ -1,4 +1,5 @@
 import { ExamSlot } from './types';
+import { canonicalizeCourse } from './course-utils';
 
 export const parsePasteSchedule = (text: string): ExamSlot[] => {
     const lines = text.split('\n');
@@ -13,8 +14,15 @@ export const parsePasteSchedule = (text: string): ExamSlot[] => {
         // Skip header line
         if (trimmedLine.toLowerCase().includes('date') && trimmedLine.toLowerCase().includes('shift') && trimmedLine.toLowerCase().includes('subject')) return;
 
-        const content = trimmedLine.replace(/^\|/, '').replace(/\|$/, '');
-        const columns = content.split('|').map(c => c.trim());
+        let columns: string[] = [];
+        if (trimmedLine.includes('\t')) {
+            columns = trimmedLine.split('\t').map(c => c.trim());
+        } else if (trimmedLine.includes('|')) {
+            const content = trimmedLine.replace(/^\|/, '').replace(/\|$/, '');
+            columns = content.split('|').map(c => c.trim());
+        } else if (trimmedLine.includes(',')) {
+            columns = trimmedLine.split(',').map(c => c.trim());
+        }
 
         if (columns.length < 4) return;
 
@@ -24,9 +32,10 @@ export const parsePasteSchedule = (text: string): ExamSlot[] => {
         const shiftStr = columns[1];
         const subjectCode = columns[2];
         const subjectName = columns[3];
-        const course = columns[4] || 'Imported';
-        const department = columns[5] || 'Imported';
-        const semStr = columns[6] || '1';
+        const rawCourse = columns[4] || 'B.Tech CSE';
+        const course = canonicalizeCourse(rawCourse);
+        const department = columns[5] || 'Computer Science and Engineering';
+        const semStr = columns[6] || '3';
 
         // Parse Date
         let formattedDate = '';
