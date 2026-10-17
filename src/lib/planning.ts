@@ -71,6 +71,83 @@ function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Stu
     });
 }
 
+/**
+ * Evaluates whether two students conflict and therefore CANNOT sit on the same bench.
+ * Under university examination regulations:
+ * 1. Students taking the same examination paper (subject code) cannot sit together.
+ * 2. Students from the same course / program / degree (e.g. B.Tech CSE) cannot sit together.
+ * 3. Students from the same department and semester cannot sit together.
+ */
+export function isStudentConflict(
+    s1: { course: string; department?: string; semester?: number | string; exam?: { subjectCode?: string; course?: string } },
+    s2: { course: string; department?: string; semester?: number | string; exam?: { subjectCode?: string; course?: string } }
+): boolean {
+    if (!s1 || !s2) return false;
+
+    // 1. Same subject code (case-insensitive & whitespace trimmed)
+    const sub1 = (s1.exam?.subjectCode || '').trim().toLowerCase();
+    const sub2 = (s2.exam?.subjectCode || '').trim().toLowerCase();
+    if (sub1 && sub2 && sub1 === sub2) {
+        return true;
+    }
+
+    // 2. Direct course match or alias match (e.g. B.Tech CSE and B.Tech Computer Science and Engineering)
+    if (isCourseMatch(s1.course, s2.course)) {
+        return true;
+    }
+    if (s1.exam?.course && s2.exam?.course && isCourseMatch(s1.exam.course, s2.exam.course)) {
+        return true;
+    }
+    if (s1.exam?.course && s2.exam?.course && isCourseMatch(s1.course, s2.exam.course)) {
+        return true;
+    }
+    if (s2.exam?.course && s1.exam?.course && isCourseMatch(s2.course, s1.exam.course)) {
+        return true;
+    }
+
+    // 3. Canonical course string comparison
+    const canon1 = canonicalizeCourse(s1.course || s1.exam?.course);
+    const canon2 = canonicalizeCourse(s2.course || s2.exam?.course);
+    if (canon1 && canon2 && canon1.toLowerCase() === canon2.toLowerCase()) {
+        return true;
+    }
+
+    // 4. Same department AND same semester check
+    if (s1.department && s2.department && s1.semester && s2.semester) {
+        const clean = (d: string) => d.trim().toLowerCase().replace(/department of |school of |college of /g, '').trim();
+        const d1 = clean(s1.department);
+        const d2 = clean(s2.department);
+        if (d1 && d2 && d1 === d2 && Number(s1.semester) === Number(s2.semester)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Checks if a candidate student conflicts with any already seated student on the same bench.
+ */
+export function doesCandidateConflictWithBench(
+    candidate: Student & { exam: ExamSlot },
+    benchFlatIdxBase: number,
+    benchSize: number,
+    currentFlatIdx: number,
+    map: (Seat | null)[]
+): boolean {
+    for (let s = 0; s < benchSize; s++) {
+        const otherFlatIdx = benchFlatIdxBase + s;
+        if (otherFlatIdx === currentFlatIdx) continue;
+        const otherSeat = map[otherFlatIdx];
+        if (otherSeat && otherSeat.student) {
+            if (isStudentConflict(candidate, otherSeat.student)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 export function generateSeatPlan(
     allStudents: Student[],
     classrooms: Classroom[],
@@ -136,37 +213,11 @@ export function generateSeatPlan(
         }
 
         // If not assigned/valid, add to pool
-        const key = student.exam.subjectCode; // Group by subject code effectively
+        const key = `${canonicalizeCourse(student.course || student.exam.course)}_${student.exam.subjectCode}`;
         if (!studentPools.has(key)) studentPools.set(key, []);
         studentPools.get(key)!.push(student);
     });
 
-    // If only one subject pool exists in this slot, split into two alternating sub-streams
-    // (Stream A and Stream B) so left and right sides of benches alternate cleanly.
-    if (studentPools.size === 1) {
-        const [singleKey, singleList] = Array.from(studentPools.entries())[0];
-        const oddList: (Student & { exam: ExamSlot })[] = [];
-        const evenList: (Student & { exam: ExamSlot })[] = [];
-        singleList.forEach((s, idx) => {
-            if (idx % 2 === 0) oddList.push(s);
-            else evenList.push(s);
-        });
-        studentPools.clear();
-        studentPools.set(`${singleKey}-A`, oddList);
-        studentPools.set(`${singleKey}-B`, evenList);
-    }
-
-    // Sort pools by size (Descending)
-    // We want to burn down the largest courses first using the largest rooms
-    let sortedPoolKeys = Array.from(studentPools.keys()).sort((a, b) =>
-        studentPools.get(b)!.length - studentPools.get(a)!.length
-    );
-
-    // 5. Assignment Loop
-    // We iterate through rooms (Largest first).
-    // For each room, we try to grab the two largest available pools and zipper them.
-
-    // 5. Assignment Preparation
     // Sort pools by roll number (numeric-aware) so students sit in order
     const sortedPools = new Map<string, (Student & { exam: ExamSlot })[]>();
     studentPools.forEach((pool, key) => {
@@ -182,10 +233,6 @@ export function generateSeatPlan(
 
     availableClassrooms.forEach(room => {
         const map = roomSeatMaps.get(room.id)!;
-        
-        // Build logical tracks for this room
-        // Each bench has 'benchSize' seats. We want to fill vertically down the room.
-        // A "Track" is the set of the same-positioned seats in all benches of a single column.
         
         // Find max bench size to determine how many 'sides' we have
         const maxBenchSize = Math.max(...room.benchCapacities);
@@ -206,44 +253,65 @@ export function generateSeatPlan(
                     const benchSize = room.benchCapacities[benchIdx];
                     if (side >= benchSize) continue;
 
-                    // Calculate the flat index in the room's map
-                    let flatIdx = 0;
-                    for (let b = 0; b < benchIdx; b++) flatIdx += room.benchCapacities[b];
-                    flatIdx += side;
+                    // Calculate the starting flat index of this bench
+                    let benchFlatIdxBase = 0;
+                    for (let b = 0; b < benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
+                    const flatIdx = benchFlatIdxBase + side;
 
                     if (map[flatIdx] !== null) continue; // Already handled (persistent seat)
-
-                    // Adjacency Check: Left neighbor in same bench
-                    const leftNeighborFlatIdx = side > 0 ? flatIdx - 1 : -1;
-                    const leftNeighborSubject = (leftNeighborFlatIdx !== -1 && map[leftNeighborFlatIdx]) 
-                        ? map[leftNeighborFlatIdx]?.student?.exam.subjectCode 
-                        : null;
 
                     let poolKey: string | null = null;
                     
                     // Priority 1: Continuity - Check if current track already has a course locked
+                    // and that course has students left and does NOT conflict with any student on this bench
                     const currentLockedPool = trackCourseMap.get(trackKey);
-                    if (currentLockedPool && sortedPools.get(currentLockedPool)!.length > 0 && currentLockedPool !== leftNeighborSubject) {
+                    if (
+                        currentLockedPool &&
+                        sortedPools.has(currentLockedPool) &&
+                        sortedPools.get(currentLockedPool)!.length > 0 &&
+                        !doesCandidateConflictWithBench(
+                            sortedPools.get(currentLockedPool)![0],
+                            benchFlatIdxBase,
+                            benchSize,
+                            flatIdx,
+                            map
+                        )
+                    ) {
                         poolKey = currentLockedPool;
                     } else {
                         // Priority 2: Select a NEW course for this track
-                        // Sort by remaining strength for stability
-                        activePoolKeys.sort((a, b) => sortedPools.get(b)!.length - sortedPools.get(a)!.length);
-                        const validPoolKeys = activePoolKeys.filter(k => 
-                            sortedPools.get(k)!.length > 0 && k !== leftNeighborSubject
+                        // Sort active pool keys by remaining strength for optimal multi-course pairing
+                        activePoolKeys.sort((a, b) => 
+                            (sortedPools.get(b)?.length || 0) - (sortedPools.get(a)?.length || 0)
                         );
 
-                        if (validPoolKeys.length > 0) {
-                            poolKey = validPoolKeys[0];
+                        const validPoolKey = activePoolKeys.find(k => {
+                            const pool = sortedPools.get(k);
+                            if (!pool || pool.length === 0) return false;
+                            return !doesCandidateConflictWithBench(
+                                pool[0],
+                                benchFlatIdxBase,
+                                benchSize,
+                                flatIdx,
+                                map
+                            );
+                        });
+
+                        if (validPoolKey) {
+                            poolKey = validPoolKey;
                             trackCourseMap.set(trackKey, poolKey); // Lock this track to the new course
                         } else {
-                            // No valid pools (possibly empty or only conflicting pools left)
+                            // No valid non-conflicting pools left: THIS BENCH SEAT MUST REMAIN EMPTY!
                             trackCourseMap.set(trackKey, null);
                         }
                     }
 
                     if (poolKey) {
                         const student = sortedPools.get(poolKey)!.shift()!;
+                        student.seatAssignment = {
+                            classroomId: room.id,
+                            seatNumber: flatIdx + 1
+                        };
                         map[flatIdx] = {
                             student: student,
                             classroom: room,
