@@ -13,7 +13,7 @@ export const AllotmentContext = createContext<AllotmentContextType>({
   setFullAllotment: () => { },
 });
 
-export const ALLOTMENT_STORAGE_KEY = 'gehu_full_allotment_v5';
+export const ALLOTMENT_STORAGE_KEY = 'gehu_full_allotment_v6';
 
 export const AllotmentProvider = ({ children }: { children: React.ReactNode }) => {
   const [fullAllotment, setFullAllotmentState] = useState<Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> | null>(null);
@@ -23,6 +23,9 @@ export const AllotmentProvider = ({ children }: { children: React.ReactNode }) =
       // Invalidate and remove outdated pre-fix allotment cache
       if (localStorage.getItem('gehu_full_allotment')) {
         localStorage.removeItem('gehu_full_allotment');
+      }
+      if (localStorage.getItem('gehu_full_allotment_v5')) {
+        localStorage.removeItem('gehu_full_allotment_v5');
       }
       const saved = localStorage.getItem(ALLOTMENT_STORAGE_KEY);
       if (saved) {

@@ -243,6 +243,78 @@ export function countSeatPlanViolations(
     return getSeatPlanViolations(plan, classrooms).length;
 }
 
+/**
+ * Verifies that a seat plan adheres to all university examination sitting rules:
+ * 1. Zero same-course or same-subject conflicts on any bench.
+ * 2. In single-course dual-bench rooms, students must alternate sides (zig-zag / checkerboard)
+ *    rather than being locked to one side.
+ */
+export function isSeatPlanCompliantWithSittingRules(
+    plan: SeatPlan,
+    classrooms: Classroom[] = []
+): boolean {
+    if (!plan || !plan.assignments || plan.assignments.length === 0) return true;
+    if (countSeatPlanViolations(plan, classrooms) > 0) return false;
+
+    const validClassrooms = Array.isArray(classrooms) ? classrooms.filter(c => c && c.id) : [];
+    const roomMap = new Map(validClassrooms.map(c => [c.id, c]));
+
+    const assignmentsByRoom = new Map<string, Seat[]>();
+    for (const seat of plan.assignments) {
+        if (!seat || !seat.classroom?.id) continue;
+        if (!assignmentsByRoom.has(seat.classroom.id)) {
+            assignmentsByRoom.set(seat.classroom.id, []);
+        }
+        assignmentsByRoom.get(seat.classroom.id)!.push(seat);
+    }
+
+    for (const [roomId, seats] of assignmentsByRoom.entries()) {
+        const room = roomMap.get(roomId) || seats[0]?.classroom;
+        if (!room || !Array.isArray(room.benchCapacities) || room.benchCapacities.length === 0) continue;
+
+        const seatedSeats = seats.filter(s => s && s.student);
+        if (seatedSeats.length <= 2) continue;
+
+        const courses = new Set(
+            seatedSeats.map(s => canonicalizeCourse(s.student?.course || s.student?.exam?.course))
+        );
+        if (courses.size === 1) {
+            let seatCounter = 1;
+            let dualBenchesWithStudent = 0;
+            let side0Count = 0;
+            let side1Count = 0;
+
+            const seatMap = new Map<number, Seat>();
+            seats.forEach(s => {
+                if (s && typeof s.seatNumber === 'number') seatMap.set(s.seatNumber, s);
+            });
+
+            room.benchCapacities.forEach(cap => {
+                if (cap >= 2) {
+                    const s0 = seatMap.get(seatCounter);
+                    const s1 = seatMap.get(seatCounter + 1);
+                    if (s0?.student && !s1?.student) {
+                        dualBenchesWithStudent++;
+                        side0Count++;
+                    } else if (!s0?.student && s1?.student) {
+                        dualBenchesWithStudent++;
+                        side1Count++;
+                    }
+                }
+                seatCounter += cap;
+            });
+
+            // If 4 or more dual benches are occupied by a single course, but 100% of them are on side 0,
+            // this plan is non-compliant with alternate seating!
+            if (dualBenchesWithStudent >= 4 && (side0Count === dualBenchesWithStudent || side1Count === dualBenchesWithStudent)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 export function generateSeatPlan(
     allStudents: Student[],
     classrooms: Classroom[],
@@ -308,96 +380,128 @@ export function generateSeatPlan(
         sortedPools.set(key, sorted);
     });
 
-    const activePoolKeys = Array.from(sortedPools.keys()).sort((a, b) => 
-        sortedPools.get(b)!.length - sortedPools.get(a)!.length
-    );
+    // Helper to find next available pool that does not conflict with excluded pools
+    const getAvailablePool = (excludePools: string[] = []): string | null => {
+        const sortedKeys = Array.from(sortedPools.keys())
+            .filter(k => (sortedPools.get(k)?.length || 0) > 0)
+            .sort((a, b) => (sortedPools.get(b)?.length || 0) - (sortedPools.get(a)?.length || 0));
+
+        for (const key of sortedKeys) {
+            const pool = sortedPools.get(key);
+            if (!pool || pool.length === 0) continue;
+            const cand = pool[0];
+            const hasConflict = excludePools.some(exKey => {
+                const exPool = sortedPools.get(exKey);
+                if (!exPool || exPool.length === 0) return false;
+                return isStudentConflict(cand, exPool[0]);
+            });
+            if (!hasConflict) {
+                return key;
+            }
+        }
+        return null;
+    };
+
+    let activeTrackAPool: string | null = null;
+    let activeTrackBPool: string | null = null;
 
     availableClassrooms.forEach(room => {
         const map = roomSeatMaps.get(room.id)!;
-        
-        // Find max bench size to determine how many 'sides' we have
-        const maxBenchSize = Math.max(...room.benchCapacities);
-        
-        // Track the current course assigned to each vertical track for continuity
-        const trackCourseMap = new Map<string, string | null>();
 
-        // Iterate through columns first, then sides, then rows
-        // This ensures the sequential flow (Col 1 Side A, then Col 1 Side B...)
+        // Iterate column by column to maintain sequential roll-number progression down each aisle
         for (let col = 0; col < room.columns; col++) {
-            for (let side = 0; side < maxBenchSize; side++) {
-                const trackKey = `${col}-${side}`;
+            // Track continuity or re-selection for Track A (Primary)
+            if (!activeTrackAPool || (sortedPools.get(activeTrackAPool)?.length || 0) === 0) {
+                activeTrackAPool = getAvailablePool(activeTrackBPool ? [activeTrackBPool] : []);
+            }
 
-                for (let row = 0; row < room.rows; row++) {
-                    const benchIdx = row * room.columns + col;
-                    if (benchIdx >= room.benchCapacities.length) continue;
-                    
-                    const benchSize = room.benchCapacities[benchIdx];
-                    if (side >= benchSize) continue;
+            // Track continuity or re-selection for Track B (Secondary)
+            if (!activeTrackBPool || (sortedPools.get(activeTrackBPool)?.length || 0) === 0) {
+                activeTrackBPool = getAvailablePool(activeTrackAPool ? [activeTrackAPool] : []);
+            }
 
-                    // Calculate the starting flat index of this bench
-                    let benchFlatIdxBase = 0;
-                    for (let b = 0; b < benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
-                    const flatIdx = benchFlatIdxBase + side;
+            for (let row = 0; row < room.rows; row++) {
+                const benchIdx = row * room.columns + col;
+                if (benchIdx >= room.benchCapacities.length) continue;
 
-                    if (map[flatIdx] !== null) continue; // Already handled (persistent seat)
+                const benchSize = room.benchCapacities[benchIdx];
+                if (benchSize <= 0) continue;
 
-                    let poolKey: string | null = null;
-                    
-                    // Priority 1: Continuity - Check if current track already has a course locked
-                    // and that course has students left and does NOT conflict with any student on this bench
-                    const currentLockedPool = trackCourseMap.get(trackKey);
-                    if (
-                        currentLockedPool &&
-                        sortedPools.has(currentLockedPool) &&
-                        sortedPools.get(currentLockedPool)!.length > 0 &&
-                        !doesCandidateConflictWithBench(
-                            sortedPools.get(currentLockedPool)![0],
-                            benchFlatIdxBase,
-                            benchSize,
-                            flatIdx,
-                            map
-                        )
-                    ) {
-                        poolKey = currentLockedPool;
-                    } else {
-                        // Priority 2: Select a NEW course for this track
-                        // Sort active pool keys by remaining strength for optimal multi-course pairing
-                        activePoolKeys.sort((a, b) => 
-                            (sortedPools.get(b)?.length || 0) - (sortedPools.get(a)?.length || 0)
-                        );
+                let benchFlatIdxBase = 0;
+                for (let b = 0; b < benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
 
-                        const validPoolKey = activePoolKeys.find(k => {
-                            const pool = sortedPools.get(k);
-                            if (!pool || pool.length === 0) return false;
-                            return !doesCandidateConflictWithBench(
-                                pool[0],
+                if (benchSize === 1) {
+                    // Single bench seat: assign to primary track (or next available pool)
+                    const flatIdx = benchFlatIdxBase + 0;
+                    if (map[flatIdx] !== null) continue;
+
+                    let poolKey = activeTrackAPool;
+                    if (!poolKey || (sortedPools.get(poolKey)?.length || 0) === 0) {
+                        poolKey = getAvailablePool();
+                        activeTrackAPool = poolKey;
+                    }
+
+                    if (poolKey && (sortedPools.get(poolKey)?.length || 0) > 0) {
+                        const student = sortedPools.get(poolKey)!.shift()!;
+                        student.seatAssignment = { classroomId: room.id, seatNumber: flatIdx + 1 };
+                        map[flatIdx] = { student, classroom: room, seatNumber: flatIdx + 1 };
+                    }
+                } else {
+                    // Dual (or multi-seater) bench:
+                    // Parity is calculated as (row + col) % 2 for authentic university zig-zag checkerboard:
+                    // 1. In any column, students on consecutive benches alternate between Left and Right sides.
+                    // 2. In any row, students in adjacent columns alternate sides (no adjacent same-row seating).
+                    // 3. Multi-course examinations interleave courses across Left and Right with zero conflicts.
+                    const primarySide = (row + col) % 2;
+                    const secondarySide = 1 - primarySide;
+
+                    const primaryFlatIdx = benchFlatIdxBase + primarySide;
+                    const secondaryFlatIdx = benchFlatIdxBase + secondarySide;
+
+                    // 1. Seat Primary Track (Track A)
+                    if (map[primaryFlatIdx] === null) {
+                        if (!activeTrackAPool || (sortedPools.get(activeTrackAPool)?.length || 0) === 0) {
+                            activeTrackAPool = getAvailablePool(activeTrackBPool ? [activeTrackBPool] : []);
+                        }
+
+                        if (
+                            activeTrackAPool &&
+                            (sortedPools.get(activeTrackAPool)?.length || 0) > 0 &&
+                            !doesCandidateConflictWithBench(
+                                sortedPools.get(activeTrackAPool)![0],
                                 benchFlatIdxBase,
                                 benchSize,
-                                flatIdx,
+                                primaryFlatIdx,
                                 map
-                            );
-                        });
-
-                        if (validPoolKey) {
-                            poolKey = validPoolKey;
-                            trackCourseMap.set(trackKey, poolKey); // Lock this track to the new course
-                        } else {
-                            // No valid non-conflicting pools left: THIS BENCH SEAT MUST REMAIN EMPTY!
-                            trackCourseMap.set(trackKey, null);
+                            )
+                        ) {
+                            const student = sortedPools.get(activeTrackAPool)!.shift()!;
+                            student.seatAssignment = { classroomId: room.id, seatNumber: primaryFlatIdx + 1 };
+                            map[primaryFlatIdx] = { student, classroom: room, seatNumber: primaryFlatIdx + 1 };
                         }
                     }
 
-                    if (poolKey) {
-                        const student = sortedPools.get(poolKey)!.shift()!;
-                        student.seatAssignment = {
-                            classroomId: room.id,
-                            seatNumber: flatIdx + 1
-                        };
-                        map[flatIdx] = {
-                            student: student,
-                            classroom: room,
-                            seatNumber: flatIdx + 1
-                        };
+                    // 2. Seat Secondary Track (Track B)
+                    if (map[secondaryFlatIdx] === null) {
+                        if (!activeTrackBPool || (sortedPools.get(activeTrackBPool)?.length || 0) === 0) {
+                            activeTrackBPool = getAvailablePool(activeTrackAPool ? [activeTrackAPool] : []);
+                        }
+
+                        if (
+                            activeTrackBPool &&
+                            (sortedPools.get(activeTrackBPool)?.length || 0) > 0 &&
+                            !doesCandidateConflictWithBench(
+                                sortedPools.get(activeTrackBPool)![0],
+                                benchFlatIdxBase,
+                                benchSize,
+                                secondaryFlatIdx,
+                                map
+                            )
+                        ) {
+                            const student = sortedPools.get(activeTrackBPool)!.shift()!;
+                            student.seatAssignment = { classroomId: room.id, seatNumber: secondaryFlatIdx + 1 };
+                            map[secondaryFlatIdx] = { student, classroom: room, seatNumber: secondaryFlatIdx + 1 };
+                        }
                     }
                 }
             }

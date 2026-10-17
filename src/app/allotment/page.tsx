@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator, FacultyStudentRule } from '@/lib/types';
-import { generateSeatPlan, assignInvigilators, countSeatPlanViolations } from '@/lib/planning';
+import { generateSeatPlan, assignInvigilators, countSeatPlanViolations, isSeatPlanCompliantWithSittingRules } from '@/lib/planning';
 import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateDetailedInvigilatorDutyChart } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
@@ -143,10 +143,11 @@ export default function AllotmentPage() {
       const sessionExamIds = new Set(concurrentExams.map(e => e.id));
 
       // 1. Strict seating compliance self-repair:
-      // If the loaded seat plan has bench violations (e.g. from an outdated pre-fix plan in localStorage),
-      // automatically heal it with the strict 1-student-per-bench spacing rules at most once per slotKey.
-      const benchViolations = countSeatPlanViolations(newSeatPlan, classrooms);
-      if (benchViolations > 0 && concurrentExams.length > 0 && students.length > 0 && !autoRepairedSlotsRef.current.has(slotKey)) {
+      // If the loaded seat plan has bench violations or breaks alternate zig-zag seating
+      // (e.g. from an outdated pre-fix plan in localStorage),
+      // automatically heal it with the strict alternate checkerboard spacing rules at most once per slotKey.
+      const isCompliant = isSeatPlanCompliantWithSittingRules(newSeatPlan, classrooms);
+      if (!isCompliant && concurrentExams.length > 0 && students.length > 0 && !autoRepairedSlotsRef.current.has(slotKey)) {
         autoRepairedSlotsRef.current.add(slotKey);
         const cleanStudents = students.map(s => ({ ...s, seatAssignment: null }));
         const { plan: healedSeatPlan } = generateSeatPlan(cleanStudents, classrooms, concurrentExams, blockPriority);
@@ -172,8 +173,8 @@ export default function AllotmentPage() {
         const firstClassroomId = healedSeatPlan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
         setSelectedClassroomId(firstClassroomId);
         toast({
-          title: "Allotment Auto-Repaired",
-          description: `Resolved ${benchViolations} same-course bench conflict(s). Strict 1-student-per-bench spacing enforced.`,
+          title: "Allotment Synchronized",
+          description: "Applied strict alternate (zig-zag / checkerboard) seating rules.",
         });
         return;
       }
