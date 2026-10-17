@@ -4,8 +4,9 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Seat, Student } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { User, Ban } from 'lucide-react';
+import { User, Ban, AlertTriangle } from 'lucide-react';
 import { useMemo } from 'react';
+import { isStudentConflict } from '@/lib/planning';
 
 
 // Predefined pastel palette for distinct course colors
@@ -92,11 +93,19 @@ export function ClassroomVisualizer({ assignments, classroom, courseColors }: Cl
             {Array.from({ length: classroom.rows }).map((_, r) => {
               const benchIdx = r * classroom.columns + c;
               const benchSeats = benches[benchIdx] || [];
+              const benchStudents = benchSeats.filter(s => s.student).map(s => s.student!);
+              const hasBenchConflict = benchStudents.length > 1 && benchStudents.some((s1, i) =>
+                benchStudents.slice(i + 1).some(s2 => isStudentConflict(s1, s2))
+              );
 
               return (
                 <div
                   key={`bench-${r}-${c}`}
-                  className="flex items-center justify-center gap-0.5 p-0.5 rounded-md bg-background border shadow-sm flex-nowrap min-h-[3rem]"
+                  className={cn(
+                    "flex items-center justify-center gap-0.5 p-0.5 rounded-md bg-background border shadow-sm flex-nowrap min-h-[3rem] transition-all",
+                    hasBenchConflict && "border-rose-400 bg-rose-50/60 ring-1 ring-rose-400"
+                  )}
+                  title={hasBenchConflict ? "Bench Rule Violation: Same-course or same-subject students seated together" : undefined}
                 >
                   {benchSeats.map((seat, seatIdx) => {
                     const subjectCode = seat.student?.exam?.subjectCode;

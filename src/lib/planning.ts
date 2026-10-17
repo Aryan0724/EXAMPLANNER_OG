@@ -98,10 +98,10 @@ export function isStudentConflict(
     if (s1.exam?.course && s2.exam?.course && isCourseMatch(s1.exam.course, s2.exam.course)) {
         return true;
     }
-    if (s1.exam?.course && s2.exam?.course && isCourseMatch(s1.course, s2.exam.course)) {
+    if (s2.exam?.course && isCourseMatch(s1.course, s2.exam.course)) {
         return true;
     }
-    if (s2.exam?.course && s1.exam?.course && isCourseMatch(s2.course, s1.exam.course)) {
+    if (s1.exam?.course && isCourseMatch(s2.course, s1.exam.course)) {
         return true;
     }
 
@@ -146,6 +146,94 @@ export function doesCandidateConflictWithBench(
         }
     }
     return false;
+}
+
+export interface BenchViolationDetail {
+    classroomId: string;
+    roomNo: string;
+    benchIndex: number;
+    seatNumber1: number;
+    seatNumber2: number;
+    student1: Student;
+    student2: Student;
+    reason: string;
+}
+
+/**
+ * Inspects every bench across all classrooms in a seat plan and returns detailed violations
+ * where two students seated on the same bench conflict under university examination rules.
+ */
+export function getSeatPlanViolations(
+    plan: SeatPlan,
+    classrooms: Classroom[]
+): BenchViolationDetail[] {
+    if (!plan || !plan.assignments || plan.assignments.length === 0) return [];
+
+    const violations: BenchViolationDetail[] = [];
+    const roomMap = new Map(classrooms.map(c => [c.id, c]));
+
+    const assignmentsByRoom = new Map<string, Seat[]>();
+    for (const seat of plan.assignments) {
+        if (!seat.classroom) continue;
+        if (!assignmentsByRoom.has(seat.classroom.id)) {
+            assignmentsByRoom.set(seat.classroom.id, []);
+        }
+        assignmentsByRoom.get(seat.classroom.id)!.push(seat);
+    }
+
+    assignmentsByRoom.forEach((seats, roomId) => {
+        const room = roomMap.get(roomId) || seats[0]?.classroom;
+        if (!room || !room.benchCapacities || room.benchCapacities.length === 0) return;
+
+        const sortedSeats = [...seats].sort((a, b) => a.seatNumber - b.seatNumber);
+
+        let currentSeatIdx = 0;
+        room.benchCapacities.forEach((capacity, benchIdx) => {
+            const benchSeats: Seat[] = [];
+            for (let i = 0; i < capacity; i++) {
+                if (currentSeatIdx < sortedSeats.length) {
+                    const seat = sortedSeats[currentSeatIdx];
+                    if (seat && seat.student) {
+                        benchSeats.push(seat);
+                    }
+                    currentSeatIdx++;
+                }
+            }
+
+            for (let i = 0; i < benchSeats.length; i++) {
+                for (let j = i + 1; j < benchSeats.length; j++) {
+                    const s1 = benchSeats[i].student!;
+                    const s2 = benchSeats[j].student!;
+                    if (isStudentConflict(s1, s2)) {
+                        violations.push({
+                            classroomId: room.id,
+                            roomNo: room.roomNo,
+                            benchIndex: benchIdx,
+                            seatNumber1: benchSeats[i].seatNumber,
+                            seatNumber2: benchSeats[j].seatNumber,
+                            student1: s1,
+                            student2: s2,
+                            reason: s1.exam?.subjectCode === s2.exam?.subjectCode
+                                ? `Same Subject (${s1.exam?.subjectCode})`
+                                : `Same Course (${s1.course})`
+                        });
+                    }
+                }
+            }
+        });
+    });
+
+    return violations;
+}
+
+/**
+ * Fast violation counter for seat plans.
+ */
+export function countSeatPlanViolations(
+    plan: SeatPlan,
+    classrooms: Classroom[]
+): number {
+    return getSeatPlanViolations(plan, classrooms).length;
 }
 
 export function generateSeatPlan(

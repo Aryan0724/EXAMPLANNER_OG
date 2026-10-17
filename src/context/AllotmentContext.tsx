@@ -13,12 +13,18 @@ export const AllotmentContext = createContext<AllotmentContextType>({
   setFullAllotment: () => { },
 });
 
+export const ALLOTMENT_STORAGE_KEY = 'gehu_full_allotment_v5';
+
 export const AllotmentProvider = ({ children }: { children: React.ReactNode }) => {
   const [fullAllotment, setFullAllotmentState] = useState<Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> | null>(null);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('gehu_full_allotment');
+      // Invalidate and remove outdated pre-fix allotment cache
+      if (localStorage.getItem('gehu_full_allotment')) {
+        localStorage.removeItem('gehu_full_allotment');
+      }
+      const saved = localStorage.getItem(ALLOTMENT_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
@@ -33,10 +39,11 @@ export const AllotmentProvider = ({ children }: { children: React.ReactNode }) =
       const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
       try {
         if (next && Object.keys(next).length > 0) {
-          localStorage.setItem('gehu_full_allotment', JSON.stringify(next));
+          localStorage.setItem(ALLOTMENT_STORAGE_KEY, JSON.stringify(next));
         } else {
-          localStorage.removeItem('gehu_full_allotment');
+          localStorage.removeItem(ALLOTMENT_STORAGE_KEY);
         }
+        localStorage.removeItem('gehu_full_allotment');
       } catch (err) {}
       return next;
     });

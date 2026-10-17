@@ -111,6 +111,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.removeItem('gehu_exam_schedule');
       localStorage.removeItem('gehu_full_allotment');
+      localStorage.removeItem('gehu_full_allotment_v5');
     } catch (err) {}
   };
 

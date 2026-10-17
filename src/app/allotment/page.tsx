@@ -9,10 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet } from 'lucide-react';
+import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator, FacultyStudentRule } from '@/lib/types';
-import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
+import { generateSeatPlan, assignInvigilators, countSeatPlanViolations } from '@/lib/planning';
 import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateDetailedInvigilatorDutyChart } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
@@ -51,7 +51,7 @@ const getSlotOptions = (allotment: Record<string, any> | null, examSchedule: Exa
 export default function AllotmentPage() {
   const { toast } = useToast();
   const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
-  const { students, classrooms, invigilators, setInvigilators, examSchedule, isHydrated, reservedCount, setReservedCount, facultyStudentRules, setFacultyStudentRules } = useContext(DataContext);
+  const { students, classrooms, invigilators, setInvigilators, examSchedule, isHydrated, reservedCount, setReservedCount, facultyStudentRules, setFacultyStudentRules, blockPriority } = useContext(DataContext);
 
   const examSlotsByTime = useMemo(() => getExamSlotsByTime(examSchedule), [examSchedule]);
 
@@ -121,6 +121,40 @@ export default function AllotmentPage() {
       const concurrentExams = examSlotsByTime[slotKey] || [];
       const sessionExamIds = new Set(concurrentExams.map(e => e.id));
 
+      // 1. Strict seating compliance self-repair:
+      // If the loaded seat plan has bench violations (e.g. from an outdated pre-fix plan in localStorage),
+      // automatically heal it with the strict 1-student-per-bench spacing rules.
+      const benchViolations = countSeatPlanViolations(newSeatPlan, classrooms);
+      if (benchViolations > 0 && concurrentExams.length > 0 && students.length > 0) {
+        const { plan: healedSeatPlan } = generateSeatPlan(students, classrooms, concurrentExams, blockPriority);
+        const sessionTargetPool = invigilators.filter(inv => {
+          if (!inv.isAvailable) return false;
+          return !inv.unavailableSlots.some(s => s.slotId === slotKey || sessionExamIds.has(s.slotId));
+        });
+
+        const { assignments: healedInvAsg } = assignInvigilators(
+          sessionTargetPool,
+          healedSeatPlan,
+          concurrentExams[0],
+          reservedCount,
+          facultyStudentRules
+        );
+
+        setSeatPlan(healedSeatPlan);
+        setInvigilatorAssignments(healedInvAsg);
+        setFullAllotment((prev: any) => ({
+          ...(prev || {}),
+          [slotKey]: { seatPlan: healedSeatPlan, invigilatorAssignments: healedInvAsg }
+        }));
+        const firstClassroomId = healedSeatPlan.assignments.length > 0 ? [...new Set(healedSeatPlan.assignments.map(a => a.classroom.id))][0] : null;
+        setSelectedClassroomId(firstClassroomId);
+        toast({
+          title: "Allotment Auto-Repaired",
+          description: `Resolved ${benchViolations} same-course bench conflict(s). Strict 1-student-per-bench spacing enforced.`,
+        });
+        return;
+      }
+
       const hasInvalidAssignments = existingInvAsg.some(asg => {
         const invInMaster = invigilators.find(i => i.id === asg.invigilator.id);
         if (!invInMaster || !invInMaster.isAvailable) return true;
@@ -166,7 +200,7 @@ export default function AllotmentPage() {
       setInvigilatorAssignments(null);
       setSelectedClassroomId(null);
     }
-  }, [fullAllotment, calculateExclusions, invigilators, examSlotsByTime, toast, setFullAllotment]);
+  }, [fullAllotment, calculateExclusions, invigilators, classrooms, students, blockPriority, reservedCount, facultyStudentRules, examSlotsByTime, toast, setFullAllotment]);
 
   // Sync slot options when exam schedule hydrtates
   useEffect(() => {
@@ -344,7 +378,7 @@ export default function AllotmentPage() {
         return;
       }
 
-      const { plan, updatedStudents } = generateSeatPlan(students, classrooms, selectedExams);
+      const { plan, updatedStudents } = generateSeatPlan(students, classrooms, selectedExams, blockPriority);
       setSeatPlan(plan);
       const firstClassroomId = plan.assignments.length > 0 ? [...new Set(plan.assignments.map(a => a.classroom.id))][0] : null;
       setSelectedClassroomId(firstClassroomId);
@@ -385,10 +419,85 @@ export default function AllotmentPage() {
       setIsGenerating(false);
       toast({
         title: 'Generation Complete',
-        description: `Seat plan generated for ${selectedExams.length} concurrent exam(s) with custom faculty allocation rules.`,
+        description: `Seat plan generated for ${selectedExams.length} concurrent exam(s) with strict conflict-free seating.`,
       });
-    }, 1500);
+    }, 600);
   };
+
+  const handleRegenerateCurrentSession = () => {
+    if (!selectedSlotKey) {
+      toast({ variant: 'destructive', title: 'No Session Selected', description: 'Please select an exam session first.' });
+      return;
+    }
+    executeGeneration(facultyStudentRules, reservedCount);
+  };
+
+  const handleRegenerateAllSessions = () => {
+    const sessionKeys = Object.keys(examSlotsByTime);
+    if (sessionKeys.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Sessions Found',
+        description: 'Exam schedule has no active sessions to generate.'
+      });
+      return;
+    }
+    setIsGenerating(true);
+    setTimeout(() => {
+      try {
+        let studentMasterList: Student[] = JSON.parse(JSON.stringify(students));
+        let invigilatorMasterList: Invigilator[] = JSON.parse(JSON.stringify(invigilators));
+        const classroomMasterList = JSON.parse(JSON.stringify(classrooms));
+
+        const generatedPlans: Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }> = {};
+        const sortedSessionKeys = sessionKeys.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+        for (const key of sortedSessionKeys) {
+          const concurrentExams = examSlotsByTime[key];
+          if (!concurrentExams || concurrentExams.length === 0) continue;
+
+          const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority);
+          studentMasterList = updatedStudents;
+
+          const sessionExamIds = new Set(concurrentExams.map(e => e.id));
+          const sessionTargetPool = invigilatorMasterList.filter(inv => {
+            if (!inv.isAvailable) return false;
+            return !inv.unavailableSlots.some(s => s.slotId === key || sessionExamIds.has(s.slotId));
+          });
+
+          const { assignments: invAsg, updatedInvigilators } = assignInvigilators(
+            sessionTargetPool,
+            plan,
+            concurrentExams[0],
+            reservedCount,
+            facultyStudentRules
+          );
+          invigilatorMasterList = updatedInvigilators;
+          generatedPlans[key] = { seatPlan: plan, invigilatorAssignments: invAsg };
+        }
+
+        setFullAllotment(generatedPlans);
+        if (selectedSlotKey && generatedPlans[selectedSlotKey]) {
+          setSeatPlan(generatedPlans[selectedSlotKey].seatPlan);
+          setInvigilatorAssignments(generatedPlans[selectedSlotKey].invigilatorAssignments);
+        }
+
+        toast({
+          title: "All Sessions Regenerated",
+          description: `Strict conflict-free seating applied across ${sortedSessionKeys.length} session(s).`,
+        });
+      } catch (err: any) {
+        toast({ variant: 'destructive', title: 'Generation Failed', description: err.message });
+      } finally {
+        setIsGenerating(false);
+      }
+    }, 400);
+  };
+
+  const currentBenchViolations = useMemo(() => {
+    if (!seatPlan || !selectedClassroom) return 0;
+    return countSeatPlanViolations(seatPlan, [selectedClassroom]);
+  }, [seatPlan, selectedClassroom]);
 
   const handlePrint = () => {
     window.print();
@@ -577,12 +686,22 @@ export default function AllotmentPage() {
                           Faculty Ratio Rules
                         </Button>
                         <Button
+                          onClick={handleRegenerateAllSessions}
+                          disabled={isGenerating || Object.keys(examSlotsByTime).length === 0}
+                          variant="default"
+                          className="h-9 font-semibold gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                        >
+                          {isGenerating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1.5 h-4 w-4" />}
+                          Regenerate All (Strict Rules)
+                        </Button>
+                        <Button
                           onClick={handleOpenGenerationDialog}
                           disabled={isGenerating || !selectedSlotKey}
                           className="h-9 font-semibold gap-1.5"
+                          variant="outline"
                         >
-                          {isGenerating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
-                          Generate Plan
+                          <Sparkles className="mr-1.5 h-4 w-4" />
+                          Custom Generate
                         </Button>
                       </div>
                     </CardContent>
@@ -632,6 +751,10 @@ export default function AllotmentPage() {
                                 ))}
                               </SelectContent>
                             </Select>
+                            <Button onClick={handleRegenerateCurrentSession} variant="outline" disabled={isGenerating || !selectedSlotKey} className="hidden sm:flex border-purple-300 text-purple-700 hover:bg-purple-50">
+                              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                              Regenerate Slot
+                            </Button>
                             <Button onClick={handleDownloadPDF} variant="outline" disabled={!selectedClassroom} className="hidden sm:flex">
                               <FileDown className="mr-2 h-4 w-4" />
                               PDF
@@ -650,6 +773,24 @@ export default function AllotmentPage() {
                       <CardContent>
                         {selectedClassroom && (
                           <div key={selectedClassroom.id}>
+                            <div className="flex justify-center mb-3">
+                              {currentBenchViolations === 0 ? (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold shadow-sm">
+                                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span>Strict Seating: 0 Same-Course Bench Conflicts (Single-Course Alternate Desks Active)</span>
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold shadow-sm">
+                                  <div className="flex items-center gap-1.5">
+                                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                                    <span>{currentBenchViolations} same-course desk conflict(s) detected in this room from outdated cache.</span>
+                                  </div>
+                                  <Button size="sm" onClick={handleRegenerateCurrentSession} className="bg-rose-600 hover:bg-rose-700 text-white h-6 px-2 text-[11px]">
+                                    Auto-Fix Now
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                             <h3 className="flex items-center gap-2 text-xl font-semibold mb-2 text-center justify-center">
                               <Building className="w-6 h-6" />
                               Seat Plan: {selectedClassroom.roomNo} ({selectedClassroom.building})
