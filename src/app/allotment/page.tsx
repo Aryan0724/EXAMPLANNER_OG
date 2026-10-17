@@ -301,6 +301,11 @@ export default function AllotmentPage() {
     }, {} as Record<string, { min: string, max: string, count: number }>);
   }, [selectedClassroom, seatPlan]);
 
+  const currentBenchViolations = useMemo(() => {
+    if (!seatPlan || !selectedClassroom) return 0;
+    return countSeatPlanViolations(seatPlan, [selectedClassroom]);
+  }, [seatPlan, selectedClassroom]);
+
 
   if (!isHydrated) {
     return (
@@ -515,11 +520,6 @@ export default function AllotmentPage() {
       }
     }, 400);
   };
-
-  const currentBenchViolations = useMemo(() => {
-    if (!seatPlan || !selectedClassroom) return 0;
-    return countSeatPlanViolations(seatPlan, [selectedClassroom]);
-  }, [seatPlan, selectedClassroom]);
 
   const handlePrint = () => {
     window.print();
