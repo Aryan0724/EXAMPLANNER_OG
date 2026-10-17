@@ -55,34 +55,39 @@ export function ClassroomVisualizer({ assignments = [], classroom, courseColors 
     return null;
   }
 
-  const seatsForThisRoom = useMemo(() => {
-    if (!classroom?.id || !Array.isArray(assignments)) return [];
-    return assignments
-      .filter(a => a && a.classroom && a.classroom.id === classroom.id)
-      .sort((a, b) => (a.seatNumber ?? 0) - (b.seatNumber ?? 0));
-  }, [assignments, classroom?.id]);
-
   const benches = useMemo(() => {
     if (!classroom?.benchCapacities || !Array.isArray(classroom.benchCapacities)) return [];
-    const result: Seat[][] = [];
-    let currentSeatIdx = 0;
     
+    // Index all available seats by exact seatNumber to ensure empty seats never collapse across benches
+    const seatMap = new Map<number, Seat>();
+    if (Array.isArray(assignments)) {
+      assignments
+        .filter(a => a && a.classroom && a.classroom.id === classroom.id)
+        .forEach(a => {
+          if (a && typeof a.seatNumber === 'number') {
+            seatMap.set(a.seatNumber, a);
+          }
+        });
+    }
+
+    const result: Seat[][] = [];
+    let seatCounter = 1;
     classroom.benchCapacities.forEach(capacity => {
       const bench: Seat[] = [];
       for (let i = 0; i < capacity; i++) {
-        if (currentSeatIdx < seatsForThisRoom.length) {
-          const seat = seatsForThisRoom[currentSeatIdx];
-          if (seat) {
-            bench.push(seat);
-          }
-          currentSeatIdx++;
-        }
+        const seatNum = seatCounter++;
+        const seat = seatMap.get(seatNum) || {
+          classroom,
+          seatNumber: seatNum,
+          student: null
+        };
+        bench.push(seat);
       }
       result.push(bench);
     });
-    
+
     return result;
-  }, [seatsForThisRoom, classroom?.benchCapacities]);
+  }, [assignments, classroom]);
 
   const columns = classroom.columns || 1;
   const rows = classroom.rows || 1;

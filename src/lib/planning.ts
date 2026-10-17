@@ -189,18 +189,21 @@ export function getSeatPlanViolations(
         const room = roomMap.get(roomId) || seats[0]?.classroom;
         if (!room || !Array.isArray(room.benchCapacities) || room.benchCapacities.length === 0) return;
 
-        const sortedSeats = [...seats].sort((a, b) => (a.seatNumber ?? 0) - (b.seatNumber ?? 0));
+        const seatMap = new Map<number, Seat>();
+        seats.forEach(s => {
+            if (s && typeof s.seatNumber === 'number') {
+                seatMap.set(s.seatNumber, s);
+            }
+        });
 
-        let currentSeatIdx = 0;
+        let seatCounter = 1;
         room.benchCapacities.forEach((capacity, benchIdx) => {
             const benchSeats: Seat[] = [];
             for (let i = 0; i < capacity; i++) {
-                if (currentSeatIdx < sortedSeats.length) {
-                    const seat = sortedSeats[currentSeatIdx];
-                    if (seat && seat.student) {
-                        benchSeats.push(seat);
-                    }
-                    currentSeatIdx++;
+                const seatNum = seatCounter++;
+                const seat = seatMap.get(seatNum);
+                if (seat && seat.student) {
+                    benchSeats.push(seat);
                 }
             }
 
@@ -246,7 +249,7 @@ export function generateSeatPlan(
     exams: ExamSlot[],
     blockPriority: string[] = [] // Default to empty array if not provided
 ): { plan: SeatPlan; updatedStudents: Student[] } {
-    const studentMasterList: Student[] = JSON.parse(JSON.stringify(allStudents));
+    const studentMasterList: Student[] = allStudents.map(s => ({ ...s, seatAssignment: null }));
     const finalAssignments: Seat[] = [];
 
     // 1. Identify all eligible students for today's exams
@@ -290,21 +293,7 @@ export function generateSeatPlan(
     const studentPools = new Map<string, (Student & { exam: ExamSlot })[]>();
 
     eligibleStudentsToday.forEach(student => {
-        // Check for persistent seat
-        if (student.seatAssignment && roomSeatMaps.has(student.seatAssignment.classroomId)) {
-            const map = roomSeatMaps.get(student.seatAssignment.classroomId)!;
-            const index = student.seatAssignment.seatNumber - 1;
-            if (index >= 0 && index < map.length && map[index] === null) {
-                map[index] = {
-                    student: student,
-                    classroom: availableClassrooms.find(r => r.id === student.seatAssignment!.classroomId)!,
-                    seatNumber: student.seatAssignment.seatNumber
-                };
-                return; // Handled
-            }
-        }
-
-        // If not assigned/valid, add to pool
+        // Group students into course/subject pools for track-based interleaved seating
         const key = `${canonicalizeCourse(student.course || student.exam.course)}_${student.exam.subjectCode}`;
         if (!studentPools.has(key)) studentPools.set(key, []);
         studentPools.get(key)!.push(student);
@@ -413,6 +402,36 @@ export function generateSeatPlan(
                 }
             }
         }
+    });
+
+    // Strict Post-Generation Compliance Verification:
+    // Guarantee that no two students with the same course or subject sit on the same bench under any circumstance.
+    availableClassrooms.forEach(room => {
+        const map = roomSeatMaps.get(room.id);
+        if (!map) return;
+        let benchFlatIdxBase = 0;
+        room.benchCapacities.forEach(benchSize => {
+            const benchStudents: { s: number; student: Student }[] = [];
+            for (let s = 0; s < benchSize; s++) {
+                const flatIdx = benchFlatIdxBase + s;
+                const seat = map[flatIdx];
+                if (seat && seat.student) {
+                    benchStudents.push({ s, student: seat.student });
+                }
+            }
+            if (benchStudents.length > 1) {
+                for (let i = 0; i < benchStudents.length; i++) {
+                    for (let j = i + 1; j < benchStudents.length; j++) {
+                        if (isStudentConflict(benchStudents[i].student, benchStudents[j].student)) {
+                            // Eject conflicting student to keep bench strictly compliant
+                            const ejectFlatIdx = benchFlatIdxBase + benchStudents[j].s;
+                            map[ejectFlatIdx] = null;
+                        }
+                    }
+                }
+            }
+            benchFlatIdxBase += benchSize;
+        });
     });
 
     // 8. Update Master List and Final Plan

@@ -137,7 +137,9 @@ export default function AllotmentPage() {
     if (fullAllotment && fullAllotment[slotKey]) {
       const { seatPlan: newSeatPlan, invigilatorAssignments: existingInvAsg } = fullAllotment[slotKey];
 
-      const concurrentExams = examSlotsByTime[slotKey] || [];
+      const concurrentExams = (examSlotsByTime[slotKey] && examSlotsByTime[slotKey].length > 0)
+        ? examSlotsByTime[slotKey]
+        : (newSeatPlan?.exam ? (Array.isArray(newSeatPlan.exam) ? newSeatPlan.exam : [newSeatPlan.exam]) : []);
       const sessionExamIds = new Set(concurrentExams.map(e => e.id));
 
       // 1. Strict seating compliance self-repair:
@@ -146,7 +148,8 @@ export default function AllotmentPage() {
       const benchViolations = countSeatPlanViolations(newSeatPlan, classrooms);
       if (benchViolations > 0 && concurrentExams.length > 0 && students.length > 0 && !autoRepairedSlotsRef.current.has(slotKey)) {
         autoRepairedSlotsRef.current.add(slotKey);
-        const { plan: healedSeatPlan } = generateSeatPlan(students, classrooms, concurrentExams, blockPriority);
+        const cleanStudents = students.map(s => ({ ...s, seatAssignment: null }));
+        const { plan: healedSeatPlan } = generateSeatPlan(cleanStudents, classrooms, concurrentExams, blockPriority);
         const sessionTargetPool = invigilators.filter(inv => {
           if (!inv.isAvailable) return false;
           return !inv.unavailableSlots.some(s => s.slotId === slotKey || sessionExamIds.has(s.slotId));
@@ -404,7 +407,8 @@ export default function AllotmentPage() {
       }
 
       autoRepairedSlotsRef.current.clear();
-      const { plan, updatedStudents } = generateSeatPlan(students, classrooms, selectedExams, blockPriority);
+      const cleanStudents = students.map(s => ({ ...s, seatAssignment: null }));
+      const { plan, updatedStudents } = generateSeatPlan(cleanStudents, classrooms, selectedExams, blockPriority);
       setSeatPlan(plan);
       const firstClassroomId = plan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
       setSelectedClassroomId(firstClassroomId);
@@ -482,7 +486,8 @@ export default function AllotmentPage() {
           const concurrentExams = examSlotsByTime[key];
           if (!concurrentExams || concurrentExams.length === 0) continue;
 
-          const { plan, updatedStudents } = generateSeatPlan(studentMasterList, classroomMasterList, concurrentExams, blockPriority);
+          const cleanStudents = studentMasterList.map(s => ({ ...s, seatAssignment: null }));
+          const { plan, updatedStudents } = generateSeatPlan(cleanStudents, classroomMasterList, concurrentExams, blockPriority);
           studentMasterList = updatedStudents;
 
           const sessionExamIds = new Set(concurrentExams.map(e => e.id));
