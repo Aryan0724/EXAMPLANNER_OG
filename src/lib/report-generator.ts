@@ -53,7 +53,7 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
         const roomGroups = new Map<string, { students: Student[], invigilators: Invigilator[] }>();
 
         seatPlan.assignments.forEach(seat => {
-            if (seat.student && seat.classroom) {
+            if (seat && seat.student && seat.classroom?.id) {
                 if (!roomGroups.has(seat.classroom.id)) roomGroups.set(seat.classroom.id, { students: [], invigilators: [] });
                 roomGroups.get(seat.classroom.id)!.students.push(seat.student);
             }
@@ -162,7 +162,7 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
         const roomCourseMap = new Map<string, Map<string, Student[]>>();
 
         seatPlan.assignments.forEach(seat => {
-            if (seat.student && seat.classroom) {
+            if (seat && seat.student && seat.classroom?.id) {
                 if (!roomCourseMap.has(seat.classroom.id)) roomCourseMap.set(seat.classroom.id, new Map());
                 if (!roomCourseMap.get(seat.classroom.id)!.has(seat.student.course)) roomCourseMap.get(seat.classroom.id)!.set(seat.student.course, []);
                 roomCourseMap.get(seat.classroom.id)!.get(seat.student.course)!.push(seat.student);
@@ -247,7 +247,7 @@ export function generateVisualSeatPlanExcel(fullAllotment: FullAllotment, allCla
         };
 
         seatPlan.assignments.forEach(seat => {
-            if (seat.student && seat.classroom) {
+            if (seat && seat.student && seat.classroom?.id) {
                 getRoomGroup(seat.classroom.id).students.push(seat.student);
             }
         });
@@ -303,8 +303,8 @@ export function generateVisualSeatPlanExcel(fullAllotment: FullAllotment, allCla
 
             // Populate Grid - using visualizer logic to map flat seats to grid
             const seatsForRoom = seatPlan.assignments
-                .filter(a => a.classroom.id === roomId)
-                .sort((a, b) => a.seatNumber - b.seatNumber);
+                .filter(a => a && a.classroom?.id === roomId)
+                .sort((a, b) => (a.seatNumber ?? 0) - (b.seatNumber ?? 0));
 
             let seatIndex = 0;
             for (let r = 0; r < room.rows; r++) {

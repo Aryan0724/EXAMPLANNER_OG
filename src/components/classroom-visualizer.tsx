@@ -31,7 +31,7 @@ interface ClassroomVisualizerProps {
     columns: number;
     benchCapacities: number[];
   };
-  courseColors: Map<string, string>;
+  courseColors?: Map<string, string>;
 }
 
 const StudentTooltip = ({ student, seatNumber, isDebarredSeat }: { student: Student | null, seatNumber: number, isDebarredSeat?: boolean }) => {
@@ -41,7 +41,7 @@ const StudentTooltip = ({ student, seatNumber, isDebarredSeat }: { student: Stud
         <p className="font-bold">{student ? student.name : (isDebarredSeat ? 'Seat Reserved (Debarred)' : 'Empty')}</p>
         <p>Seat: {seatNumber}</p>
         {student && <p>Roll No: {student.rollNo}</p>}
-        {student && <p>Subject: {student.exam?.subjectCode}</p>}
+        {student && student.exam && <p>Subject: {student.exam.subjectCode}</p>}
         {student && <p className="text-xs text-muted-foreground">{student.course} - {student.department}</p>}
         {student?.isDebarred && <p className="text-destructive font-bold">Status: Debarred</p>}
       </div>
@@ -50,18 +50,20 @@ const StudentTooltip = ({ student, seatNumber, isDebarredSeat }: { student: Stud
 };
 
 
-export function ClassroomVisualizer({ assignments, classroom, courseColors }: ClassroomVisualizerProps) {
-  // Internal color calculation removed in favor of passed prop
+export function ClassroomVisualizer({ assignments = [], classroom, courseColors }: ClassroomVisualizerProps) {
+  if (!classroom || !classroom.id) {
+    return null;
+  }
 
   const seatsForThisRoom = useMemo(() => {
+    if (!classroom?.id || !Array.isArray(assignments)) return [];
     return assignments
-      .filter(a => a.classroom.id === classroom.id)
-      .sort((a, b) => a.seatNumber - b.seatNumber);
-  }, [assignments, classroom.id]);
-
-  const grid: (Seat | null)[][] = Array.from({ length: classroom.rows }, () => Array(classroom.columns * 2).fill(null));
+      .filter(a => a && a.classroom && a.classroom.id === classroom.id)
+      .sort((a, b) => (a.seatNumber ?? 0) - (b.seatNumber ?? 0));
+  }, [assignments, classroom?.id]);
 
   const benches = useMemo(() => {
+    if (!classroom?.benchCapacities || !Array.isArray(classroom.benchCapacities)) return [];
     const result: Seat[][] = [];
     let currentSeatIdx = 0;
     
@@ -69,7 +71,10 @@ export function ClassroomVisualizer({ assignments, classroom, courseColors }: Cl
       const bench: Seat[] = [];
       for (let i = 0; i < capacity; i++) {
         if (currentSeatIdx < seatsForThisRoom.length) {
-          bench.push(seatsForThisRoom[currentSeatIdx]);
+          const seat = seatsForThisRoom[currentSeatIdx];
+          if (seat) {
+            bench.push(seat);
+          }
           currentSeatIdx++;
         }
       }
@@ -77,25 +82,27 @@ export function ClassroomVisualizer({ assignments, classroom, courseColors }: Cl
     });
     
     return result;
-  }, [seatsForThisRoom, classroom.benchCapacities]);
+  }, [seatsForThisRoom, classroom?.benchCapacities]);
 
+  const columns = classroom.columns || 1;
+  const rows = classroom.rows || 1;
 
   return (
     <TooltipProvider>
       <div
         className="grid gap-1 p-2 rounded-lg border bg-muted/20 overflow-x-auto"
         style={{
-          gridTemplateColumns: `repeat(${classroom.columns}, minmax(0, 1fr))`,
+          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
         }}
       >
-        {Array.from({ length: classroom.columns }).map((_, c) => (
+        {Array.from({ length: columns }).map((_, c) => (
           <div key={`col-${c}`} className="flex flex-col gap-1">
-            {Array.from({ length: classroom.rows }).map((_, r) => {
-              const benchIdx = r * classroom.columns + c;
+            {Array.from({ length: rows }).map((_, r) => {
+              const benchIdx = r * columns + c;
               const benchSeats = benches[benchIdx] || [];
-              const benchStudents = benchSeats.filter(s => s.student).map(s => s.student!);
+              const benchStudents = benchSeats.filter(s => s && s.student).map(s => s.student!);
               const hasBenchConflict = benchStudents.length > 1 && benchStudents.some((s1, i) =>
-                benchStudents.slice(i + 1).some(s2 => isStudentConflict(s1, s2))
+                benchStudents.slice(i + 1).some(s2 => s1 && s2 && isStudentConflict(s1, s2))
               );
 
               return (
@@ -108,8 +115,9 @@ export function ClassroomVisualizer({ assignments, classroom, courseColors }: Cl
                   title={hasBenchConflict ? "Bench Rule Violation: Same-course or same-subject students seated together" : undefined}
                 >
                   {benchSeats.map((seat, seatIdx) => {
+                    if (!seat) return null;
                     const subjectCode = seat.student?.exam?.subjectCode;
-                    const bgColor = subjectCode ? courseColors?.get(subjectCode) : undefined;
+                    const bgColor = (subjectCode && courseColors) ? courseColors.get(subjectCode) : undefined;
 
                     return (
                       <Tooltip key={`seat-${benchIdx}-${seatIdx}`}>

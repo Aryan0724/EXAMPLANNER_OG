@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
+import { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
@@ -22,7 +22,8 @@ type FullAllotment = Record<string, { seatPlan: SeatPlan, invigilatorAssignments
 import { ExclusionReport } from '@/components/exclusion-report';
 
 const getExamSlotsByTime = (examSchedule: ExamSlot[]) => {
-  return examSchedule.reduce((acc, exam) => {
+  return (examSchedule || []).reduce((acc, exam) => {
+    if (!exam) return acc;
     const key = `${exam.date} ${exam.time}`;
     if (!acc[key]) {
       acc[key] = [];
@@ -34,17 +35,33 @@ const getExamSlotsByTime = (examSchedule: ExamSlot[]) => {
 
 
 const getSlotOptions = (allotment: Record<string, any> | null, examSchedule: ExamSlot[]) => {
-  const examSlotsByTime = getExamSlotsByTime(examSchedule);
-  const source = allotment ? Object.keys(allotment) : Object.keys(examSlotsByTime);
-  return source.map(key => {
-    const examsInSlot = allotment ? allotment[key].seatPlan.exam : examSlotsByTime[key];
-    const representativeExam = Array.isArray(examsInSlot) ? examsInSlot[0] : examsInSlot;
-    const examNames = Array.isArray(examsInSlot) ? examsInSlot.map(e => `${e.subjectCode}${e.group ? ` (G${e.group})` : ''}`).join(', ') : `${representativeExam.subjectCode}${representativeExam.group ? ` (G${representativeExam.group})` : ''}`;
-    return {
+  const examSlotsByTime = getExamSlotsByTime(examSchedule || []);
+  const keys = new Set<string>();
+  if (allotment && typeof allotment === 'object') {
+    Object.keys(allotment).forEach(k => keys.add(k));
+  }
+  Object.keys(examSlotsByTime).forEach(k => keys.add(k));
+
+  const options: { id: string; label: string }[] = [];
+
+  for (const key of keys) {
+    const slotExams = allotment?.[key]?.seatPlan?.exam || examSlotsByTime[key];
+    const examList = Array.isArray(slotExams) ? slotExams : (slotExams ? [slotExams] : []);
+    const rep = examList[0];
+
+    const dateStr = rep?.date || key.split(' ')[0] || 'Session';
+    const timeStr = rep?.time || key.split(' ').slice(1).join(' ') || '';
+    const examNames = examList.length > 0
+      ? examList.map(e => `${e.subjectCode || e.subjectName || 'Exam'}${e.group ? ` (G${e.group})` : ''}`).join(', ')
+      : key;
+
+    options.push({
       id: key,
-      label: `${representativeExam.date} @ ${representativeExam.time} (${examNames})`,
-    };
-  });
+      label: timeStr ? `${dateStr} @ ${timeStr} (${examNames})` : `${dateStr} (${examNames})`,
+    });
+  }
+
+  return options;
 };
 
 
@@ -58,12 +75,14 @@ export default function AllotmentPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showFacultyDialog, setShowFacultyDialog] = useState(false);
   const [slotOptions, setSlotOptions] = useState(() => getSlotOptions(fullAllotment, examSchedule));
-  const [selectedSlotKey, setSelectedSlotKey] = useState<string | undefined>(slotOptions[0]?.id);
+  const [selectedSlotKey, setSelectedSlotKey] = useState<string | undefined>(() => slotOptions[0]?.id);
 
   const [seatPlan, setSeatPlan] = useState<SeatPlan | null>(null);
   const [invigilatorAssignments, setInvigilatorAssignments] = useState<InvigilatorAssignment[] | null>(null);
 
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+
+  const autoRepairedSlotsRef = useRef<Set<string>>(new Set());
 
   const [excludedData, setExcludedData] = useState<{
     debarredStudents: Student[];
@@ -123,9 +142,10 @@ export default function AllotmentPage() {
 
       // 1. Strict seating compliance self-repair:
       // If the loaded seat plan has bench violations (e.g. from an outdated pre-fix plan in localStorage),
-      // automatically heal it with the strict 1-student-per-bench spacing rules.
+      // automatically heal it with the strict 1-student-per-bench spacing rules at most once per slotKey.
       const benchViolations = countSeatPlanViolations(newSeatPlan, classrooms);
-      if (benchViolations > 0 && concurrentExams.length > 0 && students.length > 0) {
+      if (benchViolations > 0 && concurrentExams.length > 0 && students.length > 0 && !autoRepairedSlotsRef.current.has(slotKey)) {
+        autoRepairedSlotsRef.current.add(slotKey);
         const { plan: healedSeatPlan } = generateSeatPlan(students, classrooms, concurrentExams, blockPriority);
         const sessionTargetPool = invigilators.filter(inv => {
           if (!inv.isAvailable) return false;
@@ -146,7 +166,7 @@ export default function AllotmentPage() {
           ...(prev || {}),
           [slotKey]: { seatPlan: healedSeatPlan, invigilatorAssignments: healedInvAsg }
         }));
-        const firstClassroomId = healedSeatPlan.assignments.length > 0 ? [...new Set(healedSeatPlan.assignments.map(a => a.classroom.id))][0] : null;
+        const firstClassroomId = healedSeatPlan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
         setSelectedClassroomId(firstClassroomId);
         toast({
           title: "Allotment Auto-Repaired",
@@ -155,14 +175,14 @@ export default function AllotmentPage() {
         return;
       }
 
-      const hasInvalidAssignments = existingInvAsg.some(asg => {
-        const invInMaster = invigilators.find(i => i.id === asg.invigilator.id);
+      const hasInvalidAssignments = existingInvAsg && existingInvAsg.some(asg => {
+        const invInMaster = invigilators.find(i => i.id === asg.invigilator?.id);
         if (!invInMaster || !invInMaster.isAvailable) return true;
         return invInMaster.unavailableSlots.some(s => s.slotId === slotKey || sessionExamIds.has(s.slotId));
       });
 
-      if (hasInvalidAssignments) {
-        const roomsToStaff = [...new Map(newSeatPlan.assignments.filter(a => a.student).map(item => [item.classroom.id, item.classroom])).values()];
+      if (hasInvalidAssignments && !autoRepairedSlotsRef.current.has(slotKey + '_staff')) {
+        autoRepairedSlotsRef.current.add(slotKey + '_staff');
         const sessionTargetPool = invigilators.filter(inv => {
           if (!inv.isAvailable) return false;
           return !inv.unavailableSlots.some(s => s.slotId === slotKey || sessionExamIds.has(s.slotId));
@@ -180,20 +200,23 @@ export default function AllotmentPage() {
         if (repairedInvAsg.length > 0) {
           setSeatPlan(newSeatPlan);
           setInvigilatorAssignments(repairedInvAsg);
-          setFullAllotment({
-            ...fullAllotment,
+          setFullAllotment((prev: any) => ({
+            ...(prev || {}),
             [slotKey]: { seatPlan: newSeatPlan, invigilatorAssignments: repairedInvAsg }
-          });
+          }));
           toast({
             title: "Plan Synchronized",
             description: "Replacement assigned for newly unavailable staff.",
           });
+          const firstClassroomId = newSeatPlan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
+          setSelectedClassroomId(firstClassroomId);
+          return;
         }
-      } else {
-        setSeatPlan(newSeatPlan);
-        setInvigilatorAssignments(existingInvAsg);
       }
-      const firstClassroomId = newSeatPlan.assignments.length > 0 ? [...new Set(newSeatPlan.assignments.map(a => a.classroom.id))][0] : null;
+
+      setSeatPlan(newSeatPlan);
+      setInvigilatorAssignments(existingInvAsg);
+      const firstClassroomId = newSeatPlan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
       setSelectedClassroomId(firstClassroomId);
     } else {
       setSeatPlan(null);
@@ -202,30 +225,18 @@ export default function AllotmentPage() {
     }
   }, [fullAllotment, calculateExclusions, invigilators, classrooms, students, blockPriority, reservedCount, facultyStudentRules, examSlotsByTime, toast, setFullAllotment]);
 
-  // Sync slot options when exam schedule hydrtates
-  useEffect(() => {
-    if (isHydrated) {
-      const options = getSlotOptions(fullAllotment, examSchedule);
-      setSlotOptions(options);
-      if (options.length > 0 && !selectedSlotKey) {
-        setSelectedSlotKey(options[0].id);
-      }
-    }
-  }, [isHydrated, fullAllotment, examSchedule, selectedSlotKey]);
-
+  // Synchronize slot options when fullAllotment or examSchedule updates (single consolidated, non-cyclic effect)
   useEffect(() => {
     const newSlotOptions = getSlotOptions(fullAllotment, examSchedule);
     setSlotOptions(newSlotOptions);
 
-    const isCurrentSlotValid = newSlotOptions.some(opt => opt.id === selectedSlotKey);
-
-    if (!isCurrentSlotValid && newSlotOptions.length > 0) {
-      setSelectedSlotKey(newSlotOptions[0].id);
-    } else if (newSlotOptions.length === 0) {
-      setSelectedSlotKey(undefined);
-    }
-  }, [fullAllotment, examSchedule, selectedSlotKey]);
-
+    setSelectedSlotKey(prevKey => {
+      if (prevKey && newSlotOptions.some(opt => opt.id === prevKey)) {
+        return prevKey;
+      }
+      return newSlotOptions.length > 0 ? newSlotOptions[0].id : undefined;
+    });
+  }, [fullAllotment, examSchedule]);
 
   useEffect(() => {
     if (selectedSlotKey) {
@@ -236,15 +247,24 @@ export default function AllotmentPage() {
       setInvigilatorAssignments(null);
       setSelectedClassroomId(null);
     }
-  }, [selectedSlotKey, students, classrooms, invigilators, updateStateForSlot]);
+  }, [selectedSlotKey, updateStateForSlot]);
 
-
-  const classroomsInPlan = seatPlan ? [...new Map(seatPlan.assignments.filter(a => a.student).map(item => [item.classroom.id, item.classroom])).values()] : [];
+  const classroomsInPlan = seatPlan
+    ? [
+        ...new Map(
+          seatPlan.assignments
+            .filter(a => a && a.student && a.classroom?.id)
+            .map(item => [item.classroom.id, item.classroom])
+        ).values()
+      ]
+    : [];
 
   const selectedClassroom = selectedClassroomId ? classrooms.find(c => c.id === selectedClassroomId) : null;
 
   const invigilatorsForClassroom = selectedClassroom && invigilatorAssignments
-    ? invigilatorAssignments.filter(a => a.classroom?.id === selectedClassroom.id).map(a => a.invigilator)
+    ? invigilatorAssignments
+        .filter(a => a && a.classroom?.id === selectedClassroom.id && a.invigilator)
+        .map(a => a.invigilator)
     : [];
 
   const currentExams = seatPlan?.exam ? (Array.isArray(seatPlan.exam) ? seatPlan.exam : [seatPlan.exam]) : (examSlotsByTime[selectedSlotKey!] || []);
@@ -266,11 +286,11 @@ export default function AllotmentPage() {
     if (!selectedClassroom || !seatPlan) return {};
 
     const studentsInRoom = seatPlan.assignments
-      .filter(a => a.classroom.id === selectedClassroom.id && a.student)
+      .filter(a => a && a.classroom?.id === selectedClassroom.id && a.student)
       .map(a => a.student!);
 
     return studentsInRoom.reduce((acc, student) => {
-      const subjectCode = student.exam.subjectCode;
+      const subjectCode = student?.exam?.subjectCode || student?.course || 'General';
       if (!acc[subjectCode]) {
         acc[subjectCode] = { min: student.rollNo, max: student.rollNo, count: 0 };
       }
@@ -378,14 +398,15 @@ export default function AllotmentPage() {
         return;
       }
 
+      autoRepairedSlotsRef.current.clear();
       const { plan, updatedStudents } = generateSeatPlan(students, classrooms, selectedExams, blockPriority);
       setSeatPlan(plan);
-      const firstClassroomId = plan.assignments.length > 0 ? [...new Set(plan.assignments.map(a => a.classroom.id))][0] : null;
+      const firstClassroomId = plan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
       setSelectedClassroomId(firstClassroomId);
 
       const classroomsInUse = [...new Map(
         plan.assignments
-          .filter(a => a.student)
+          .filter(a => a && a.student && a.classroom?.id)
           .map(item => [item.classroom.id, item.classroom])
       ).values()];
 
@@ -476,6 +497,7 @@ export default function AllotmentPage() {
           generatedPlans[key] = { seatPlan: plan, invigilatorAssignments: invAsg };
         }
 
+        autoRepairedSlotsRef.current.clear();
         setFullAllotment(generatedPlans);
         if (selectedSlotKey && generatedPlans[selectedSlotKey]) {
           setSeatPlan(generatedPlans[selectedSlotKey].seatPlan);
@@ -527,7 +549,7 @@ export default function AllotmentPage() {
       return !inv.unavailableSlots.some(s => s.slotId === selectedSlotKey || sessionExamIds.includes(s.slotId));
     });
 
-    const roomsInUse = [...new Map(seatPlan.assignments.filter(a => a.student).map(item => [item.classroom.id, item.classroom])).values()];
+    const roomsInUse = [...new Map(seatPlan.assignments.filter(a => a && a.student && a.classroom?.id).map(item => [item.classroom.id, item.classroom])).values()];
 
     // 3. Check for existing reserved staff in this slot who can fill the gap
     let newInvAsg: InvigilatorAssignment[] = [];
@@ -599,7 +621,7 @@ export default function AllotmentPage() {
     try {
       // For Excel, we now want to pass the full assignments for that room 
       // so the generator can build a visual grid.
-      const roomAssignments = seatPlan.assignments.filter(a => a.classroom.id === selectedClassroom.id);
+      const roomAssignments = seatPlan.assignments.filter(a => a && a.classroom?.id === selectedClassroom.id);
 
       if (roomAssignments.filter(a => a.student).length === 0) {
         toast({
@@ -906,7 +928,7 @@ export default function AllotmentPage() {
                                     )}
                                     <ClassroomVisualizer
                                       classroom={selectedClassroom}
-                                      assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
+                                      assignments={seatPlan?.assignments.filter(a => a && a.classroom?.id === selectedClassroom.id) ?? []}
                                       courseColors={courseColors}
                                     />
                                   </>
@@ -986,7 +1008,7 @@ export default function AllotmentPage() {
               return (
                 <ClassroomVisualizer
                   classroom={selectedClassroom}
-                  assignments={seatPlan?.assignments.filter(a => a.classroom.id === selectedClassroom.id) ?? []}
+                  assignments={seatPlan?.assignments.filter(a => a && a.classroom?.id === selectedClassroom.id) ?? []}
                   courseColors={printCourseColors}
                 />
               );

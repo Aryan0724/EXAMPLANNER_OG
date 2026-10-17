@@ -165,27 +165,31 @@ export interface BenchViolationDetail {
  */
 export function getSeatPlanViolations(
     plan: SeatPlan,
-    classrooms: Classroom[]
+    classrooms: Classroom[] = []
 ): BenchViolationDetail[] {
-    if (!plan || !plan.assignments || plan.assignments.length === 0) return [];
+    if (!plan || !plan.assignments || !Array.isArray(plan.assignments) || plan.assignments.length === 0) return [];
 
     const violations: BenchViolationDetail[] = [];
-    const roomMap = new Map(classrooms.map(c => [c.id, c]));
+    const validClassrooms = Array.isArray(classrooms) ? classrooms.filter(c => c && c.id) : [];
+    const roomMap = new Map(validClassrooms.map(c => [c.id, c]));
+    const filterByClassrooms = validClassrooms.length > 0;
 
     const assignmentsByRoom = new Map<string, Seat[]>();
     for (const seat of plan.assignments) {
-        if (!seat.classroom) continue;
-        if (!assignmentsByRoom.has(seat.classroom.id)) {
-            assignmentsByRoom.set(seat.classroom.id, []);
+        if (!seat || !seat.classroom?.id) continue;
+        const roomId = seat.classroom.id;
+        if (filterByClassrooms && !roomMap.has(roomId)) continue;
+        if (!assignmentsByRoom.has(roomId)) {
+            assignmentsByRoom.set(roomId, []);
         }
-        assignmentsByRoom.get(seat.classroom.id)!.push(seat);
+        assignmentsByRoom.get(roomId)!.push(seat);
     }
 
     assignmentsByRoom.forEach((seats, roomId) => {
         const room = roomMap.get(roomId) || seats[0]?.classroom;
-        if (!room || !room.benchCapacities || room.benchCapacities.length === 0) return;
+        if (!room || !Array.isArray(room.benchCapacities) || room.benchCapacities.length === 0) return;
 
-        const sortedSeats = [...seats].sort((a, b) => a.seatNumber - b.seatNumber);
+        const sortedSeats = [...seats].sort((a, b) => (a.seatNumber ?? 0) - (b.seatNumber ?? 0));
 
         let currentSeatIdx = 0;
         room.benchCapacities.forEach((capacity, benchIdx) => {
@@ -202,20 +206,20 @@ export function getSeatPlanViolations(
 
             for (let i = 0; i < benchSeats.length; i++) {
                 for (let j = i + 1; j < benchSeats.length; j++) {
-                    const s1 = benchSeats[i].student!;
-                    const s2 = benchSeats[j].student!;
-                    if (isStudentConflict(s1, s2)) {
+                    const s1 = benchSeats[i]?.student;
+                    const s2 = benchSeats[j]?.student;
+                    if (s1 && s2 && isStudentConflict(s1, s2)) {
                         violations.push({
                             classroomId: room.id,
-                            roomNo: room.roomNo,
+                            roomNo: room.roomNo || 'Room',
                             benchIndex: benchIdx,
                             seatNumber1: benchSeats[i].seatNumber,
                             seatNumber2: benchSeats[j].seatNumber,
                             student1: s1,
                             student2: s2,
-                            reason: s1.exam?.subjectCode === s2.exam?.subjectCode
+                            reason: (s1.exam?.subjectCode && s1.exam?.subjectCode === s2.exam?.subjectCode)
                                 ? `Same Subject (${s1.exam?.subjectCode})`
-                                : `Same Course (${s1.course})`
+                                : `Same Course (${s1.course || 'Same Course'})`
                         });
                     }
                 }
@@ -525,7 +529,7 @@ export function assignInvigilators(
     const classroomMap = new Map<string, Classroom>();
 
     seatPlan.assignments.forEach(seat => {
-        if (seat.student && seat.classroom) {
+        if (seat && seat.student && seat.classroom?.id) {
             const count = roomStudentCounts.get(seat.classroom.id) || 0;
             roomStudentCounts.set(seat.classroom.id, count + 1);
             if (!classroomMap.has(seat.classroom.id)) {
@@ -1034,7 +1038,7 @@ export function extractSessionRoomSummary(
     }>();
 
     seatPlan.assignments.forEach(seat => {
-        if (seat.student && seat.classroom) {
+        if (seat && seat.student && seat.classroom?.id) {
             if (!roomMap.has(seat.classroom.id)) {
                 roomMap.set(seat.classroom.id, {
                     classroom: seat.classroom,
