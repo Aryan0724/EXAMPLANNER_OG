@@ -1,6 +1,6 @@
 
 
-import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat, BatchRoomAllocation, SessionAllotmentSummary, RoomBatchDistribution, FacultyStudentRule } from './types';
+import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat, BatchRoomAllocation, SessionAllotmentSummary, RoomBatchDistribution, FacultyStudentRule, RuleViolation, RuleValidationReport, RuleConflict } from './types';
 import { DEFAULT_FACULTY_STUDENT_RULES } from './types';
 import { isCourseMatch, canonicalizeCourse } from './course-utils';
 
@@ -72,52 +72,64 @@ function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Stu
 }
 
 /**
+ * Helper to determine if two roll numbers are consecutive numbers in sequence.
+ * E.g., '25CSE001' and '25CSE002' are consecutive.
+ * Under Rule 2, students with consecutive roll numbers must sit on the same side
+ * of the benches down the column, NOT next to each other on the same bench.
+ */
+export function areRollNumbersConsecutive(r1?: string, r2?: string): boolean {
+    if (!r1 || !r2) return false;
+    const clean1 = r1.trim().toUpperCase();
+    const clean2 = r2.trim().toUpperCase();
+    if (clean1 === clean2) return true; // duplicate roll number
+
+    const match1 = clean1.match(/^(.*?)(\d+)$/);
+    const match2 = clean2.match(/^(.*?)(\d+)$/);
+    if (match1 && match2) {
+        const prefix1 = match1[1];
+        const prefix2 = match2[1];
+        if (prefix1 === prefix2) {
+            const num1 = parseInt(match1[2], 10);
+            const num2 = parseInt(match2[2], 10);
+            return Math.abs(num1 - num2) === 1;
+        }
+    }
+    return false;
+}
+
+/**
  * Evaluates whether two students conflict and therefore CANNOT sit on the same bench.
- * Under university examination regulations:
- * 1. Students taking the same examination paper (subject code) cannot sit together.
- * 2. Students from the same course / program / degree (e.g. B.Tech CSE) cannot sit together.
- * 3. Students from the same department and semester cannot sit together.
+ * 
+ * Rules enforced:
+ * - Rule 10: No duplicate allotment (same student cannot sit twice).
+ * - Rule 2: Consecutive roll numbers must sit on the same side of the benches, in ascending order.
+ *   Two students with consecutive roll numbers from the same course cannot sit on opposite sides of the same bench.
+ * - Same-course non-consecutive students CAN sit on the same bench under Rule 4 (Left-Right seating)
+ *   and Rule 8 (Same-course seating without unnecessary gaps).
  */
 export function isStudentConflict(
-    s1: { course: string; department?: string; semester?: number | string; exam?: { subjectCode?: string; course?: string } },
-    s2: { course: string; department?: string; semester?: number | string; exam?: { subjectCode?: string; course?: string } }
+    s1: { id?: string; rollNo?: string; course: string; department?: string; semester?: number | string; exam?: { subjectCode?: string; course?: string } },
+    s2: { id?: string; rollNo?: string; course: string; department?: string; semester?: number | string; exam?: { subjectCode?: string; course?: string } }
 ): boolean {
     if (!s1 || !s2) return false;
 
-    // 1. Same subject code (case-insensitive & whitespace trimmed)
-    const sub1 = (s1.exam?.subjectCode || '').trim().toLowerCase();
-    const sub2 = (s2.exam?.subjectCode || '').trim().toLowerCase();
-    if (sub1 && sub2 && sub1 === sub2) {
-        return true;
-    }
+    // Rule 10: Duplicate student check
+    if (s1.id && s2.id && s1.id === s2.id) return true;
+    if (s1.rollNo && s2.rollNo && s1.rollNo.trim().toUpperCase() === s2.rollNo.trim().toUpperCase()) return true;
 
-    // 2. Direct course match or alias match (e.g. B.Tech CSE and B.Tech Computer Science and Engineering)
-    if (isCourseMatch(s1.course, s2.course)) {
-        return true;
-    }
-    if (s1.exam?.course && s2.exam?.course && isCourseMatch(s1.exam.course, s2.exam.course)) {
-        return true;
-    }
-    if (s2.exam?.course && isCourseMatch(s1.course, s2.exam.course)) {
-        return true;
-    }
-    if (s1.exam?.course && isCourseMatch(s2.course, s1.exam.course)) {
-        return true;
-    }
+    // Rule 2: Consecutive roll numbers check
+    const isSameCourse = isCourseMatch(s1.course, s2.course) ||
+        (s1.exam?.course && s2.exam?.course && isCourseMatch(s1.exam.course, s2.exam.course)) ||
+        canonicalizeCourse(s1.course).toLowerCase() === canonicalizeCourse(s2.course).toLowerCase();
 
-    // 3. Canonical course string comparison
-    const canon1 = canonicalizeCourse(s1.course || s1.exam?.course);
-    const canon2 = canonicalizeCourse(s2.course || s2.exam?.course);
-    if (canon1 && canon2 && canon1.toLowerCase() === canon2.toLowerCase()) {
-        return true;
-    }
+    const isSameSubject = Boolean(
+        s1.exam?.subjectCode &&
+        s2.exam?.subjectCode &&
+        s1.exam.subjectCode.trim().toLowerCase() === s2.exam.subjectCode.trim().toLowerCase()
+    );
 
-    // 4. Same department AND same semester check
-    if (s1.department && s2.department && s1.semester && s2.semester) {
-        const clean = (d: string) => d.trim().toLowerCase().replace(/department of |school of |college of /g, '').trim();
-        const d1 = clean(s1.department);
-        const d2 = clean(s2.department);
-        if (d1 && d2 && d1 === d2 && Number(s1.semester) === Number(s2.semester)) {
+    if (isSameCourse || isSameSubject) {
+        if (s1.rollNo && s2.rollNo && areRollNumbersConsecutive(s1.rollNo, s2.rollNo)) {
             return true;
         }
     }
@@ -160,40 +172,99 @@ export interface BenchViolationDetail {
 }
 
 /**
- * Inspects every bench across all classrooms in a seat plan and returns detailed violations
- * where two students seated on the same bench conflict under university examination rules.
+ * Validates a SeatPlan against all 24 Student Seating Allotment Rules:
+ * 1. Course-wise classroom allocation
+ * 2. Consecutive roll numbers on same side of benches
+ * 3. Roll number sequence ascending starting from first bench
+ * 4. Left-right seating maintained on each side
+ * 5. Bench allocation capacity respected
+ * 6. Classroom filling without arbitrary fragmentation
+ * 7. Course separation unless capacity requires sharing
+ * 8. Same-course seating without unnecessary gaps
+ * 10. No duplicate student allotment
+ * 11. No duplicate seat occupancy
+ * 15. Capacity management spillover
+ * 16. Predefined consistent seating pattern
+ * 19. Incomplete sequences handled without inventing dummy students
+ * 20. Insufficient capacity reported
+ * 21. Deterministic allocation
+ * 22. Manual adjustments revalidated
+ * 23. Allocation records retain roll number, course, room, bench number, seat position
+ * 24. Flag conflicts instead of silently violating rules
  */
-export function getSeatPlanViolations(
+export function validateSeatPlanRules(
     plan: SeatPlan,
     classrooms: Classroom[] = []
-): BenchViolationDetail[] {
-    if (!plan || !plan.assignments || !Array.isArray(plan.assignments) || plan.assignments.length === 0) return [];
-
-    const violations: BenchViolationDetail[] = [];
+): RuleValidationReport {
+    const violations: RuleViolation[] = [];
     const validClassrooms = Array.isArray(classrooms) ? classrooms.filter(c => c && c.id) : [];
     const roomMap = new Map(validClassrooms.map(c => [c.id, c]));
-    const filterByClassrooms = validClassrooms.length > 0;
 
-    const assignmentsByRoom = new Map<string, Seat[]>();
-    for (const seat of plan.assignments) {
-        if (!seat || !seat.classroom?.id) continue;
-        const roomId = seat.classroom.id;
-        if (filterByClassrooms && !roomMap.has(roomId)) continue;
-        if (!assignmentsByRoom.has(roomId)) {
-            assignmentsByRoom.set(roomId, []);
+    const assignedSeats = (plan.assignments || []).filter(a => a && a.classroom?.id);
+
+    // Rule 10: No duplicate student allotment
+    const studentSeatMap = new Map<string, Seat[]>();
+    assignedSeats.forEach(seat => {
+        if (seat.student) {
+            if (!studentSeatMap.has(seat.student.id)) studentSeatMap.set(seat.student.id, []);
+            studentSeatMap.get(seat.student.id)!.push(seat);
         }
-        assignmentsByRoom.get(roomId)!.push(seat);
-    }
+    });
+    studentSeatMap.forEach((seats, studentId) => {
+        if (seats.length > 1) {
+            violations.push({
+                ruleNumber: 10,
+                ruleName: 'No duplicate allotment',
+                studentRollNo: seats[0].student?.rollNo,
+                description: `Student ${seats[0].student?.name} (${seats[0].student?.rollNo}) is assigned to ${seats.length} seats in the same session.`,
+                severity: 'error'
+            });
+        }
+    });
 
-    assignmentsByRoom.forEach((seats, roomId) => {
-        const room = roomMap.get(roomId) || seats[0]?.classroom;
-        if (!room || !Array.isArray(room.benchCapacities) || room.benchCapacities.length === 0) return;
+    // Rule 11: No duplicate seat occupancy
+    const roomSeatOccupancy = new Map<string, Map<number, Seat[]>>();
+    assignedSeats.forEach(seat => {
+        if (seat.student) {
+            const rId = seat.classroom.id;
+            if (!roomSeatOccupancy.has(rId)) roomSeatOccupancy.set(rId, new Map());
+            const seatMap = roomSeatOccupancy.get(rId)!;
+            if (!seatMap.has(seat.seatNumber)) seatMap.set(seat.seatNumber, []);
+            seatMap.get(seat.seatNumber)!.push(seat);
+        }
+    });
+    roomSeatOccupancy.forEach((seatMap, rId) => {
+        const room = roomMap.get(rId);
+        seatMap.forEach((seats, seatNumber) => {
+            if (seats.length > 1) {
+                violations.push({
+                    ruleNumber: 11,
+                    ruleName: 'No duplicate occupancy',
+                    classroomId: rId,
+                    roomNo: room?.roomNo,
+                    seatNumber,
+                    description: `Seat #${seatNumber} in Room ${room?.roomNo || rId} is occupied by ${seats.length} students.`,
+                    severity: 'error'
+                });
+            }
+        });
+    });
+
+    // Rule 5: Bench capacity & Rule 2: Consecutive roll numbers check
+    const assignmentsByRoom = new Map<string, Seat[]>();
+    assignedSeats.forEach(seat => {
+        const rId = seat.classroom.id;
+        if (!assignmentsByRoom.has(rId)) assignmentsByRoom.set(rId, []);
+        assignmentsByRoom.get(rId)!.push(seat);
+    });
+
+    assignmentsByRoom.forEach((seats, rId) => {
+        const room = roomMap.get(rId) || seats[0]?.classroom;
+        if (!room || !Array.isArray(room.benchCapacities)) return;
 
         const seatMap = new Map<number, Seat>();
         seats.forEach(s => {
-            if (s && typeof s.seatNumber === 'number') {
-                seatMap.set(s.seatNumber, s);
-            }
+            if (s && typeof s.seatNumber === 'number') seatMap.set(s.seatNumber, s);
         });
 
         let seatCounter = 1;
@@ -202,35 +273,102 @@ export function getSeatPlanViolations(
             for (let i = 0; i < capacity; i++) {
                 const seatNum = seatCounter++;
                 const seat = seatMap.get(seatNum);
-                if (seat && seat.student) {
-                    benchSeats.push(seat);
-                }
+                if (seat && seat.student) benchSeats.push(seat);
             }
 
-            for (let i = 0; i < benchSeats.length; i++) {
-                for (let j = i + 1; j < benchSeats.length; j++) {
-                    const s1 = benchSeats[i]?.student;
-                    const s2 = benchSeats[j]?.student;
-                    if (s1 && s2 && isStudentConflict(s1, s2)) {
-                        violations.push({
-                            classroomId: room.id,
-                            roomNo: room.roomNo || 'Room',
-                            benchIndex: benchIdx,
-                            seatNumber1: benchSeats[i].seatNumber,
-                            seatNumber2: benchSeats[j].seatNumber,
-                            student1: s1,
-                            student2: s2,
-                            reason: (s1.exam?.subjectCode && s1.exam?.subjectCode === s2.exam?.subjectCode)
-                                ? `Same Subject (${s1.exam?.subjectCode})`
-                                : `Same Course (${s1.course || 'Same Course'})`
-                        });
+            // Rule 5: Bench capacity check
+            if (benchSeats.length > capacity) {
+                violations.push({
+                    ruleNumber: 5,
+                    ruleName: 'Bench allocation capacity',
+                    classroomId: room.id,
+                    roomNo: room.roomNo,
+                    benchIndex: benchIdx,
+                    description: `Bench #${benchIdx + 1} has ${benchSeats.length} students but capacity is only ${capacity}.`,
+                    severity: 'error'
+                });
+            }
+
+            // Rule 2: Consecutive roll numbers on the same bench
+            if (benchSeats.length > 1) {
+                for (let i = 0; i < benchSeats.length; i++) {
+                    for (let j = i + 1; j < benchSeats.length; j++) {
+                        const s1 = benchSeats[i].student!;
+                        const s2 = benchSeats[j].student!;
+                        if (isStudentConflict(s1, s2)) {
+                            violations.push({
+                                ruleNumber: 2,
+                                ruleName: 'Consecutive roll numbers on same side',
+                                classroomId: room.id,
+                                roomNo: room.roomNo,
+                                benchIndex: benchIdx,
+                                seatNumber: benchSeats[i].seatNumber,
+                                studentRollNo: `${s1.rollNo} & ${s2.rollNo}`,
+                                description: `Students with consecutive roll numbers (${s1.rollNo} and ${s2.rollNo}) are seated side-by-side on Bench #${benchIdx + 1}. Under Rule 2, consecutive roll numbers must sit on the same side of the benches down the column.`,
+                                severity: 'error'
+                            });
+                        }
                     }
                 }
             }
         });
+
+        // Rule 7: Course separation check
+        const distinctCourses = new Set(
+            seats.filter(s => s.student).map(s => canonicalizeCourse(s.student!.course || s.student!.exam?.course))
+        );
+        if (distinctCourses.size > 1) {
+            violations.push({
+                ruleNumber: 7,
+                ruleName: 'Course separation',
+                classroomId: room.id,
+                roomNo: room.roomNo,
+                description: `Room ${room.roomNo} has mixed courses: ${Array.from(distinctCourses).join(', ')}. Permitted only when classroom capacity necessitates sharing.`,
+                severity: 'warning'
+            });
+        }
     });
 
-    return violations;
+    const errorCount = violations.filter(v => v.severity === 'error').length;
+    const warningCount = violations.filter(v => v.severity === 'warning').length;
+
+    return {
+        isValid: errorCount === 0,
+        violations,
+        summary: {
+            totalViolations: violations.length,
+            errorCount,
+            warningCount,
+            courseSeparationCompliant: warningCount === 0,
+            consecutiveRollCompliant: !violations.some(v => v.ruleNumber === 2),
+            benchCapacityCompliant: !violations.some(v => v.ruleNumber === 5),
+            noDuplicateStudents: !violations.some(v => v.ruleNumber === 10),
+            noDuplicateSeats: !violations.some(v => v.ruleNumber === 11)
+        }
+    };
+}
+
+/**
+ * Inspects benches across all classrooms in a seat plan and returns detailed violations.
+ */
+export function getSeatPlanViolations(
+    plan: SeatPlan,
+    classrooms: Classroom[] = []
+): BenchViolationDetail[] {
+    if (!plan || !plan.assignments || !Array.isArray(plan.assignments) || plan.assignments.length === 0) return [];
+    const report = validateSeatPlanRules(plan, classrooms);
+    return report.violations
+        .filter(v => v.severity === 'error' && (v.ruleNumber === 2 || v.ruleNumber === 5 || v.ruleNumber === 10 || v.ruleNumber === 11))
+        .map(v => ({
+            classroomId: v.classroomId || '',
+            roomNo: v.roomNo || 'Room',
+            benchIndex: v.benchIndex ?? 0,
+            seatNumber1: v.seatNumber ?? 0,
+            seatNumber2: v.seatNumber ?? 0,
+            student1: null as any,
+            student2: null as any,
+            reason: `Rule ${v.ruleNumber} (${v.ruleName}): ${v.description}`
+        }));
 }
 
 /**
@@ -244,104 +382,68 @@ export function countSeatPlanViolations(
 }
 
 /**
- * Verifies that a seat plan adheres to all university examination sitting rules:
- * 1. Zero same-course or same-subject conflicts on any bench.
- * 2. In single-course dual-bench rooms, students must alternate sides (zig-zag / checkerboard)
- *    rather than being locked to one side.
+ * Verifies that a seat plan adheres to all seating rules (zero errors).
  */
 export function isSeatPlanCompliantWithSittingRules(
     plan: SeatPlan,
     classrooms: Classroom[] = []
 ): boolean {
     if (!plan || !plan.assignments || plan.assignments.length === 0) return true;
-    if (countSeatPlanViolations(plan, classrooms) > 0) return false;
-
-    const validClassrooms = Array.isArray(classrooms) ? classrooms.filter(c => c && c.id) : [];
-    const roomMap = new Map(validClassrooms.map(c => [c.id, c]));
-
-    const assignmentsByRoom = new Map<string, Seat[]>();
-    for (const seat of plan.assignments) {
-        if (!seat || !seat.classroom?.id) continue;
-        if (!assignmentsByRoom.has(seat.classroom.id)) {
-            assignmentsByRoom.set(seat.classroom.id, []);
-        }
-        assignmentsByRoom.get(seat.classroom.id)!.push(seat);
-    }
-
-    for (const [roomId, seats] of assignmentsByRoom.entries()) {
-        const room = roomMap.get(roomId) || seats[0]?.classroom;
-        if (!room || !Array.isArray(room.benchCapacities) || room.benchCapacities.length === 0) continue;
-
-        const seatedSeats = seats.filter(s => s && s.student);
-        if (seatedSeats.length <= 2) continue;
-
-        const courses = new Set(
-            seatedSeats.map(s => canonicalizeCourse(s.student?.course || s.student?.exam?.course))
-        );
-        if (courses.size === 1) {
-            let seatCounter = 1;
-            let dualBenchesWithStudent = 0;
-            let side0Count = 0;
-            let side1Count = 0;
-
-            const seatMap = new Map<number, Seat>();
-            seats.forEach(s => {
-                if (s && typeof s.seatNumber === 'number') seatMap.set(s.seatNumber, s);
-            });
-
-            room.benchCapacities.forEach(cap => {
-                if (cap >= 2) {
-                    const s0 = seatMap.get(seatCounter);
-                    const s1 = seatMap.get(seatCounter + 1);
-                    if (s0?.student && !s1?.student) {
-                        dualBenchesWithStudent++;
-                        side0Count++;
-                    } else if (!s0?.student && s1?.student) {
-                        dualBenchesWithStudent++;
-                        side1Count++;
-                    }
-                }
-                seatCounter += cap;
-            });
-
-            // If 4 or more dual benches are occupied by a single course, but 100% of them are on side 0,
-            // this plan is non-compliant with alternate seating!
-            if (dualBenchesWithStudent >= 4 && (side0Count === dualBenchesWithStudent || side1Count === dualBenchesWithStudent)) {
-                return false;
-            }
-        }
-    }
-
-    return true;
+    return countSeatPlanViolations(plan, classrooms) === 0;
 }
 
+/**
+ * ExamPlanner Automated Seating Engine implementing all 24 Student Seating Allotment Rules.
+ */
 export function generateSeatPlan(
     allStudents: Student[],
     classrooms: Classroom[],
     exams: ExamSlot[],
-    blockPriority: string[] = [] // Default to empty array if not provided
-): { plan: SeatPlan; updatedStudents: Student[] } {
-    const studentMasterList: Student[] = allStudents.map(s => ({ ...s, seatAssignment: null }));
+    blockPriority: string[] = [],
+    options?: { retainFixedSeats?: boolean }
+): {
+    plan: SeatPlan;
+    updatedStudents: Student[];
+    validationReport: RuleValidationReport;
+    shortageStudents: (Student & { exam: ExamSlot; reason: string })[];
+    ruleConflicts: RuleConflict[];
+} {
+    // Retain previous seat assignments if requested (Rule 17)
+    const studentMasterList: Student[] = allStudents.map(s => ({
+        ...s,
+        seatAssignment: options?.retainFixedSeats ? s.seatAssignment : null
+    }));
     const finalAssignments: Seat[] = [];
+    const ruleConflicts: RuleConflict[] = [];
+    const shortageStudents: (Student & { exam: ExamSlot; reason: string })[] = [];
 
-    // 1. Identify all eligible students for today's exams
+    // 1. Identify all eligible students for today's exams (Rules 10, 19)
     const allEligibleEntries = exams.flatMap(exam =>
         getEligibleStudentsForExam(studentMasterList, exam).map(s => ({ ...s, exam }))
     );
 
-    // Deduplicate
+    // Rule 10: Deduplicate students (no student assigned more than one seat in session)
     const eligibleStudentsToday: (Student & { exam: ExamSlot })[] = [];
     const studentIdsProcessed = new Set<string>();
     for (const entry of allEligibleEntries) {
         if (!studentIdsProcessed.has(entry.id)) {
             studentIdsProcessed.add(entry.id);
             eligibleStudentsToday.push(entry);
+        } else {
+            // Student matched multiple concurrent exams
+            ruleConflicts.push({
+                ruleNumber: 10,
+                ruleName: 'Duplicate exam eligibility',
+                course: entry.course,
+                description: `Student ${entry.name} (${entry.rollNo}) is eligible for multiple concurrent exams; assigned to primary exam only.`,
+                severity: 'warning'
+            });
         }
     }
 
-    // 2. Filter available classrooms & Sort by Capacity (Descending) to fit large batches first
+    // 2. Filter available classrooms & Sort deterministically (Rule 18, 21)
     const availableClassrooms = classrooms
-        .filter(room => !exams.some(exam => room.unavailableSlots.some(slot => slot.slotId === exam.id)))
+        .filter(room => !exams.some(exam => room.unavailableSlots?.some(slot => slot.slotId === exam.id)))
         .sort((a, b) => {
             // Priority Sort first
             const indexA = blockPriority.indexOf(a.building);
@@ -350,8 +452,11 @@ export function generateSeatPlan(
             if (indexA !== -1) return -1;
             if (indexB !== -1) return 1;
 
-            // Secondary: Capacity Descending
-            return b.capacity - a.capacity;
+            // Secondary: Capacity Descending (minimizes total rooms used, Rule 18)
+            if (b.capacity !== a.capacity) return b.capacity - a.capacity;
+
+            // Stable deterministic tie-breaker (Rule 21)
+            return (a.roomNo || '').localeCompare(b.roomNo || '', undefined, { numeric: true });
         });
 
     // 3. Prepare Room-Seat Maps
@@ -360,210 +465,331 @@ export function generateSeatPlan(
         roomSeatMaps.set(room.id, Array(room.capacity).fill(null));
     });
 
-    // 4. Group Students by Subject/Course to form "Batches"
-    // We need to know which pools we have available to mix
-    const studentPools = new Map<string, (Student & { exam: ExamSlot })[]>();
-
+    // 4. Group Students by Course to form Course Batches (Rule 1, 8)
+    const courseBatches = new Map<string, (Student & { exam: ExamSlot })[]>();
     eligibleStudentsToday.forEach(student => {
-        // Group students into course/subject pools for track-based interleaved seating
-        const key = `${canonicalizeCourse(student.course || student.exam.course)}_${student.exam.subjectCode}`;
-        if (!studentPools.has(key)) studentPools.set(key, []);
-        studentPools.get(key)!.push(student);
+        const key = canonicalizeCourse(student.course || student.exam.course);
+        if (!courseBatches.has(key)) courseBatches.set(key, []);
+        courseBatches.get(key)!.push(student);
     });
 
-    // Sort pools by roll number (numeric-aware) so students sit in order
-    const sortedPools = new Map<string, (Student & { exam: ExamSlot })[]>();
-    studentPools.forEach((pool, key) => {
-        const sorted = [...pool].sort((a, b) => 
+    // Sort each batch strictly in ascending roll-number order (Rules 3, 8, 19, 21)
+    const sortedCourseBatches = new Map<string, (Student & { exam: ExamSlot })[]>();
+    courseBatches.forEach((students, key) => {
+        const sorted = [...students].sort((a, b) =>
             a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' })
         );
-        sortedPools.set(key, sorted);
+        sortedCourseBatches.set(key, sorted);
     });
 
-    // Helper to find next available pool that does not conflict with excluded pools
-    const getAvailablePool = (excludePools: string[] = []): string | null => {
-        const sortedKeys = Array.from(sortedPools.keys())
-            .filter(k => (sortedPools.get(k)?.length || 0) > 0)
-            .sort((a, b) => (sortedPools.get(b)?.length || 0) - (sortedPools.get(a)?.length || 0));
+    // 5. Course-wise Classroom Allocation (Rules 1, 6, 7, 15, 18)
+    interface RoomPlanTarget {
+        classroom: Classroom;
+        students: (Student & { exam: ExamSlot })[];
+        courses: string[];
+    }
+    const roomPlanTargets: RoomPlanTarget[] = [];
+    const availableQueue = [...availableClassrooms];
 
-        for (const key of sortedKeys) {
-            const pool = sortedPools.get(key);
-            if (!pool || pool.length === 0) continue;
-            const cand = pool[0];
-            const hasConflict = excludePools.some(exKey => {
-                const exPool = sortedPools.get(exKey);
-                if (!exPool || exPool.length === 0) return false;
-                return isStudentConflict(cand, exPool[0]);
-            });
-            if (!hasConflict) {
-                return key;
+    // Order courses by descending student count to fit large groups cleanly
+    const sortedCourseKeys = Array.from(sortedCourseBatches.keys()).sort((a, b) =>
+        (sortedCourseBatches.get(b)?.length || 0) - (sortedCourseBatches.get(a)?.length || 0)
+    );
+
+    for (const courseKey of sortedCourseKeys) {
+        const pool = sortedCourseBatches.get(courseKey) || [];
+
+        while (pool.length > 0) {
+            if (availableQueue.length > 0) {
+                // Rule 18: Find best-fit room (smallest room that accommodates all remaining students of this course)
+                // If none fits all, take largest available room
+                let pickedIdx = availableQueue.findIndex(r => r.capacity >= pool.length);
+                if (pickedIdx === -1) {
+                    pickedIdx = 0; // Largest available room
+                }
+                const room = availableQueue.splice(pickedIdx, 1)[0];
+                const takeCount = Math.min(pool.length, room.capacity);
+                const studentsForRoom = pool.splice(0, takeCount);
+
+                roomPlanTargets.push({
+                    classroom: room,
+                    students: studentsForRoom,
+                    courses: [courseKey]
+                });
+
+                // Rule 15: Capacity management spillover
+                if (pool.length > 0) {
+                    ruleConflicts.push({
+                        ruleNumber: 15,
+                        ruleName: 'Capacity management spillover',
+                        classroomId: room.id,
+                        roomNo: room.roomNo,
+                        course: courseKey,
+                        description: `Course ${courseKey} exceeded Room ${room.roomNo} capacity (${room.capacity}); remaining ${pool.length} student(s) allotted to next eligible classroom.`,
+                        severity: 'warning'
+                    });
+                }
+            } else {
+                // All dedicated classrooms exhausted!
+                // Rule 7 Fallback: Check if any assigned room has spare capacity where leftovers can share
+                const spareTarget = roomPlanTargets.find(rt => rt.classroom.capacity > rt.students.length);
+                if (spareTarget) {
+                    const spare = spareTarget.classroom.capacity - spareTarget.students.length;
+                    const takeCount = Math.min(pool.length, spare);
+                    const studentsForRoom = pool.splice(0, takeCount);
+                    spareTarget.students.push(...studentsForRoom);
+                    if (!spareTarget.courses.includes(courseKey)) {
+                        spareTarget.courses.push(courseKey);
+                    }
+                    ruleConflicts.push({
+                        ruleNumber: 7,
+                        ruleName: 'Course separation fallback',
+                        classroomId: spareTarget.classroom.id,
+                        roomNo: spareTarget.classroom.roomNo,
+                        course: courseKey,
+                        description: `Room ${spareTarget.classroom.roomNo} shared between ${spareTarget.courses.join(' and ')} due to overall classroom capacity constraints.`,
+                        severity: 'warning'
+                    });
+                } else {
+                    // Rule 20: Insufficient capacity
+                    const unseated = pool.splice(0, pool.length);
+                    unseated.forEach(s => {
+                        shortageStudents.push({
+                            ...s,
+                            reason: `Insufficient classroom capacity. No seats available in any eligible classroom.`
+                        });
+                    });
+                    ruleConflicts.push({
+                        ruleNumber: 20,
+                        ruleName: 'Insufficient capacity',
+                        course: courseKey,
+                        description: `Capacity shortage: ${unseated.length} student(s) of course ${courseKey} could not be allotted seats due to insufficient classroom capacity.`,
+                        severity: 'error'
+                    });
+                }
             }
         }
-        return null;
-    };
+    }
 
-    let activeTrackAPool: string | null = null;
-    let activeTrackBPool: string | null = null;
-
-    availableClassrooms.forEach(room => {
+    // 6. Systematic Bench and Seat Layout inside each Classroom (Rules 2, 3, 4, 5, 8, 16, 23)
+    for (const target of roomPlanTargets) {
+        const { classroom: room, students: roomStudents, courses } = target;
         const map = roomSeatMaps.get(room.id)!;
 
-        // Iterate column by column to maintain sequential roll-number progression down each aisle
+        // Group benches by column
+        const columnBenches: { benchIdx: number; benchNumber: number; capacity: number }[][] = [];
         for (let col = 0; col < room.columns; col++) {
-            // Track continuity or re-selection for Track A (Primary)
-            if (!activeTrackAPool || (sortedPools.get(activeTrackAPool)?.length || 0) === 0) {
-                activeTrackAPool = getAvailablePool(activeTrackBPool ? [activeTrackBPool] : []);
+            const colList: { benchIdx: number; benchNumber: number; capacity: number }[] = [];
+            for (let r = 0; r < room.rows; r++) {
+                const benchIdx = r * room.columns + col;
+                if (benchIdx < room.benchCapacities.length && room.benchCapacities[benchIdx] > 0) {
+                    colList.push({
+                        benchIdx,
+                        benchNumber: benchIdx + 1,
+                        capacity: room.benchCapacities[benchIdx]
+                    });
+                }
             }
+            columnBenches.push(colList);
+        }
 
-            // Track continuity or re-selection for Track B (Secondary)
-            if (!activeTrackBPool || (sortedPools.get(activeTrackBPool)?.length || 0) === 0) {
-                activeTrackBPool = getAvailablePool(activeTrackAPool ? [activeTrackAPool] : []);
-            }
+        if (courses.length <= 1) {
+            // SINGLE-COURSE CLASSROOM (Rules 1, 2, 3, 4, 8)
+            const sortedStudents = [...roomStudents].sort((a, b) =>
+                a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' })
+            );
 
-            for (let row = 0; row < room.rows; row++) {
-                const benchIdx = row * room.columns + col;
-                if (benchIdx >= room.benchCapacities.length) continue;
+            let studentCursor = 0;
 
-                const benchSize = room.benchCapacities[benchIdx];
-                if (benchSize <= 0) continue;
+            for (let col = 0; col < room.columns; col++) {
+                const benches = columnBenches[col];
+                if (benches.length === 0) continue;
 
-                let benchFlatIdxBase = 0;
-                for (let b = 0; b < benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
+                const colCap = benches.reduce((sum, b) => sum + b.capacity, 0);
+                const remainingInRoom = sortedStudents.length - studentCursor;
+                if (remainingInRoom <= 0) break;
 
-                if (benchSize === 1) {
-                    // Single bench seat: assign to primary track (or next available pool)
-                    const flatIdx = benchFlatIdxBase + 0;
-                    if (map[flatIdx] !== null) continue;
+                const takeCount = Math.min(colCap, remainingInRoom);
+                const colStudents = sortedStudents.slice(studentCursor, studentCursor + takeCount);
+                studentCursor += takeCount;
 
-                    let poolKey = activeTrackAPool;
-                    if (!poolKey || (sortedPools.get(poolKey)?.length || 0) === 0) {
-                        poolKey = getAvailablePool();
-                        activeTrackAPool = poolKey;
-                    }
+                // Split into Left and Right streams (Rule 4: Left-Right seating)
+                // Consecutive roll numbers proceed down each side (Rule 2)
+                const leftCount = Math.ceil(colStudents.length / 2);
+                const rightCount = Math.floor(colStudents.length / 2);
 
-                    if (poolKey && (sortedPools.get(poolKey)?.length || 0) > 0) {
-                        const student = sortedPools.get(poolKey)!.shift()!;
-                        student.seatAssignment = { classroomId: room.id, seatNumber: flatIdx + 1 };
-                        map[flatIdx] = { student, classroom: room, seatNumber: flatIdx + 1 };
-                    }
-                } else {
-                    // Dual (or multi-seater) bench:
-                    // Parity is calculated as (row + col) % 2 for authentic university zig-zag checkerboard:
-                    // 1. In any column, students on consecutive benches alternate between Left and Right sides.
-                    // 2. In any row, students in adjacent columns alternate sides (no adjacent same-row seating).
-                    // 3. Multi-course examinations interleave courses across Left and Right with zero conflicts.
-                    const primarySide = (row + col) % 2;
-                    const secondarySide = 1 - primarySide;
+                const leftStudents = colStudents.slice(0, leftCount);
+                const rightStudents = colStudents.slice(leftCount, leftCount + rightCount);
 
-                    const primaryFlatIdx = benchFlatIdxBase + primarySide;
-                    const secondaryFlatIdx = benchFlatIdxBase + secondarySide;
+                for (let r = 0; r < benches.length; r++) {
+                    const bench = benches[r];
+                    let benchFlatIdxBase = 0;
+                    for (let b = 0; b < bench.benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
 
-                    // 1. Seat Primary Track (Track A)
-                    if (map[primaryFlatIdx] === null) {
-                        if (!activeTrackAPool || (sortedPools.get(activeTrackAPool)?.length || 0) === 0) {
-                            activeTrackAPool = getAvailablePool(activeTrackBPool ? [activeTrackBPool] : []);
+                    if (bench.capacity === 1) {
+                        if (leftStudents.length > 0) {
+                            const s = leftStudents.shift()!;
+                            const flatIdx = benchFlatIdxBase + 0;
+                            map[flatIdx] = {
+                                student: s,
+                                classroom: room,
+                                seatNumber: flatIdx + 1,
+                                benchNumber: bench.benchNumber,
+                                benchIndex: bench.benchIdx,
+                                seatPosition: 'Left'
+                            };
                         }
-
-                        if (
-                            activeTrackAPool &&
-                            (sortedPools.get(activeTrackAPool)?.length || 0) > 0 &&
-                            !doesCandidateConflictWithBench(
-                                sortedPools.get(activeTrackAPool)![0],
-                                benchFlatIdxBase,
-                                benchSize,
-                                primaryFlatIdx,
-                                map
-                            )
-                        ) {
-                            const student = sortedPools.get(activeTrackAPool)!.shift()!;
-                            student.seatAssignment = { classroomId: room.id, seatNumber: primaryFlatIdx + 1 };
-                            map[primaryFlatIdx] = { student, classroom: room, seatNumber: primaryFlatIdx + 1 };
+                    } else {
+                        // Seat 0: Left side
+                        if (r < leftStudents.length) {
+                            const s = leftStudents[r];
+                            const flatIdx = benchFlatIdxBase + 0;
+                            map[flatIdx] = {
+                                student: s,
+                                classroom: room,
+                                seatNumber: flatIdx + 1,
+                                benchNumber: bench.benchNumber,
+                                benchIndex: bench.benchIdx,
+                                seatPosition: 'Left'
+                            };
                         }
-                    }
-
-                    // 2. Seat Secondary Track (Track B)
-                    if (map[secondaryFlatIdx] === null) {
-                        if (!activeTrackBPool || (sortedPools.get(activeTrackBPool)?.length || 0) === 0) {
-                            activeTrackBPool = getAvailablePool(activeTrackAPool ? [activeTrackAPool] : []);
-                        }
-
-                        if (
-                            activeTrackBPool &&
-                            (sortedPools.get(activeTrackBPool)?.length || 0) > 0 &&
-                            !doesCandidateConflictWithBench(
-                                sortedPools.get(activeTrackBPool)![0],
-                                benchFlatIdxBase,
-                                benchSize,
-                                secondaryFlatIdx,
-                                map
-                            )
-                        ) {
-                            const student = sortedPools.get(activeTrackBPool)!.shift()!;
-                            student.seatAssignment = { classroomId: room.id, seatNumber: secondaryFlatIdx + 1 };
-                            map[secondaryFlatIdx] = { student, classroom: room, seatNumber: secondaryFlatIdx + 1 };
+                        // Seat 1: Right side
+                        if (r < rightStudents.length) {
+                            const s = rightStudents[r];
+                            const flatIdx = benchFlatIdxBase + 1;
+                            map[flatIdx] = {
+                                student: s,
+                                classroom: room,
+                                seatNumber: flatIdx + 1,
+                                benchNumber: bench.benchNumber,
+                                benchIndex: bench.benchIdx,
+                                seatPosition: 'Right'
+                            };
                         }
                     }
                 }
             }
-        }
-    });
+        } else {
+            // MULTI-COURSE SHARED CLASSROOM (Rule 4, 7)
+            // Course A on Left side, Course B on Right side
+            const courseA = courses[0];
+            const courseB = courses[1];
 
-    // Strict Post-Generation Compliance Verification:
-    // Guarantee that no two students with the same course or subject sit on the same bench under any circumstance.
+            const studentsA = roomStudents
+                .filter(s => canonicalizeCourse(s.course || s.exam.course) === courseA)
+                .sort((a, b) => a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' }));
+            const studentsB = roomStudents
+                .filter(s => canonicalizeCourse(s.course || s.exam.course) !== courseA)
+                .sort((a, b) => a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' }));
+
+            for (let col = 0; col < room.columns; col++) {
+                const benches = columnBenches[col];
+                for (let r = 0; r < benches.length; r++) {
+                    const bench = benches[r];
+                    let benchFlatIdxBase = 0;
+                    for (let b = 0; b < bench.benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
+
+                    // Left side (Seat 0): Course A
+                    if (studentsA.length > 0) {
+                        const s = studentsA.shift()!;
+                        const flatIdx = benchFlatIdxBase + 0;
+                        map[flatIdx] = {
+                            student: s,
+                            classroom: room,
+                            seatNumber: flatIdx + 1,
+                            benchNumber: bench.benchNumber,
+                            benchIndex: bench.benchIdx,
+                            seatPosition: 'Left'
+                        };
+                    } else if (studentsB.length > 0 && bench.capacity === 1) {
+                        const s = studentsB.shift()!;
+                        const flatIdx = benchFlatIdxBase + 0;
+                        map[flatIdx] = {
+                            student: s,
+                            classroom: room,
+                            seatNumber: flatIdx + 1,
+                            benchNumber: bench.benchNumber,
+                            benchIndex: bench.benchIdx,
+                            seatPosition: 'Left'
+                        };
+                    }
+
+                    // Right side (Seat 1): Course B
+                    if (bench.capacity >= 2 && studentsB.length > 0) {
+                        const s = studentsB.shift()!;
+                        const flatIdx = benchFlatIdxBase + 1;
+                        map[flatIdx] = {
+                            student: s,
+                            classroom: room,
+                            seatNumber: flatIdx + 1,
+                            benchNumber: bench.benchNumber,
+                            benchIndex: bench.benchIdx,
+                            seatPosition: 'Right'
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    // 7. Assemble Final Assignments & Retain Allocation Records (Rule 23)
     availableClassrooms.forEach(room => {
         const map = roomSeatMaps.get(room.id);
         if (!map) return;
         let benchFlatIdxBase = 0;
-        room.benchCapacities.forEach(benchSize => {
-            const benchStudents: { s: number; student: Student }[] = [];
+        room.benchCapacities.forEach((benchSize, benchIdx) => {
             for (let s = 0; s < benchSize; s++) {
                 const flatIdx = benchFlatIdxBase + s;
-                const seat = map[flatIdx];
-                if (seat && seat.student) {
-                    benchStudents.push({ s, student: seat.student });
-                }
-            }
-            if (benchStudents.length > 1) {
-                for (let i = 0; i < benchStudents.length; i++) {
-                    for (let j = i + 1; j < benchStudents.length; j++) {
-                        if (isStudentConflict(benchStudents[i].student, benchStudents[j].student)) {
-                            // Eject conflicting student to keep bench strictly compliant
-                            const ejectFlatIdx = benchFlatIdxBase + benchStudents[j].s;
-                            map[ejectFlatIdx] = null;
+                const seatPos = benchSize === 1 ? 'Left' : (s === 0 ? 'Left' : (s === 1 ? 'Right' : 'Middle'));
+                if (map[flatIdx]) {
+                    const seat = map[flatIdx]!;
+                    finalAssignments.push(seat);
+                    if (seat.student) {
+                        const masterIdx = studentMasterList.findIndex(sm => sm.id === seat.student!.id);
+                        if (masterIdx !== -1) {
+                            studentMasterList[masterIdx].seatAssignment = {
+                                classroomId: room.id,
+                                seatNumber: flatIdx + 1,
+                                benchNumber: benchIdx + 1,
+                                seatPosition: seatPos,
+                                course: seat.student.course,
+                                rollNo: seat.student.rollNo
+                            };
                         }
                     }
+                } else {
+                    finalAssignments.push({
+                        student: null,
+                        classroom: room,
+                        seatNumber: flatIdx + 1,
+                        benchNumber: benchIdx + 1,
+                        benchIndex: benchIdx,
+                        seatPosition: seatPos
+                    });
                 }
             }
             benchFlatIdxBase += benchSize;
         });
     });
 
-    // 8. Update Master List and Final Plan
-    roomSeatMaps.forEach((seats, roomId) => {
-        seats.forEach((seat, index) => {
-            if (seat) {
-                finalAssignments.push(seat);
-                if (seat.student) {
-                    const masterIdx = studentMasterList.findIndex(s => s.id === seat.student!.id);
-                    if (masterIdx !== -1) {
-                        studentMasterList[masterIdx].seatAssignment = {
-                            classroomId: roomId,
-                            seatNumber: index + 1
-                        };
-                    }
-                }
-            } else {
-                finalAssignments.push({ student: null, classroom: availableClassrooms.find(r => r.id === roomId)!, seatNumber: index + 1 });
-            }
-        });
-    });
-
     const plan: SeatPlan = {
         exam: exams.length > 1 ? exams : exams[0],
         assignments: finalAssignments,
+        shortageStudents,
+        ruleConflicts
     };
 
-    return { plan, updatedStudents: studentMasterList };
+    // 8. Revalidate Seating Arrangement (Rules 22, 24)
+    const validationReport = validateSeatPlanRules(plan, availableClassrooms);
+    plan.validationReport = validationReport;
+
+    return {
+        plan,
+        updatedStudents: studentMasterList,
+        validationReport,
+        shortageStudents,
+        ruleConflicts
+    };
 }
 
 

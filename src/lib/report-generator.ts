@@ -529,7 +529,10 @@ export async function generateRoomSeatPlanExcel(
             .filter(a => a.student)
             .map(a => ({
                 'Seat': a.seatNumber,
+                'Bench': a.benchNumber || '-',
+                'Side': a.seatPosition || '-',
                 'Roll No': a.student.rollNo,
+                'Course': a.student.course || '-',
                 'Name': a.student.name,
                 'Subject': a.student.exam?.subjectCode || '-',
                 'Signature': '________________'
@@ -540,7 +543,7 @@ export async function generateRoomSeatPlanExcel(
 
         // Formatting
         wsGrid['!cols'] = [{ wch: 10 }, ...Array(40).fill({ wch: 18 })];
-        wsList['!cols'] = [{ wch: 8 }, { wch: 18 }, { wch: 28 }, { wch: 15 }, { wch: 20 }];
+        wsList['!cols'] = [{ wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 28 }, { wch: 15 }, { wch: 20 }];
 
         XLSX.utils.book_append_sheet(wb, wsGrid, "Seating Chart");
         XLSX.utils.book_append_sheet(wb, wsList, "Attendance List");

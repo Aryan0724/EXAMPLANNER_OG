@@ -3,6 +3,10 @@
 export interface SeatAssignment {
   classroomId: string;
   seatNumber: number;
+  benchNumber?: number;
+  seatPosition?: 'Left' | 'Right' | 'Middle' | 'Single' | string;
+  course?: string;
+  rollNo?: string;
 }
 
 export interface AvailabilitySlot {
@@ -100,16 +104,59 @@ export const DEFAULT_FACULTY_STUDENT_RULES: FacultyStudentRule[] = [
   { id: 'rule-4', minStudents: 81, maxStudents: 999, facultyCount: 4 },
 ];
 
+export interface RuleViolation {
+  ruleNumber: number;
+  ruleName: string;
+  classroomId?: string;
+  roomNo?: string;
+  seatNumber?: number;
+  benchIndex?: number;
+  studentRollNo?: string;
+  description: string;
+  severity: 'error' | 'warning';
+}
+
+export interface RuleConflict {
+  ruleNumber: number;
+  ruleName: string;
+  classroomId?: string;
+  roomNo?: string;
+  course?: string;
+  description: string;
+  severity: 'warning' | 'error';
+}
+
+export interface RuleValidationReport {
+  isValid: boolean;
+  violations: RuleViolation[];
+  summary: {
+    totalViolations: number;
+    errorCount: number;
+    warningCount: number;
+    courseSeparationCompliant: boolean;
+    consecutiveRollCompliant: boolean;
+    benchCapacityCompliant: boolean;
+    noDuplicateStudents: boolean;
+    noDuplicateSeats: boolean;
+  };
+}
+
 export interface Seat {
   student: (Student & { exam: ExamSlot }) | null; // Null if empty
   isDebarredSeat?: boolean; // True if the seat is reserved for a debarred student
   classroom: Classroom;
   seatNumber: number; // 1-based index in the classroom
+  benchNumber?: number; // 1-based bench number in the classroom (Rule 23)
+  benchIndex?: number; // 0-based bench index
+  seatPosition?: 'Left' | 'Right' | 'Middle' | 'Single' | string; // Position on the bench (Rule 23)
 }
 
 export interface SeatPlan {
   exam: ExamSlot | ExamSlot[]; // Can be for one or more concurrent exams
   assignments: Seat[];
+  validationReport?: RuleValidationReport;
+  shortageStudents?: (Student & { exam: ExamSlot; reason: string })[];
+  ruleConflicts?: RuleConflict[];
 }
 
 export interface InvigilatorAssignment {

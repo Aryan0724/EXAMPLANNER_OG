@@ -18,6 +18,7 @@ import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
 import { FacultyAllocationDialog } from '@/components/faculty-allocation-dialog';
+import { AllotmentRulesDialog } from '@/components/allotment-rules-dialog';
 type FullAllotment = Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }>;
 import { ExclusionReport } from '@/components/exclusion-report';
 
@@ -74,6 +75,7 @@ export default function AllotmentPage() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [showFacultyDialog, setShowFacultyDialog] = useState(false);
+  const [showRulesDialog, setShowRulesDialog] = useState(false);
   const [slotOptions, setSlotOptions] = useState(() => getSlotOptions(fullAllotment, examSchedule));
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | undefined>(() => slotOptions[0]?.id);
 
@@ -174,7 +176,7 @@ export default function AllotmentPage() {
         setSelectedClassroomId(firstClassroomId);
         toast({
           title: "Allotment Synchronized",
-          description: "Applied strict alternate (zig-zag / checkerboard) seating rules.",
+          description: "Applied ExamPlanner 24-rule seating allotment (Course-wise separation & Left-Right consecutive roll allotment).",
         });
         return;
       }
@@ -707,6 +709,15 @@ export default function AllotmentPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => setShowRulesDialog(true)}
+                          className="h-9 text-xs font-semibold gap-1.5 border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                        >
+                          <ShieldCheck className="mr-1.5 h-4 w-4" />
+                          Seating Rules (24 Rules)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setShowFacultyDialog(true)}
                           className="h-9 text-xs font-semibold gap-1.5 border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20"
                         >
@@ -803,18 +814,18 @@ export default function AllotmentPage() {
                           <div key={selectedClassroom.id}>
                             <div className="flex justify-center mb-3">
                               {currentBenchViolations === 0 ? (
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold shadow-sm">
+                                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold shadow-xs">
                                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                  <span>Strict Seating: 0 Same-Course Bench Conflicts (Single-Course Alternate Desks Active)</span>
+                                  <span>Allotment Rules Compliant: 0 Conflicts (24 Rules Active)</span>
                                 </div>
                               ) : (
-                                <div className="inline-flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold shadow-sm">
+                                <div className="inline-flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold shadow-xs">
                                   <div className="flex items-center gap-1.5">
                                     <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-                                    <span>{currentBenchViolations} same-course desk conflict(s) detected in this room from outdated cache.</span>
+                                    <span>{currentBenchViolations} seating rule conflict(s) detected in this room.</span>
                                   </div>
                                   <Button size="sm" onClick={handleRegenerateCurrentSession} className="bg-rose-600 hover:bg-rose-700 text-white h-6 px-2 text-[11px]">
-                                    Auto-Fix Now
+                                    Re-Apply Rules
                                   </Button>
                                 </div>
                               )}
@@ -1030,6 +1041,10 @@ export default function AllotmentPage() {
         initialReserveCount={reservedCount}
         title="Faculty Allocation Rules (Session)"
         description="Configure how many invigilators/faculty to assign per classroom based on student count for this exam session."
+      />
+      <AllotmentRulesDialog
+        open={showRulesDialog}
+        onOpenChange={setShowRulesDialog}
       />
     </>
   );

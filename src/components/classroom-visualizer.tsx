@@ -34,13 +34,21 @@ interface ClassroomVisualizerProps {
   courseColors?: Map<string, string>;
 }
 
-const StudentTooltip = ({ student, seatNumber, isDebarredSeat }: { student: Student | null, seatNumber: number, isDebarredSeat?: boolean }) => {
+const StudentTooltip = ({ student, seatNumber, benchNumber, seatPosition, isDebarredSeat }: {
+  student: Student | null;
+  seatNumber: number;
+  benchNumber?: number;
+  seatPosition?: string;
+  isDebarredSeat?: boolean;
+}) => {
   return (
     <TooltipContent>
       <div className="text-sm">
-        <p className="font-bold">{student ? student.name : (isDebarredSeat ? 'Seat Reserved (Debarred)' : 'Empty')}</p>
-        <p>Seat: {seatNumber}</p>
-        {student && <p>Roll No: {student.rollNo}</p>}
+        <p className="font-bold">{student ? student.name : (isDebarredSeat ? 'Seat Reserved (Debarred)' : 'Empty Seat')}</p>
+        <p className="font-medium text-xs text-primary">
+          Seat #{seatNumber} {benchNumber ? `• Bench #${benchNumber}` : ''} {seatPosition ? `(${seatPosition} Side)` : ''}
+        </p>
+        {student && <p>Roll No: <span className="font-semibold">{student.rollNo}</span></p>}
         {student && student.exam && <p>Subject: {student.exam.subjectCode}</p>}
         {student && <p className="text-xs text-muted-foreground">{student.course} - {student.department}</p>}
         {student?.isDebarred && <p className="text-destructive font-bold">Status: Debarred</p>}
@@ -76,8 +84,8 @@ export function ClassroomVisualizer({ assignments = [], classroom, courseColors 
       const bench: Seat[] = [];
       for (let i = 0; i < capacity; i++) {
         const seatNum = seatCounter++;
-        const seat = seatMap.get(seatNum) || {
-          classroom,
+        const seat: Seat = seatMap.get(seatNum) || {
+          classroom: classroom as any,
           seatNumber: seatNum,
           student: null
         };
@@ -117,12 +125,14 @@ export function ClassroomVisualizer({ assignments = [], classroom, courseColors 
                     "flex items-center justify-center gap-0.5 p-0.5 rounded-md bg-background border shadow-sm flex-nowrap min-h-[3rem] transition-all",
                     hasBenchConflict && "border-rose-400 bg-rose-50/60 ring-1 ring-rose-400"
                   )}
-                  title={hasBenchConflict ? "Bench Rule Violation: Same-course or same-subject students seated together" : undefined}
+                  title={hasBenchConflict ? "Rule 2 Violation: Students with consecutive roll numbers seated on the same bench" : undefined}
                 >
                   {benchSeats.map((seat, seatIdx) => {
                     if (!seat) return null;
                     const subjectCode = seat.student?.exam?.subjectCode;
                     const bgColor = (subjectCode && courseColors) ? courseColors.get(subjectCode) : undefined;
+                    const benchNum = seat.benchNumber || (benchIdx + 1);
+                    const seatPos = seat.seatPosition || (seatIdx === 0 ? 'Left' : (seatIdx === 1 ? 'Right' : `Seat ${seatIdx + 1}`));
 
                     return (
                       <Tooltip key={`seat-${benchIdx}-${seatIdx}`}>
@@ -155,7 +165,13 @@ export function ClassroomVisualizer({ assignments = [], classroom, courseColors 
                             </span>
                           </div>
                         </TooltipTrigger>
-                        <StudentTooltip student={seat.student} seatNumber={seat.seatNumber} isDebarredSeat={seat.isDebarredSeat} />
+                        <StudentTooltip
+                          student={seat.student}
+                          seatNumber={seat.seatNumber}
+                          benchNumber={benchNum}
+                          seatPosition={seatPos}
+                          isDebarredSeat={seat.isDebarredSeat}
+                        />
                       </Tooltip>
                     );
                   })}
