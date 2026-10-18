@@ -225,6 +225,27 @@ export default function AllotmentPage() {
       const firstClassroomId = newSeatPlan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
       setSelectedClassroomId(firstClassroomId);
     } else {
+      const concurrentExams = examSlotsByTime[slotKey] || [];
+      if (concurrentExams.length > 0 && students.length > 0 && classrooms.length > 0) {
+        const cleanStudents = students.map(s => ({ ...s, seatAssignment: null }));
+        const { plan: freshPlan } = generateSeatPlan(cleanStudents, classrooms, concurrentExams, blockPriority);
+        const sessionExamIds = new Set(concurrentExams.map(e => e.id));
+        const sessionTargetPool = invigilators.filter(inv => {
+          if (!inv.isAvailable) return false;
+          return !inv.unavailableSlots.some(s => s.slotId === slotKey || sessionExamIds.has(s.slotId));
+        });
+        const { assignments: freshInvAsg } = assignInvigilators(sessionTargetPool, freshPlan, concurrentExams[0], reservedCount, facultyStudentRules);
+        setSeatPlan(freshPlan);
+        setInvigilatorAssignments(freshInvAsg);
+        setFullAllotment((prev: any) => ({
+          ...(prev || {}),
+          [slotKey]: { seatPlan: freshPlan, invigilatorAssignments: freshInvAsg }
+        }));
+        const firstClassroomId = freshPlan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
+        setSelectedClassroomId(firstClassroomId);
+        return;
+      }
+
       setSeatPlan(null);
       setInvigilatorAssignments(null);
       setSelectedClassroomId(null);
@@ -515,6 +536,8 @@ export default function AllotmentPage() {
         if (selectedSlotKey && generatedPlans[selectedSlotKey]) {
           setSeatPlan(generatedPlans[selectedSlotKey].seatPlan);
           setInvigilatorAssignments(generatedPlans[selectedSlotKey].invigilatorAssignments);
+          const firstClassroomId = generatedPlans[selectedSlotKey].seatPlan.assignments.find(a => a && a.classroom?.id)?.classroom?.id ?? null;
+          setSelectedClassroomId(firstClassroomId);
         }
 
         toast({
