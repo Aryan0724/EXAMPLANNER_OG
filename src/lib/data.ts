@@ -226,22 +226,374 @@ export interface OfficialBatchSpec {
  * Total students: Exactly 1,147 students
  */
 export const OFFICIAL_STUDENT_BATCH_SPECS: OfficialBatchSpec[] = [
-  { course: 'B.Sc (Nursing)', batch: '2026–2030', semester: 1, totalStudents: 63, department: 'College of Nursing', code: 'NUR' },
-  { course: 'B.Tech CSE', batch: '2025–2029', semester: 3, totalStudents: 424, department: 'Computer Science and Engineering', code: 'CSE' },
-  { course: 'B.Tech ECE', batch: '2025–2029', semester: 3, totalStudents: 5, department: 'Electronics and Communication Engineering', code: 'ECE' },
-  { course: 'B.Tech ME', batch: '2025–2029', semester: 3, totalStudents: 14, department: 'Mechanical Engineering', code: 'ME' },
-  { course: 'B.Tech CE', batch: '2025–2029', semester: 3, totalStudents: 8, department: 'Civil Engineering', code: 'CE' },
-  { course: 'B.Pharma', batch: '2025–2029', semester: 3, totalStudents: 44, department: 'College of Pharmacy', code: 'PHARM' },
-  { course: 'BBA', batch: '2025–2028', semester: 3, totalStudents: 202, department: 'School of Management', code: 'BBA' },
-  { course: 'BCA', batch: '2025–2028', semester: 3, totalStudents: 80, department: 'Computer Applications', code: 'BCA' },
-  { course: 'B.Com(H)', batch: '2025–2028', semester: 3, totalStudents: 52, department: 'Commerce', code: 'BCOM' },
-  { course: 'BCA(Hons.) with AI&DS', batch: '2025–2028', semester: 3, totalStudents: 178, department: 'Computer Applications', code: 'BCAAI' },
-  { course: 'MCA', batch: '2025–2027', semester: 3, totalStudents: 35, department: 'Computer Applications', code: 'MCA' },
-  { course: 'MCA AI&DS', batch: '2025–2027', semester: 3, totalStudents: 37, department: 'Computer Applications', code: 'MCAAI' },
-  { course: 'M.Tech CSE', batch: '2025–2027', semester: 3, totalStudents: 1, department: 'Computer Science and Engineering', code: 'MTCSE' },
-  { course: 'Diploma CSE', batch: '2025–2028', semester: 3, totalStudents: 2, department: 'Computer Science and Engineering', code: 'DIPCSE' },
-  { course: 'Diploma ECE', batch: '2026–2028', semester: 3, totalStudents: 1, department: 'Electronics and Communication Engineering', code: 'DIPECE' },
-  { course: 'Diploma ME', batch: '2026–2028', semester: 3, totalStudents: 1, department: 'Mechanical Engineering', code: 'DIPME' },
+  {
+    "course": "B.Sc (Nursing)",
+    "batch": "2026-2030",
+    "semester": 1,
+    "totalStudents": 63,
+    "department": "College of Nursing",
+    "code": "NUR"
+  },
+  {
+    "course": "B.Tech CSE",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 424,
+    "department": "Computer Science and Engineering",
+    "code": "CSE"
+  },
+  {
+    "course": "B.Tech ECE",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 5,
+    "department": "Electronics and Communication Engineering",
+    "code": "ECE"
+  },
+  {
+    "course": "B.Tech ME",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 14,
+    "department": "Mechanical Engineering",
+    "code": "ME"
+  },
+  {
+    "course": "B.Tech CE",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 8,
+    "department": "Civil Engineering",
+    "code": "CE"
+  },
+  {
+    "course": "B.Pharma",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 44,
+    "department": "College of Pharmacy",
+    "code": "PHARM"
+  },
+  {
+    "course": "BBA",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 202,
+    "department": "School of Management",
+    "code": "BBA"
+  },
+  {
+    "course": "BCA",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 80,
+    "department": "Computer Applications",
+    "code": "BCA"
+  },
+  {
+    "course": "B.Com(H)",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 52,
+    "department": "Commerce",
+    "code": "BCOM"
+  },
+  {
+    "course": "BCA(Hons.) with AI&DS",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 178,
+    "department": "Computer Applications",
+    "code": "BCAAI"
+  },
+  {
+    "course": "MCA",
+    "batch": "2025-2027",
+    "semester": 3,
+    "totalStudents": 35,
+    "department": "Computer Applications",
+    "code": "MCA"
+  },
+  {
+    "course": "MCA AI&DS",
+    "batch": "2025-2027",
+    "semester": 3,
+    "totalStudents": 37,
+    "department": "Computer Applications",
+    "code": "MCAAI"
+  },
+  {
+    "course": "M.Tech CSE",
+    "batch": "2025-2027",
+    "semester": 3,
+    "totalStudents": 1,
+    "department": "Computer Science and Engineering",
+    "code": "MTCSE"
+  },
+  {
+    "course": "Diploma CSE",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 2,
+    "department": "Polytechnic",
+    "code": "DIPCSE"
+  },
+  {
+    "course": "Diploma ECE",
+    "batch": "2026-2028",
+    "semester": 3,
+    "totalStudents": 1,
+    "department": "Polytechnic",
+    "code": "DIPECE"
+  },
+  {
+    "course": "Diploma ME",
+    "batch": "2026-2028",
+    "semester": 3,
+    "totalStudents": 1,
+    "department": "Polytechnic",
+    "code": "DIPME"
+  },
+  {
+    "course": "B.Sc (Nursing)",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 64,
+    "department": "College of Nursing",
+    "code": "NUR"
+  },
+  {
+    "course": "B.Tech CSE",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 364,
+    "department": "Computer Science and Engineering",
+    "code": "CSE"
+  },
+  {
+    "course": "B.Tech ECE",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 9,
+    "department": "Electronics and Communication Engineering",
+    "code": "ECE"
+  },
+  {
+    "course": "B.Tech ME",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 7,
+    "department": "Mechanical Engineering",
+    "code": "ME"
+  },
+  {
+    "course": "B.Tech CE",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 3,
+    "department": "Civil Engineering",
+    "code": "CE"
+  },
+  {
+    "course": "B.Pharma",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 58,
+    "department": "College of Pharmacy",
+    "code": "PHARM"
+  },
+  {
+    "course": "BBA",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 154,
+    "department": "School of Management",
+    "code": "BBA"
+  },
+  {
+    "course": "BCA",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 188,
+    "department": "Computer Applications",
+    "code": "BCA"
+  },
+  {
+    "course": "B.Com(H)",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 22,
+    "department": "Commerce",
+    "code": "BCOM"
+  },
+  {
+    "course": "BCA(Hons.) with AI&DS",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 111,
+    "department": "Computer Applications",
+    "code": "BCAAI"
+  },
+  {
+    "course": "Diploma CSE",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 1,
+    "department": "Polytechnic",
+    "code": "DIPCSE"
+  },
+  {
+    "course": "Diploma CE",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 2,
+    "department": "Polytechnic",
+    "code": "DIPCE"
+  },
+  {
+    "course": "BCA",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 73,
+    "department": "Computer Applications",
+    "code": "BCA"
+  },
+  {
+    "course": "BCA(Hons.) with AI&DS",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 271,
+    "department": "Computer Applications",
+    "code": "BCAAI"
+  },
+  {
+    "course": "Diploma CSE",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 5,
+    "department": "Polytechnic",
+    "code": "DIP"
+  },
+  {
+    "course": "M.Tech CSE",
+    "batch": "2026-2028",
+    "semester": 1,
+    "totalStudents": 1,
+    "department": "Computer Science and Engineering",
+    "code": "MTCSE"
+  },
+  {
+    "course": "B.Sc (Nursing)",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 55,
+    "department": "College of Nursing",
+    "code": "NUR"
+  },
+  {
+    "course": "B.Tech CSE",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 557,
+    "department": "Computer Science and Engineering",
+    "code": "CSE"
+  },
+  {
+    "course": "B.Tech ECE",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 8,
+    "department": "Electronics and Communication Engineering",
+    "code": "ECE"
+  },
+  {
+    "course": "B.Tech ME",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 5,
+    "department": "Mechanical Engineering",
+    "code": "ME"
+  },
+  {
+    "course": "B.Tech CE",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 4,
+    "department": "Civil Engineering",
+    "code": "CE"
+  },
+  {
+    "course": "B.Pharma",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 75,
+    "department": "College of Pharmacy",
+    "code": "PHARM"
+  },
+  {
+    "course": "B.Tech",
+    "batch": "2026-2030",
+    "semester": 1,
+    "totalStudents": 638,
+    "department": "Engineering",
+    "code": "BT"
+  },
+  {
+    "course": "B.Pharma",
+    "batch": "2026-2030",
+    "semester": 1,
+    "totalStudents": 57,
+    "department": "College of Pharmacy",
+    "code": "PHARM"
+  },
+  {
+    "course": "BBA",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 187,
+    "department": "School of Management",
+    "code": "BBA"
+  },
+  {
+    "course": "B.Com(H)",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 78,
+    "department": "Commerce",
+    "code": "BCOM"
+  },
+  {
+    "course": "MCA",
+    "batch": "2026-2028",
+    "semester": 1,
+    "totalStudents": 17,
+    "department": "Computer Applications",
+    "code": "MCA"
+  },
+  {
+    "course": "MCA AI&DS",
+    "batch": "2026-2028",
+    "semester": 1,
+    "totalStudents": 41,
+    "department": "Computer Applications",
+    "code": "MCAAI"
+  },
+  {
+    "course": "M.Pharma",
+    "batch": "2026-2028",
+    "semester": 1,
+    "totalStudents": 12,
+    "department": "College of Pharmacy",
+    "code": "MPHARM"
+  },
+  {
+    "course": "B.Sc (Nursing)",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 53,
+    "department": "College of Nursing",
+    "code": "NUR"
+  }
 ];
 
 export function generateOfficialStudents(): Student[] {

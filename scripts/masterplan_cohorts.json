@@ -1,0 +1,324 @@
+[
+  {
+    "shift": "ETE_Shift_1",
+    "course": "B.Sc (Nursing)",
+    "batch": "2026-2030",
+    "semester": 1,
+    "totalStudents": 63
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "B.Tech CSE",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 424
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "B.Tech ECE",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 5
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "B.Tech ME",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 14
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "B.Tech CE",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 8
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "B.Pharma",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 44
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "BBA",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 202
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "BCA",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 80
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "B.Com(H)",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 52
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "BCA(Hons.) with AI&DS",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 178
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "MCA",
+    "batch": "2025-2027",
+    "semester": 3,
+    "totalStudents": 35
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "MCA AI&DS",
+    "batch": "2025-2027",
+    "semester": 3,
+    "totalStudents": 37
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "M.Tech CSE",
+    "batch": "2025-2027",
+    "semester": 3,
+    "totalStudents": 1
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "DiplomaCSE",
+    "batch": "2025-2028",
+    "semester": 3,
+    "totalStudents": 2
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "DiplomaECE",
+    "batch": "2026-2028",
+    "semester": 3,
+    "totalStudents": 1
+  },
+  {
+    "shift": "ETE_Shift_1",
+    "course": "DiplomaME",
+    "batch": "2026-2028",
+    "semester": 3,
+    "totalStudents": 1
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "B.Sc (Nursing)",
+    "batch": "2025-2029",
+    "semester": 3,
+    "totalStudents": 64
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "B.Tech CSE",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 364
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "B.Tech ECE",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 9
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "B.Tech ME",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 7
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "B.Tech CE",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 3
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "B.Pharma",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 58
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "BBA",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 154
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "BCA",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 188
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "B.Com(H)",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 22
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "BCA(Hons.) with AI&DS",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 111
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "Diploma CSE",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 1
+  },
+  {
+    "shift": "ETE_Shift_2",
+    "course": "Diploma CE",
+    "batch": "2024-2027",
+    "semester": 5,
+    "totalStudents": 2
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "BCA",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 73
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "BCA A I A D S",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 271
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "DIPLOMA",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 5
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "M.Tech CSE",
+    "batch": "2026-2028",
+    "semester": 1,
+    "totalStudents": 1
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "B.Sc (Nursing)",
+    "batch": "2024-2028",
+    "semester": 5,
+    "totalStudents": 55
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "B.Tech CSE",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 557
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "B.Tech ECE",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 8
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "B.Tech ME",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 5
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "B.Tech CE",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 4
+  },
+  {
+    "shift": "ETE_Shift_3",
+    "course": "B.Pharma",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 75
+  },
+  {
+    "shift": "ETE_Shift_4",
+    "course": "B.Tech",
+    "batch": "2026-2030",
+    "semester": 1,
+    "totalStudents": 638
+  },
+  {
+    "shift": "ETE_Shift_4",
+    "course": "B.Pharma",
+    "batch": "2026-2030",
+    "semester": 1,
+    "totalStudents": 57
+  },
+  {
+    "shift": "ETE_Shift_4",
+    "course": "BBA",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 187
+  },
+  {
+    "shift": "ETE_Shift_4",
+    "course": "B.Com(H)",
+    "batch": "2026-2029",
+    "semester": 1,
+    "totalStudents": 78
+  },
+  {
+    "shift": "ETE_Shift_4",
+    "course": "MCA",
+    "batch": "2026-2028",
+    "semester": 1,
+    "totalStudents": 17
+  },
+  {
+    "shift": "ETE_Shift_4",
+    "course": "MCA AI&DS",
+    "batch": "2026-2028",
+    "semester": 1,
+    "totalStudents": 41
+  },
+  {
+    "shift": "ETE_Shift_4",
+    "course": "M.Pharma",
+    "batch": "2026-2028",
+    "semester": 1,
+    "totalStudents": 12
+  },
+  {
+    "shift": "ETE_Shift_4",
+    "course": "B.Sc (Nursing)",
+    "batch": "2023-2027",
+    "semester": 7,
+    "totalStudents": 53
+  }
+]

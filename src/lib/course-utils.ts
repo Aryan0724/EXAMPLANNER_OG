@@ -17,13 +17,15 @@ export const CANONICAL_COURSES = [
   'MCA',
   'MCA AI&DS',
   'M.Tech CSE',
+  'M.Pharma',
   'Diploma CSE',
   'Diploma ECE',
   'Diploma ME',
+  'Diploma CE',
 ] as const;
 
 export const COURSE_ALIASES: Record<string, string> = {
-  // B.Tech CSE
+  // B.Tech CSE / General B.Tech
   'b.tech cse': 'B.Tech CSE',
   'b.tech computer science and engineering': 'B.Tech CSE',
   'btech cse': 'B.Tech CSE',
@@ -34,6 +36,12 @@ export const COURSE_ALIASES: Record<string, string> = {
   'computer science and engineering': 'B.Tech CSE',
   'b.tech computer science & engineering': 'B.Tech CSE',
   'cse': 'B.Tech CSE',
+  'bachelor of technology (computer science)': 'B.Tech CSE',
+  'bachelor of technology (computer science)(btl/hld)': 'B.Tech CSE',
+  'bachelor of technology (computer science)(hld/btl)': 'B.Tech CSE',
+  'bachelor of technology': 'B.Tech CSE',
+  'b.tech': 'B.Tech CSE',
+  'btech': 'B.Tech CSE',
 
   // B.Sc (Nursing)
   'b.sc (nursing)': 'B.Sc (Nursing)',
@@ -52,6 +60,10 @@ export const COURSE_ALIASES: Record<string, string> = {
   'b.tech. ece': 'B.Tech ECE',
   'b tech ece': 'B.Tech ECE',
   'ece': 'B.Tech ECE',
+  'bachelor of technology (ece) only (btl)': 'B.Tech ECE',
+  'bachelor of technology ece  group only (btl)': 'B.Tech ECE',
+  'bachelor of technology( ece)  only (btl)': 'B.Tech ECE',
+  'bachelor of technology ece group only (btl)': 'B.Tech ECE',
 
   // B.Tech ME
   'b.tech me': 'B.Tech ME',
@@ -61,6 +73,8 @@ export const COURSE_ALIASES: Record<string, string> = {
   'b.tech. me': 'B.Tech ME',
   'b tech me': 'B.Tech ME',
   'me': 'B.Tech ME',
+  'bachelor of technology (me) only (btl)': 'B.Tech ME',
+  'bachelor of technology (mechanical engineering) only (btl)': 'B.Tech ME',
 
   // B.Tech CE
   'b.tech ce': 'B.Tech CE',
@@ -70,6 +84,9 @@ export const COURSE_ALIASES: Record<string, string> = {
   'b.tech. ce': 'B.Tech CE',
   'b tech ce': 'B.Tech CE',
   'ce': 'B.Tech CE',
+  'bachelor of technology (ce) only (btl)': 'B.Tech CE',
+  'bachelor of technology (civil engineering)  only (btl)': 'B.Tech CE',
+  'bachelor of technology (civil engineering) only (btl)': 'B.Tech CE',
 
   // B.Pharma
   'b.pharma': 'B.Pharma',
@@ -85,6 +102,7 @@ export const COURSE_ALIASES: Record<string, string> = {
   'bba': 'BBA',
   'bachelor of business administration (bba)': 'BBA',
   'bachelor of business administration': 'BBA',
+  'bachelor of business administration (btl/hld)': 'BBA',
   'bba - general': 'BBA',
   'bba general': 'BBA',
 
@@ -101,6 +119,7 @@ export const COURSE_ALIASES: Record<string, string> = {
   'bcom(h)': 'B.Com(H)',
   'bcom (h)': 'B.Com(H)',
   'bcom hons': 'B.Com(H)',
+  'bachelor of commerce (honours)': 'B.Com(H)',
   'b.com': 'B.Com(H)',
   'bcom': 'B.Com(H)',
 
@@ -115,6 +134,9 @@ export const COURSE_ALIASES: Record<string, string> = {
   'bca (hons) ai&ds': 'BCA(Hons.) with AI&DS',
   'bca hons with ai&ds': 'BCA(Hons.) with AI&DS',
   'bca-ai&ds': 'BCA(Hons.) with AI&DS',
+  'bca a i a d s': 'BCA(Hons.) with AI&DS',
+  'bca(artificial intelligence and data science)': 'BCA(Hons.) with AI&DS',
+  'bca (artificial intelligence and data science)': 'BCA(Hons.) with AI&DS',
 
   // MCA
   'mca': 'MCA',
@@ -133,24 +155,43 @@ export const COURSE_ALIASES: Record<string, string> = {
   'mtech cse': 'M.Tech CSE',
   'm.tech (cse)': 'M.Tech CSE',
   'm tech cse': 'M.Tech CSE',
+  'master of technology': 'M.Tech CSE',
+
+  // M.Pharma
+  'm.pharma': 'M.Pharma',
+  'master of pharmacy(pharmaceutics)': 'M.Pharma',
+  'master of pharmacy': 'M.Pharma',
 
   // Diploma CSE
   'diploma cse': 'Diploma CSE',
+  'diplomacse': 'Diploma CSE',
+  'diploma (cs)': 'Diploma CSE',
+  'diploma': 'Diploma CSE',
   'diploma in computer science and engineering': 'Diploma CSE',
   'diploma in cse': 'Diploma CSE',
   'diploma (cse)': 'Diploma CSE',
 
   // Diploma ECE
   'diploma ece': 'Diploma ECE',
+  'diplomaece': 'Diploma ECE',
+  'diploma (ece)': 'Diploma ECE',
   'diploma in electronics and communication engineering': 'Diploma ECE',
   'diploma in ece': 'Diploma ECE',
-  'diploma (ece)': 'Diploma ECE',
 
   // Diploma ME
   'diploma me': 'Diploma ME',
+  'diplomame': 'Diploma ME',
+  'diploma (me)': 'Diploma ME',
   'diploma in mechanical engineering': 'Diploma ME',
   'diploma in me': 'Diploma ME',
-  'diploma (me)': 'Diploma ME',
+
+  // Diploma CE
+  'diploma ce': 'Diploma CE',
+  'diplomace': 'Diploma CE',
+  'diploma (ce)': 'Diploma CE',
+  'diploma (ce)  (btl)': 'Diploma CE',
+  'diploma in civil engineering': 'Diploma CE',
+  'diploma in ce': 'Diploma CE',
 
   // B.Tech ECE (EC)
   'b tech ec': 'B.Tech ECE',

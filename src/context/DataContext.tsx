@@ -173,14 +173,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     }
     setClassroomsState(initialRooms);
 
-    // 2. Initialize Students (Official 16 batches / 1,147 students or saved user data)
+    // 2. Initialize Students (Official 46 cohorts / 4,267 students from 1MASTERPLAN)
     let initialStudents: Student[] = [];
     try {
       const savedStudents = localStorage.getItem('gehu_students');
       if (savedStudents) {
         const parsed = JSON.parse(savedStudents);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        // Automatically upgrade if localStorage has previous smaller student dataset (< 4000 students)
+        if (Array.isArray(parsed) && parsed.length >= 4000) {
           initialStudents = parsed;
+        } else {
+          localStorage.removeItem('gehu_students');
         }
       }
     } catch (err) {}
@@ -197,22 +200,30 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     setInvigilators(generateMockInvigilators());
 
     // 4. Initialize Exam Schedule:
-    // User requirement: It must NOT have already exam schedule there.
-    // Start empty ([]) unless the user has explicitly imported or created their own exam schedule.
+    // Load official extracted Bhimtal campus exam schedule (279 slots across 24 sessions)
     let initialSchedule: ExamSlot[] = [];
     try {
       const savedSchedule = localStorage.getItem('gehu_exam_schedule');
       if (savedSchedule) {
         const parsed = JSON.parse(savedSchedule);
-        // If it was the old default mock schedule, discard it so user gets a fresh start
-        const isOldMock = Array.isArray(parsed) && parsed.some((e: any) => e.id?.startsWith('BE') && parsed.length >= 20);
-        if (Array.isArray(parsed) && !isOldMock) {
+        // Check if saved schedule is outdated (e.g. less than 200 slots or from May 2026)
+        const isUpToDate = Array.isArray(parsed) && parsed.length >= 250;
+        if (isUpToDate) {
           initialSchedule = parsed;
-        } else if (isOldMock) {
+        } else {
           localStorage.removeItem('gehu_exam_schedule');
+          localStorage.removeItem('gehu_full_allotment');
+          localStorage.removeItem('gehu_full_allotment_v5');
         }
       }
     } catch (err) {}
+
+    if (initialSchedule.length === 0) {
+      initialSchedule = getBhimtalExamSchedule();
+      try {
+        localStorage.setItem('gehu_exam_schedule', JSON.stringify(initialSchedule));
+      } catch (err) {}
+    }
     setExamScheduleState(initialSchedule);
 
     setBlockPriority(['Admin Block A', 'Academic Block C', 'Academic Block D', 'Academic Block E']);
