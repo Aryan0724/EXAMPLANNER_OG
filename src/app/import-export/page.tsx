@@ -29,6 +29,8 @@ import {
   generateDayWiseSessionRosters
 } from '@/lib/report-generator';
 import { parseExamPDF } from '@/lib/pdf-parser';
+import { generateStudentsFromBatches } from '@/lib/planning';
+import { canonicalizeCourse } from '@/lib/course-utils';
 
 const ImportItem = ({ title, format, onUpload, onPdfUpload, accept = ".csv" }: { title: string, format: string[], onUpload?: (data: string) => void, onPdfUpload?: (file: File) => void, accept?: string }) => {
   const { toast } = useToast();
@@ -147,7 +149,49 @@ export default function ImportExportPage() {
   const confirmPdfImport = () => {
     if (pdfPreviewData) {
       setExamSchedule(prev => [...prev, ...pdfPreviewData]);
-      toast({ title: 'Import Successful', description: `${pdfPreviewData.length} exams added to the schedule.` });
+
+      // Check if we need to auto-generate corresponding students for newly imported courses
+      const existingCourses = new Set(students.map(s => canonicalizeCourse(s.course).toLowerCase()));
+      const newBatchesToGenerate: { course: string; department?: string; semester: number; count: number }[] = [];
+
+      // Find distinct course & semester cohorts from the imported PDF
+      const cohortMap = new Map<string, { course: string; department?: string; semester: number }>();
+      pdfPreviewData.forEach(exam => {
+        const key = `${exam.course}__${exam.semester}`;
+        if (!cohortMap.has(key)) {
+          cohortMap.set(key, {
+            course: exam.course,
+            department: exam.department,
+            semester: exam.semester || 1
+          });
+        }
+      });
+
+      cohortMap.forEach(cohort => {
+        const canon = canonicalizeCourse(cohort.course).toLowerCase();
+        if (!existingCourses.has(canon)) {
+          // Standard student cohort size (30-40 students per batch)
+          newBatchesToGenerate.push({
+            course: cohort.course,
+            department: cohort.department || cohort.course,
+            semester: cohort.semester,
+            count: 36
+          });
+          existingCourses.add(canon);
+        }
+      });
+
+      if (newBatchesToGenerate.length > 0) {
+        const newStudents = generateStudentsFromBatches(newBatchesToGenerate);
+        setStudents(prev => [...prev, ...newStudents]);
+        toast({
+          title: 'Import & Roster Synchronized',
+          description: `Added ${pdfPreviewData.length} exams and automatically generated student cohorts for ${newBatchesToGenerate.length} courses.`,
+        });
+      } else {
+        toast({ title: 'Import Successful', description: `${pdfPreviewData.length} exams added to the schedule.` });
+      }
+
       setPdfPreviewData(null);
       setShowPdfPreview(false);
     }

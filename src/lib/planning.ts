@@ -29,7 +29,12 @@ function getEligibleStudentsForExam(allStudents: Student[], exam: ExamSlot): Stu
     return allStudents.filter(s => {
         const normalize = (str: string) => str ? str.trim().toLowerCase() : '';
 
-        const courseMatch = isCourseMatch(s.course, exam.course) || normalize(s.course) === normalize(exam.course);
+        const courseMatch = isCourseMatch(s.course, exam.course) || 
+                            normalize(s.course) === normalize(exam.course) ||
+                            (Boolean(exam.subjectCode) && (
+                                normalize(s.course) === normalize(exam.subjectCode) ||
+                                normalize(s.course).replace(/[^a-z0-9]/g, '') === normalize(exam.subjectCode).replace(/[^a-z0-9]/g, '')
+                            ));
         const cleanDept = (d: string) => normalize(d).replace(/department of |school of |college of /g, '').trim();
 
         const examDeptClean = cleanDept(exam.department);

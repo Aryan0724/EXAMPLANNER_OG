@@ -151,6 +151,53 @@ export const COURSE_ALIASES: Record<string, string> = {
   'diploma in mechanical engineering': 'Diploma ME',
   'diploma in me': 'Diploma ME',
   'diploma (me)': 'Diploma ME',
+
+  // B.Tech ECE (EC)
+  'b tech ec': 'B.Tech ECE',
+  'btech ec': 'B.Tech ECE',
+  'b.tech ec': 'B.Tech ECE',
+  'b.tech (ec)': 'B.Tech ECE',
+
+  // B.Com(H)
+  'b com (h)': 'B.Com(H)',
+  'b com h': 'B.Com(H)',
+  'b.com(hons) aat': 'B.Com(H)',
+  'b.com(hons.) b&f': 'B.Com(H)',
+  'b.com (hons) aat': 'B.Com(H)',
+  'b.com (hons.) b&f': 'B.Com(H)',
+  'b com (hons)': 'B.Com(H)',
+
+  // B.Pharma
+  'b pharma': 'B.Pharma',
+  'b pharm': 'B.Pharma',
+
+  // English
+  'ba (h) eng': 'B.A. (Hons.) English with Research',
+  'b.a. (hons.) english with research': 'B.A. (Hons.) English with Research',
+  'ba (hons) eng': 'B.A. (Hons.) English with Research',
+  'ba hons eng': 'B.A. (Hons.) English with Research',
+  'b.a. (h) english': 'B.A. (Hons.) English with Research',
+  'b.a. (hons) english': 'B.A. (Hons.) English with Research',
+
+  // Chemistry
+  'b sc (h) chem': 'B.Sc (H) Chem',
+  'bsc (h) chem': 'B.Sc (H) Chem',
+  'b.sc (h) chem': 'B.Sc (H) Chem',
+
+  // Maths
+  'b sc (h) maths': 'B.Sc (H) Maths',
+  'bsc (h) maths': 'B.Sc (H) Maths',
+  'b.sc (h) maths': 'B.Sc (H) Maths',
+
+  // Physics
+  'b sc (h) phy': 'B.Sc (H) Phy',
+  'bsc (h) phy': 'B.Sc (H) Phy',
+  'b.sc (h) phy': 'B.Sc (H) Phy',
+
+  // Agriculture
+  'b sc (h) agri': 'B.Sc (H) Agri',
+  'bsc (h) agri': 'B.Sc (H) Agri',
+  'b.sc (h) agri': 'B.Sc (H) Agri',
 };
 
 /**
@@ -168,12 +215,23 @@ export function canonicalizeCourse(courseStr?: string): string {
     return COURSE_ALIASES[clean];
   }
 
-  // Also check without punctuation e.g. "btech cse"
+  // 1. Strip punctuation & extra spaces
   const stripped = clean.replace(/[\.\(\)\-_]/g, '').replace(/\s+/g, ' ').trim();
   for (const [key, val] of Object.entries(COURSE_ALIASES)) {
     const keyStripped = key.replace(/[\.\(\)\-_]/g, '').replace(/\s+/g, ' ').trim();
     if (keyStripped === stripped) {
       return val;
+    }
+  }
+
+  // 2. Alphanumeric only (e.g. "b com (h)" => "bcomh" matches "b.com(h)" => "bcomh")
+  const alphanumeric = clean.replace(/[^a-z0-9]/g, '');
+  if (alphanumeric.length >= 3) {
+    for (const [key, val] of Object.entries(COURSE_ALIASES)) {
+      const keyAlpha = key.replace(/[^a-z0-9]/g, '');
+      if (keyAlpha === alphanumeric) {
+        return val;
+      }
     }
   }
 
