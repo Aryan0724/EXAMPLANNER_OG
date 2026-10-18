@@ -613,60 +613,99 @@ export function generateSeatPlan(
                 const colStudents = sortedStudents.slice(studentCursor, studentCursor + takeCount);
                 studentCursor += takeCount;
 
-                // Split into Left and Right streams (Rule 4: Left-Right seating)
-                // Consecutive roll numbers proceed down each side (Rule 2)
-                const leftCount = Math.ceil(colStudents.length / 2);
-                const rightCount = Math.floor(colStudents.length / 2);
+                // Collect ordered seat slots for this column:
+                // Rule 2 & 4: Left side of benches filled first from front to back with consecutive ascending roll numbers,
+                // followed by Right side from front to back, ensuring no consecutive roll numbers sit side-by-side on the same bench.
+                interface ColSeatSlot {
+                    flatIdx: number;
+                    benchNumber: number;
+                    benchIndex: number;
+                    seatPosition: 'Left' | 'Right' | 'Middle';
+                }
 
-                const leftStudents = colStudents.slice(0, leftCount);
-                const rightStudents = colStudents.slice(leftCount, leftCount + rightCount);
+                const leftSlots: ColSeatSlot[] = [];
+                const rightSlots: ColSeatSlot[] = [];
+                const middleSlots: ColSeatSlot[] = [];
 
                 for (let r = 0; r < benches.length; r++) {
                     const bench = benches[r];
                     let benchFlatIdxBase = 0;
                     for (let b = 0; b < bench.benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
 
-                    if (bench.capacity === 1) {
-                        if (leftStudents.length > 0) {
-                            const s = leftStudents.shift()!;
-                            const flatIdx = benchFlatIdxBase + 0;
-                            map[flatIdx] = {
-                                student: s,
-                                classroom: room,
-                                seatNumber: flatIdx + 1,
-                                benchNumber: bench.benchNumber,
-                                benchIndex: bench.benchIdx,
-                                seatPosition: 'Left'
-                            };
-                        }
-                    } else {
-                        // Seat 0: Left side
-                        if (r < leftStudents.length) {
-                            const s = leftStudents[r];
-                            const flatIdx = benchFlatIdxBase + 0;
-                            map[flatIdx] = {
-                                student: s,
-                                classroom: room,
-                                seatNumber: flatIdx + 1,
-                                benchNumber: bench.benchNumber,
-                                benchIndex: bench.benchIdx,
-                                seatPosition: 'Left'
-                            };
-                        }
-                        // Seat 1: Right side
-                        if (r < rightStudents.length) {
-                            const s = rightStudents[r];
-                            const flatIdx = benchFlatIdxBase + 1;
-                            map[flatIdx] = {
-                                student: s,
-                                classroom: room,
-                                seatNumber: flatIdx + 1,
-                                benchNumber: bench.benchNumber,
-                                benchIndex: bench.benchIdx,
-                                seatPosition: 'Right'
-                            };
-                        }
+                    // Seat 0 is always the Left position
+                    leftSlots.push({
+                        flatIdx: benchFlatIdxBase + 0,
+                        benchNumber: bench.benchNumber,
+                        benchIndex: bench.benchIdx,
+                        seatPosition: 'Left'
+                    });
+
+                    // Seat 1 (if capacity >= 2) is the Right position
+                    if (bench.capacity >= 2) {
+                        rightSlots.push({
+                            flatIdx: benchFlatIdxBase + 1,
+                            benchNumber: bench.benchNumber,
+                            benchIndex: bench.benchIdx,
+                            seatPosition: 'Right'
+                        });
                     }
+
+                    // Extra seats (if capacity >= 3)
+                    for (let s = 2; s < bench.capacity; s++) {
+                        middleSlots.push({
+                            flatIdx: benchFlatIdxBase + s,
+                            benchNumber: bench.benchNumber,
+                            benchIndex: bench.benchIdx,
+                            seatPosition: 'Middle'
+                        });
+                    }
+                }
+
+                const studentQueue = [...colStudents];
+
+                // 1. Allot Left side slots in ascending order starting from first bench down the column (Rules 2, 3, 4)
+                for (let i = 0; i < leftSlots.length; i++) {
+                    if (studentQueue.length === 0) break;
+                    const s = studentQueue.shift()!;
+                    const slot = leftSlots[i];
+                    map[slot.flatIdx] = {
+                        student: s,
+                        classroom: room,
+                        seatNumber: slot.flatIdx + 1,
+                        benchNumber: slot.benchNumber,
+                        benchIndex: slot.benchIndex,
+                        seatPosition: slot.seatPosition
+                    };
+                }
+
+                // 2. Allot Right side slots in ascending order starting from first bench down the column (Rules 2, 3, 4)
+                for (let i = 0; i < rightSlots.length; i++) {
+                    if (studentQueue.length === 0) break;
+                    const s = studentQueue.shift()!;
+                    const slot = rightSlots[i];
+                    map[slot.flatIdx] = {
+                        student: s,
+                        classroom: room,
+                        seatNumber: slot.flatIdx + 1,
+                        benchNumber: slot.benchNumber,
+                        benchIndex: slot.benchIndex,
+                        seatPosition: slot.seatPosition
+                    };
+                }
+
+                // 3. Allot any Middle slots if present
+                for (let i = 0; i < middleSlots.length; i++) {
+                    if (studentQueue.length === 0) break;
+                    const s = studentQueue.shift()!;
+                    const slot = middleSlots[i];
+                    map[slot.flatIdx] = {
+                        student: s,
+                        classroom: room,
+                        seatNumber: slot.flatIdx + 1,
+                        benchNumber: slot.benchNumber,
+                        benchIndex: slot.benchIndex,
+                        seatPosition: slot.seatPosition
+                    };
                 }
             }
         } else {
