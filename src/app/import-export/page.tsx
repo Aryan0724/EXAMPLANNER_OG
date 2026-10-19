@@ -27,7 +27,9 @@ import {
   generateVisualSeatPlanExcel, 
   generateDetailedInvigilatorDutyChart,
   generateSessionWiseInvigilationRoster,
-  generateDayWiseSessionRosters
+  generateDayWiseSessionRosters,
+  downloadMasterSeatingMatrixCSV,
+  downloadMasterSeatingMatrixExcel
 } from '@/lib/report-generator';
 import { parseExamPDF } from '@/lib/pdf-parser';
 import { generateStudentsFromBatches } from '@/lib/planning';
@@ -228,6 +230,54 @@ export default function ImportExportPage() {
         variant: 'destructive',
         title: 'Export Failed',
         description: 'There was an error generating the report. Check the console for details.',
+      });
+    }
+  };
+
+  const handleExportMasterMatrixCSV = () => {
+    if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Allotment Data',
+        description: 'Please generate a full allotment before exporting the matrix.',
+      });
+      return;
+    }
+    try {
+      downloadMasterSeatingMatrixCSV(fullAllotment, classrooms);
+      toast({
+        title: 'Matrix CSV Generated',
+        description: 'The official GEHU Bhimtal Master Seating Matrix (.csv) has been downloaded.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Export Failed',
+        description: error?.message || 'Could not generate matrix CSV.',
+      });
+    }
+  };
+
+  const handleExportMasterMatrixExcel = async () => {
+    if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Allotment Data',
+        description: 'Please generate a full allotment before exporting the matrix.',
+      });
+      return;
+    }
+    try {
+      await downloadMasterSeatingMatrixExcel(fullAllotment, classrooms);
+      toast({
+        title: 'Matrix Excel Generated',
+        description: 'The official GEHU Bhimtal Master Seating Matrix (.xlsx) has been downloaded.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Export Failed',
+        description: error?.message || 'Could not generate matrix Excel.',
       });
     }
   };
@@ -572,6 +622,14 @@ export default function ImportExportPage() {
                     <CardDescription>Export detailed reports and logs from the generated allotment data in various formats.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Button onClick={handleExportMasterMatrixCSV} className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-medium shadow-sm">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Master Matrix (.csv - GEHU Format)
+                    </Button>
+                    <Button onClick={handleExportMasterMatrixExcel} className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-medium shadow-sm">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Master Matrix (.xlsx - GEHU Format)
+                    </Button>
                     <Button onClick={handleExportMasterReport}>
                       <FileDown className="mr-2 h-4 w-4" />
                       Generate Master Report (Excel)

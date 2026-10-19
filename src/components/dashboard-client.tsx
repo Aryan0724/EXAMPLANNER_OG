@@ -18,7 +18,7 @@ import { DataContext } from '@/context/DataContext';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
 import { createClassroom, type ExamSlot, type Student, type Invigilator, type SeatPlan, type InvigilatorAssignment, type FacultyStudentRule } from '@/lib/types';
-import { generateMasterReport, generateInvigilatorDutyRoster, generateSessionWiseInvigilationRoster } from '@/lib/report-generator';
+import { generateMasterReport, generateInvigilatorDutyRoster, generateSessionWiseInvigilationRoster, downloadMasterSeatingMatrixCSV, downloadMasterSeatingMatrixExcel } from '@/lib/report-generator';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 
 import { BlockPriorityDialog } from '@/components/block-priority-dialog';
@@ -106,6 +106,32 @@ export function DashboardClient() {
         } catch (error) {
             console.error("Failed to generate report:", error);
             toast({ variant: 'destructive', title: 'Export Failed', description: 'There was an error generating the report.' });
+        }
+    };
+
+    const handleExportMasterMatrixCSV = () => {
+        if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
+            toast({ variant: 'destructive', title: 'No Allotment Data', description: 'Please generate a full allotment first.' });
+            return;
+        }
+        try {
+            downloadMasterSeatingMatrixCSV(fullAllotment, classrooms);
+            toast({ title: 'Matrix CSV Generated', description: 'Official GEHU Bhimtal format (.csv) downloaded successfully.' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Export Failed', description: error?.message || 'Could not generate matrix CSV.' });
+        }
+    };
+
+    const handleExportMasterMatrixExcel = async () => {
+        if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
+            toast({ variant: 'destructive', title: 'No Allotment Data', description: 'Please generate a full allotment first.' });
+            return;
+        }
+        try {
+            await downloadMasterSeatingMatrixExcel(fullAllotment, classrooms);
+            toast({ title: 'Matrix Excel Generated', description: 'Official GEHU Bhimtal format (.xlsx) downloaded successfully.' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Export Failed', description: error?.message || 'Could not generate matrix Excel.' });
         }
     };
 
@@ -567,7 +593,33 @@ export function DashboardClient() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={handleExportMasterMatrixCSV}
+                            disabled={!fullAllotment}
+                            className="h-12 justify-start px-4 text-xs font-semibold hover:border-emerald-500/50 transition-colors border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/20"
+                        >
+                            <Sparkles className="mr-2.5 size-4 text-emerald-600" />
+                            <div className="text-left">
+                                <div className="font-semibold text-emerald-900 dark:text-emerald-300">Master Matrix (CSV)</div>
+                                <div className="text-[10px] text-muted-foreground font-normal">Exact GEHU Bhimtal format</div>
+                            </div>
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            onClick={handleExportMasterMatrixExcel}
+                            disabled={!fullAllotment}
+                            className="h-12 justify-start px-4 text-xs font-semibold hover:border-blue-500/50 transition-colors border-blue-200 dark:border-blue-900/50 bg-blue-50/30 dark:bg-blue-950/20"
+                        >
+                            <Sparkles className="mr-2.5 size-4 text-blue-600" />
+                            <div className="text-left">
+                                <div className="font-semibold text-blue-900 dark:text-blue-300">Master Matrix (Excel)</div>
+                                <div className="text-[10px] text-muted-foreground font-normal">Room distribution grid</div>
+                            </div>
+                        </Button>
+
                         <Button
                             variant="outline"
                             onClick={handleExportMasterReport}

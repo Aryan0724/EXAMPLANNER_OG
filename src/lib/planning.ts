@@ -1414,7 +1414,7 @@ export function generateStudentsFromBatches(
     let rollCounter = 1;
 
     batches.forEach(b => {
-        const count = Number(b.count) || 0;
+        const count = Number(b.count || (b as any).totalStudents) || 0;
         if (count <= 0) return;
 
         // Clean code for roll number prefix

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck, ChevronDown, FileText, CalendarCheck2, Armchair, CalendarDays, SlidersHorizontal, ArrowRight } from 'lucide-react';
+import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck, ChevronDown, FileText, CalendarCheck2, Armchair, CalendarDays, SlidersHorizontal, ArrowRight, Copy } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator, FacultyStudentRule } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators, countSeatPlanViolations, isSeatPlanCompliantWithSittingRules } from '@/lib/planning';
-import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateDetailedInvigilatorDutyChart } from '@/lib/report-generator';
+import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateDetailedInvigilatorDutyChart, downloadMasterSeatingMatrixCSV, downloadMasterSeatingMatrixExcel, generateMasterSeatingMatrixCSV } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
@@ -446,6 +446,49 @@ export default function AllotmentPage() {
     } catch (error) {
       console.error("Duty chart export failed", error);
       toast({ variant: "destructive", title: "Export Failed", description: "Could not generate duty chart." });
+    }
+  };
+
+  const handleExportMasterMatrixCSV = () => {
+    if (!fullAllotment) return;
+    try {
+      downloadMasterSeatingMatrixCSV(fullAllotment, classrooms);
+      toast({
+        title: "Master Seating Matrix CSV Exported",
+        description: "Official GEHU Bhimtal format (.csv) downloaded successfully."
+      });
+    } catch (error: any) {
+      console.error("Master matrix CSV export failed", error);
+      toast({ variant: "destructive", title: "Export Failed", description: error?.message || "Could not generate CSV matrix." });
+    }
+  };
+
+  const handleExportMasterMatrixExcel = async () => {
+    if (!fullAllotment) return;
+    try {
+      await downloadMasterSeatingMatrixExcel(fullAllotment, classrooms);
+      toast({
+        title: "Master Seating Matrix Excel Exported",
+        description: "Official GEHU Bhimtal format (.xlsx) downloaded successfully."
+      });
+    } catch (error: any) {
+      console.error("Master matrix Excel export failed", error);
+      toast({ variant: "destructive", title: "Export Failed", description: error?.message || "Could not generate Excel matrix." });
+    }
+  };
+
+  const handleCopyMasterMatrixCSV = () => {
+    if (!fullAllotment) return;
+    try {
+      const csv = generateMasterSeatingMatrixCSV(fullAllotment, classrooms);
+      navigator.clipboard.writeText(csv);
+      toast({
+        title: "Master Seating Matrix Copied!",
+        description: "Exact GEHU Bhimtal CSV format copied to clipboard. You can paste it directly."
+      });
+    } catch (error: any) {
+      console.error("Copy failed", error);
+      toast({ variant: "destructive", title: "Copy Failed", description: error?.message || "Could not copy matrix." });
     }
   };
 
@@ -984,6 +1027,27 @@ export default function AllotmentPage() {
                               <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                 University Reports
                               </DropdownMenuLabel>
+                              <DropdownMenuItem onClick={handleExportMasterMatrixCSV}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-xs">Master Seating Matrix (.csv)</span>
+                                  <span className="text-[10px] text-muted-foreground">Official GEHU Bhimtal format (exact ditto)</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleExportMasterMatrixExcel}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-xs">Master Seating Matrix (.xlsx)</span>
+                                  <span className="text-[10px] text-muted-foreground">Full room & course distribution table</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleCopyMasterMatrixCSV}>
+                                <Copy className="mr-2 h-4 w-4 text-indigo-600" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-xs">Copy Matrix to Clipboard</span>
+                                  <span className="text-[10px] text-muted-foreground">Copy ditto CSV text for 1-click paste</span>
+                                </div>
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={handleExportDutyChart}>
                                 <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
                                 <div className="flex flex-col">

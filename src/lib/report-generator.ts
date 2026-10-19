@@ -1211,3 +1211,552 @@ export async function generateDayWiseSessionRosters(fullAllotment: FullAllotment
     saveAs(zipBlob, `Exam_Duty_Charts_Pack_${new Date().toISOString().split('T')[0]}.zip`);
 }
 
+/**
+ * Helper to derive program batch year string (e.g. '2025-2029', '2026-2030', etc.)
+ */
+export function deriveBatchYear(courseName: string, sem: number | string, examDateStr?: string): string {
+    const s = Number(sem) || 1;
+    const cleanCourse = (courseName || '').toLowerCase();
+    
+    let duration = 4;
+    if (cleanCourse.includes('bca') || cleanCourse.includes('bba') || cleanCourse.includes('b.com') || cleanCourse.includes('diploma')) {
+        duration = 3;
+    } else if (cleanCourse.includes('mca') || cleanCourse.includes('m.tech') || cleanCourse.includes('m.pharm') || cleanCourse.includes('mba')) {
+        duration = 2;
+    }
+
+    let examYear = 2026;
+    if (examDateStr) {
+        const d = new Date(examDateStr);
+        if (!isNaN(d.getFullYear())) examYear = d.getFullYear();
+    }
+
+    const yearsPrior = Math.floor((s - 1) / 2);
+    const startYear = examYear - yearsPrior;
+    const endYear = startYear + duration;
+    return `${startYear}-${endYear}`;
+}
+
+/**
+ * Helper to convert semester number to Roman numeral
+ */
+export function toSemesterRoman(sem: number | string): string {
+    const n = Number(sem);
+    const romanMap: Record<number, string> = {
+        1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI', 7: 'VII', 8: 'VIII'
+    };
+    return romanMap[n] || String(sem || 'I');
+}
+
+/**
+ * Generates the official GEHU Bhimtal Master Seating Matrix in the exact university CSV format.
+ * Matches the user's template row-for-row and column-for-column.
+ */
+export function generateMasterSeatingMatrixCSV(
+    fullAllotment: FullAllotment,
+    allClassrooms: Classroom[]
+): string {
+    const lines: string[] = [];
+    const sortedSessionKeys = Object.keys(fullAllotment || {}).sort(
+        (a, b) => new Date(a).getTime() - new Date(b).getTime()
+    );
+
+    if (sortedSessionKeys.length === 0) return '';
+
+    sortedSessionKeys.forEach((sessionKey) => {
+        const sessionData = fullAllotment[sessionKey];
+        if (!sessionData || !sessionData.seatPlan) return;
+
+        const { seatPlan } = sessionData;
+        const representativeExam = Array.isArray(seatPlan.exam) ? seatPlan.exam[0] : seatPlan.exam;
+        const timing = parseSessionTiming(sessionKey, representativeExam);
+
+        const examDate = new Date(timing.date);
+        const monthYear = !isNaN(examDate.getTime())
+            ? examDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()
+            : 'SEPTEMBER 2026';
+
+        // 1. Title Block
+        lines.push('"Graphic Era Hill University, Dehradun",,,,,,,,,,,,,,,,,,,,,,,,,,');
+        lines.push('"Examination Center_GEHU, Bhimtal Campus",,,,,,,,,,,,,,,,,,,,,,,,,,');
+        lines.push(`"TERM EVALUATION THEORY (ODD) SEMESTER REGULAR EXAMINATION, ${monthYear}",,,,,,,,,,,,,,,,,,,,,,,,,,`);
+        
+        // Timing line, e.g.: Shift I 09:30AM-11:00AM,,,,,,,,,,,,,,,,,,,,,,,,,,
+        const rawTime = (timing.timingDisplay || timing.time).replace(/timing:?/i, '').trim();
+        const formattedTimeRange = rawTime.replace(/\s*to\s*/i, '-').replace(/\s+/g, '');
+        lines.push(`${timing.shiftRoman} ${formattedTimeRange},,,,,,,,,,,,,,,,,,,,,,,,,,`);
+
+        // 2. Identify active classrooms in this session
+        const assignedSeats = (seatPlan.assignments || []).filter(a => a && a.student && a.classroom?.id);
+        const activeRoomMap = new Map<string, Classroom>();
+        assignedSeats.forEach(seat => {
+            if (!activeRoomMap.has(seat.classroom.id)) {
+                activeRoomMap.set(seat.classroom.id, seat.classroom);
+            }
+        });
+
+        let sessionRooms = Array.from(activeRoomMap.values());
+        if (sessionRooms.length === 0) {
+            sessionRooms = allClassrooms.slice(0, 18);
+        }
+        sessionRooms.sort((a, b) => {
+            const getBlockWeight = (building: string) => {
+                const bl = building.toLowerCase();
+                if (bl.includes('admin') || bl.includes('block a')) return 0;
+                if (bl.includes('block c')) return 1;
+                if (bl.includes('block d')) return 2;
+                if (bl.includes('block e')) return 3;
+                return 10;
+            };
+            const wA = getBlockWeight(a.building || '');
+            const wB = getBlockWeight(b.building || '');
+            if (wA !== wB) return wA - wB;
+            return (a.roomNo || '').localeCompare(b.roomNo || '', undefined, { numeric: true });
+        });
+
+        // 3. Bench Dimensions Row (e.g. ,,,,,,,6*4,6*4,...)
+        const dimRow: string[] = ['', '', '', '', ''];
+        sessionRooms.forEach(room => {
+            if (room.rows && room.columns && room.rows > 0 && room.columns > 0) {
+                if (room.building.includes('Admin') || room.roomNo.startsWith('A')) {
+                    dimRow.push('');
+                } else {
+                    dimRow.push(`${room.rows}*${room.columns}`);
+                }
+            } else if (room.benchCapacities && room.benchCapacities.length > 0) {
+                dimRow.push(`${Math.ceil(room.benchCapacities.length / 3)}*3`);
+            } else {
+                dimRow.push('');
+            }
+        });
+        dimRow.push('', '', '', '');
+        lines.push(dimRow.join(','));
+
+        // 4. Table Header Row
+        const headerRow: string[] = [
+            'Sn.',
+            'COURSE',
+            'Batch',
+            'Sem',
+            'Total Students'
+        ];
+        sessionRooms.forEach(room => {
+            if (room.building.includes('Admin')) {
+                headerRow.push(`"${room.building} Room No. ${room.roomNo}"`);
+            } else {
+                headerRow.push(`"${room.building}\nRoom No ${room.roomNo}"`);
+            }
+        });
+        headerRow.push('', '', '', '');
+        lines.push(headerRow.join(','));
+
+        // 5. Group Students by Course & Semester
+        interface CourseCohort {
+            courseName: string;
+            semester: number | string;
+            batchStr: string;
+            students: (Student & { exam: ExamSlot })[];
+            roomStudents: Map<string, (Student & { exam: ExamSlot })[]>;
+        }
+
+        const cohortMap = new Map<string, CourseCohort>();
+        assignedSeats.forEach(seat => {
+            const student = seat.student!;
+            const courseName = student.course || student.exam?.course || 'Unknown';
+            const sem = student.semester || (student.exam as any)?.semester || 1;
+            const cohortKey = `${courseName}__${sem}`;
+
+            if (!cohortMap.has(cohortKey)) {
+                cohortMap.set(cohortKey, {
+                    courseName,
+                    semester: sem,
+                    batchStr: deriveBatchYear(courseName, sem, timing.date),
+                    students: [],
+                    roomStudents: new Map()
+                });
+            }
+
+            const cohort = cohortMap.get(cohortKey)!;
+            cohort.students.push(student as any);
+
+            const roomId = seat.classroom.id;
+            if (!cohort.roomStudents.has(roomId)) {
+                cohort.roomStudents.set(roomId, []);
+            }
+            cohort.roomStudents.get(roomId)!.push(student as any);
+        });
+
+        const cohorts = Array.from(cohortMap.values()).sort(
+            (a, b) => b.students.length - a.students.length
+        );
+
+        let sn = 1;
+        let sessionTotalStudents = 0;
+        const roomTotalStudentsMap = new Map<string, number>();
+        sessionRooms.forEach(r => roomTotalStudentsMap.set(r.id, 0));
+
+        cohorts.forEach(cohort => {
+            sessionTotalStudents += cohort.students.length;
+            const row: string[] = [
+                String(sn++),
+                `"${cohort.courseName}"`,
+                cohort.batchStr,
+                toSemesterRoman(cohort.semester),
+                String(cohort.students.length)
+            ];
+
+            let cohortSeatedTotal = 0;
+            sessionRooms.forEach(room => {
+                const studentsInRoom = cohort.roomStudents.get(room.id) || [];
+                const count = studentsInRoom.length;
+                if (count === 0) {
+                    row.push('');
+                } else {
+                    cohortSeatedTotal += count;
+                    const prevRoomTotal = roomTotalStudentsMap.get(room.id) || 0;
+                    roomTotalStudentsMap.set(room.id, prevRoomTotal + count);
+
+                    const rollNumbers = studentsInRoom
+                        .map(s => s.rollNo)
+                        .filter(Boolean)
+                        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+                    const minRoll = rollNumbers[0] || '';
+                    const maxRoll = rollNumbers[rollNumbers.length - 1] || '';
+                    const rollRange = rollNumbers.length > 1 ? `${minRoll}-${maxRoll}` : minRoll;
+
+                    row.push(`"${count}\n${rollRange}"`);
+                }
+            });
+
+            const balance = Math.max(0, cohort.students.length - cohortSeatedTotal);
+            row.push(String(cohortSeatedTotal));
+            row.push(String(balance));
+            row.push('', '');
+            lines.push(row.join(','));
+        });
+
+        // 6. Total Row at bottom of shift
+        const totalRow: string[] = [
+            'Total',
+            '',
+            '',
+            '',
+            String(sessionTotalStudents)
+        ];
+        sessionRooms.forEach(room => {
+            const count = roomTotalStudentsMap.get(room.id) || 0;
+            totalRow.push(String(count));
+        });
+        totalRow.push('', '', '', '');
+        lines.push(totalRow.join(','));
+        lines.push(',,,,,,,,,,,,,,,,,,,,,,,,,,');
+    });
+
+    return lines.join('\n');
+}
+
+/**
+ * Downloads the official Master Seating Matrix in exact CSV format.
+ */
+export function downloadMasterSeatingMatrixCSV(
+    fullAllotment: FullAllotment,
+    allClassrooms: Classroom[],
+    filename?: string
+): void {
+    const csvContent = generateMasterSeatingMatrixCSV(fullAllotment, allClassrooms);
+    if (!csvContent) {
+        throw new Error('No allotment sessions available to generate Master Seating Matrix.');
+    }
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const targetFilename = filename || `GEHU_Bhimtal_Master_Seating_Matrix_${new Date().toISOString().split('T')[0]}.csv`;
+    saveAs(blob, targetFilename);
+}
+
+/**
+ * Generates and downloads the official Master Seating Matrix in native formatted Excel (.xlsx).
+ */
+export async function downloadMasterSeatingMatrixExcel(
+    fullAllotment: FullAllotment,
+    allClassrooms: Classroom[],
+    filename?: string
+): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+    const sortedSessionKeys = Object.keys(fullAllotment || {}).sort(
+        (a, b) => new Date(a).getTime() - new Date(b).getTime()
+    );
+
+    if (sortedSessionKeys.length === 0) {
+        throw new Error('No allotment sessions available to generate Master Seating Matrix.');
+    }
+
+    sortedSessionKeys.forEach((sessionKey) => {
+        const sessionData = fullAllotment[sessionKey];
+        if (!sessionData || !sessionData.seatPlan) return;
+
+        const { seatPlan } = sessionData;
+        const representativeExam = Array.isArray(seatPlan.exam) ? seatPlan.exam[0] : seatPlan.exam;
+        const timing = parseSessionTiming(sessionKey, representativeExam);
+
+        const examDate = new Date(timing.date);
+        const monthYear = !isNaN(examDate.getTime())
+            ? examDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()
+            : 'SEPTEMBER 2026';
+
+        const desiredSheetName = `${timing.shiftRoman} Matrix`;
+        const sheetName = getUniqueWorksheetName(workbook, desiredSheetName);
+        const ws = workbook.addWorksheet(sheetName);
+
+        const assignedSeats = (seatPlan.assignments || []).filter(a => a && a.student && a.classroom?.id);
+        const activeRoomMap = new Map<string, Classroom>();
+        assignedSeats.forEach(seat => {
+            if (!activeRoomMap.has(seat.classroom.id)) {
+                activeRoomMap.set(seat.classroom.id, seat.classroom);
+            }
+        });
+
+        let sessionRooms = Array.from(activeRoomMap.values());
+        if (sessionRooms.length === 0) {
+            sessionRooms = allClassrooms.slice(0, 18);
+        }
+        sessionRooms.sort((a, b) => {
+            const getBlockWeight = (building: string) => {
+                const bl = building.toLowerCase();
+                if (bl.includes('admin') || bl.includes('block a')) return 0;
+                if (bl.includes('block c')) return 1;
+                if (bl.includes('block d')) return 2;
+                if (bl.includes('block e')) return 3;
+                return 10;
+            };
+            const wA = getBlockWeight(a.building || '');
+            const wB = getBlockWeight(b.building || '');
+            if (wA !== wB) return wA - wB;
+            return (a.roomNo || '').localeCompare(b.roomNo || '', undefined, { numeric: true });
+        });
+
+        const totalCols = 5 + sessionRooms.length + 2;
+
+        // Title Rows
+        ws.mergeCells(1, 1, 1, totalCols);
+        ws.getCell(1, 1).value = 'Graphic Era Hill University, Dehradun';
+        ws.getCell(1, 1).font = { name: 'Times New Roman', size: 14, bold: true };
+        ws.getCell(1, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        ws.mergeCells(2, 1, 2, totalCols);
+        ws.getCell(2, 1).value = 'Examination Center_GEHU, Bhimtal Campus';
+        ws.getCell(2, 1).font = { name: 'Times New Roman', size: 12, bold: true };
+        ws.getCell(2, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        ws.mergeCells(3, 1, 3, totalCols);
+        ws.getCell(3, 1).value = `TERM EVALUATION THEORY (ODD) SEMESTER REGULAR EXAMINATION, ${monthYear}`;
+        ws.getCell(3, 1).font = { name: 'Times New Roman', size: 11, bold: true };
+        ws.getCell(3, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const rawTime = (timing.timingDisplay || timing.time).replace(/timing:?/i, '').trim();
+        const formattedTimeRange = rawTime.replace(/\s*to\s*/i, '-').replace(/\s+/g, '');
+        ws.mergeCells(4, 1, 4, totalCols);
+        ws.getCell(4, 1).value = `${timing.shiftRoman} ${formattedTimeRange}`;
+        ws.getCell(4, 1).font = { name: 'Times New Roman', size: 11, bold: true, color: { argb: 'FF800000' } };
+        ws.getCell(4, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+        // Dimensions Row (Row 5)
+        sessionRooms.forEach((room, idx) => {
+            const col = 6 + idx;
+            let dim = '';
+            if (room.rows && room.columns && room.rows > 0 && room.columns > 0) {
+                if (!room.building.includes('Admin') && !room.roomNo.startsWith('A')) {
+                    dim = `${room.rows}*${room.columns}`;
+                }
+            } else if (room.benchCapacities && room.benchCapacities.length > 0) {
+                dim = `${Math.ceil(room.benchCapacities.length / 3)}*3`;
+            }
+            if (dim) {
+                const cell = ws.getCell(5, col);
+                cell.value = dim;
+                cell.font = { name: 'Times New Roman', size: 9, italic: true };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            }
+        });
+
+        // Headers Row (Row 6)
+        const headerTitles = ['Sn.', 'COURSE', 'Batch', 'Sem', 'Total Students'];
+        headerTitles.forEach((title, idx) => {
+            const cell = ws.getCell(6, idx + 1);
+            cell.value = title;
+            cell.font = { name: 'Times New Roman', size: 10, bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF5' } };
+            cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        });
+
+        sessionRooms.forEach((room, idx) => {
+            const col = 6 + idx;
+            const cell = ws.getCell(6, col);
+            cell.value = `${room.building}\nRoom No ${room.roomNo}`.trim();
+            cell.font = { name: 'Times New Roman', size: 9, bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF5' } };
+            cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        });
+
+        const totalCell = ws.getCell(6, 6 + sessionRooms.length);
+        totalCell.value = 'Total Allotted';
+        totalCell.font = { name: 'Times New Roman', size: 9, bold: true };
+        totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        totalCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF5' } };
+        totalCell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+
+        const balanceCell = ws.getCell(6, 7 + sessionRooms.length);
+        balanceCell.value = 'Balance';
+        balanceCell.font = { name: 'Times New Roman', size: 9, bold: true };
+        balanceCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        balanceCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF5' } };
+        balanceCell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+
+        interface CourseCohort {
+            courseName: string;
+            semester: number | string;
+            batchStr: string;
+            students: (Student & { exam: ExamSlot })[];
+            roomStudents: Map<string, (Student & { exam: ExamSlot })[]>;
+        }
+
+        const cohortMap = new Map<string, CourseCohort>();
+        assignedSeats.forEach(seat => {
+            const student = seat.student!;
+            const courseName = student.course || student.exam?.course || 'Unknown';
+            const sem = student.semester || (student.exam as any)?.semester || 1;
+            const cohortKey = `${courseName}__${sem}`;
+
+            if (!cohortMap.has(cohortKey)) {
+                cohortMap.set(cohortKey, {
+                    courseName,
+                    semester: sem,
+                    batchStr: deriveBatchYear(courseName, sem, timing.date),
+                    students: [],
+                    roomStudents: new Map()
+                });
+            }
+
+            const cohort = cohortMap.get(cohortKey)!;
+            cohort.students.push(student as any);
+
+            const roomId = seat.classroom.id;
+            if (!cohort.roomStudents.has(roomId)) {
+                cohort.roomStudents.set(roomId, []);
+            }
+            cohort.roomStudents.get(roomId)!.push(student as any);
+        });
+
+        const cohorts = Array.from(cohortMap.values()).sort(
+            (a, b) => b.students.length - a.students.length
+        );
+
+        let currentRow = 7;
+        let sessionTotalStudents = 0;
+        const roomTotalStudentsMap = new Map<string, number>();
+        sessionRooms.forEach(r => roomTotalStudentsMap.set(r.id, 0));
+
+        cohorts.forEach((cohort, cIdx) => {
+            sessionTotalStudents += cohort.students.length;
+            ws.getCell(currentRow, 1).value = cIdx + 1;
+            ws.getCell(currentRow, 2).value = cohort.courseName;
+            ws.getCell(currentRow, 3).value = cohort.batchStr;
+            ws.getCell(currentRow, 4).value = toSemesterRoman(cohort.semester);
+            ws.getCell(currentRow, 5).value = cohort.students.length;
+
+            [1, 2, 3, 4, 5].forEach(col => {
+                const cell = ws.getCell(currentRow, col);
+                cell.font = { name: 'Times New Roman', size: 9 };
+                cell.alignment = { horizontal: col === 2 ? 'left' : 'center', vertical: 'middle' };
+                cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+            });
+
+            let cohortSeatedTotal = 0;
+            sessionRooms.forEach((room, rIdx) => {
+                const col = 6 + rIdx;
+                const studentsInRoom = cohort.roomStudents.get(room.id) || [];
+                const count = studentsInRoom.length;
+                const cell = ws.getCell(currentRow, col);
+
+                if (count > 0) {
+                    cohortSeatedTotal += count;
+                    const prevRoomTotal = roomTotalStudentsMap.get(room.id) || 0;
+                    roomTotalStudentsMap.set(room.id, prevRoomTotal + count);
+
+                    const rollNumbers = studentsInRoom
+                        .map(s => s.rollNo)
+                        .filter(Boolean)
+                        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+                    const minRoll = rollNumbers[0] || '';
+                    const maxRoll = rollNumbers[rollNumbers.length - 1] || '';
+                    const rollRange = rollNumbers.length > 1 ? `${minRoll}-${maxRoll}` : minRoll;
+
+                    cell.value = `${count}\n${rollRange}`;
+                    cell.font = { name: 'Times New Roman', size: 9, bold: true };
+                } else {
+                    cell.value = '';
+                }
+
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+            });
+
+            const allottedCell = ws.getCell(currentRow, 6 + sessionRooms.length);
+            allottedCell.value = cohortSeatedTotal;
+            allottedCell.font = { name: 'Times New Roman', size: 9, bold: true };
+            allottedCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            allottedCell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+
+            const balCell = ws.getCell(currentRow, 7 + sessionRooms.length);
+            balCell.value = Math.max(0, cohort.students.length - cohortSeatedTotal);
+            balCell.font = { name: 'Times New Roman', size: 9 };
+            balCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            balCell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+
+            currentRow++;
+        });
+
+        // Total Row at bottom
+        ws.getCell(currentRow, 1).value = 'Total';
+        ws.getCell(currentRow, 5).value = sessionTotalStudents;
+
+        [1, 2, 3, 4, 5].forEach(col => {
+            const cell = ws.getCell(currentRow, col);
+            cell.font = { name: 'Times New Roman', size: 10, bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+            cell.border = { top: { style: 'thin' }, bottom: { style: 'double' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        });
+
+        sessionRooms.forEach((room, rIdx) => {
+            const col = 6 + rIdx;
+            const count = roomTotalStudentsMap.get(room.id) || 0;
+            const cell = ws.getCell(currentRow, col);
+            cell.value = count;
+            cell.font = { name: 'Times New Roman', size: 10, bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+            cell.border = { top: { style: 'thin' }, bottom: { style: 'double' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        });
+
+        // Set column widths
+        ws.getColumn(1).width = 6;
+        ws.getColumn(2).width = 25;
+        ws.getColumn(3).width = 12;
+        ws.getColumn(4).width = 8;
+        ws.getColumn(5).width = 14;
+        sessionRooms.forEach((_, idx) => {
+            ws.getColumn(6 + idx).width = 18;
+        });
+        ws.getColumn(6 + sessionRooms.length).width = 14;
+        ws.getColumn(7 + sessionRooms.length).width = 10;
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const targetFilename = filename || `GEHU_Bhimtal_Master_Seating_Matrix_${new Date().toISOString().split('T')[0]}.xlsx`;
+    saveAs(blob, targetFilename);
+}
+
