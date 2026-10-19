@@ -9,6 +9,7 @@ import { Student, Classroom, createClassroom, Invigilator, ExamSlot } from '@/li
 import { useToast } from '@/hooks/use-toast';
 import { parsePasteSchedule } from '@/lib/parsers';
 import { canonicalizeCourse } from '@/lib/course-utils';
+import { getFacultySeniority } from '@/lib/data';
 
 interface DataImportDialogProps {
     isOpen: boolean;
@@ -171,16 +172,31 @@ export function DataImportDialog({
                 onImportClassrooms(rooms);
                 count = rooms.length;
             } else if (activeTab === 'invigilators') {
-                const invs: Invigilator[] = data.map((row: any) => ({
-                    id: String(row.id || Math.random().toString(36).substr(2, 9)),
-                    name: row.name || row.Name,
-                    department: normalizeText(row.department || row.Department),
-                    designation: row.designation || row.Designation || 'Assistant Professor',
-                    gender: (row.gender || row.Gender || 'Male') as 'Male' | 'Female',
-                    isAvailable: true,
-                    unavailableSlots: [],
-                    assignedDuties: []
-                })).filter(i => i.name);
+                const invs: Invigilator[] = data.map((row: any) => {
+                    const rawSeniority = String(row.seniority || row.Seniority || row['Senior/Junior'] || row['Seniority Level'] || '').trim().toLowerCase();
+                    const name = row.name || row.Name || '';
+                    const designation = row.designation || row.Designation || 'Assistant Professor';
+                    let seniority: 'Senior' | 'Junior';
+                    if (rawSeniority === 'senior' || rawSeniority === 'sr' || rawSeniority === 'sr.') {
+                        seniority = 'Senior';
+                    } else if (rawSeniority === 'junior' || rawSeniority === 'jr' || rawSeniority === 'jr.') {
+                        seniority = 'Junior';
+                    } else {
+                        seniority = getFacultySeniority({ name, designation });
+                    }
+
+                    return {
+                        id: String(row.id || Math.random().toString(36).substr(2, 9)),
+                        name: name,
+                        department: normalizeText(row.department || row.Department),
+                        designation: designation,
+                        seniority: seniority,
+                        gender: (row.gender || row.Gender || 'Male') as 'Male' | 'Female',
+                        isAvailable: true,
+                        unavailableSlots: [],
+                        assignedDuties: []
+                    };
+                }).filter(i => i.name);
 
                 if (invs.length === 0) throw new Error("No valid invigilators found. Check headers: name, department");
                 onImportInvigilators(invs);
@@ -252,7 +268,7 @@ export function DataImportDialog({
                 headers = [{ roomNo: "C-101", capacity: 60, building: "Block C", floor: 1 }];
                 fileName = 'classrooms_template.xlsx';
             } else if (activeTab === 'invigilators') {
-                headers = [{ name: "Dr. Smith", department: "CSE", designation: "Professor", email: "smith@example.com", maxDuties: 5 }];
+                headers = [{ name: "Dr. Smith", department: "CSE", designation: "Professor", seniority: "Senior", gender: "Male", isAvailable: "true" }];
                 fileName = 'invigilators_template.xlsx';
             } else if (activeTab === 'exams') {
                 headers = [{ date: "2025-05-20", time: "09:30", course: "B.Tech", department: "CSE", semester: 4, subjectName: "Data Structures", subjectCode: "CS201", duration: 90, shift: 1 }];

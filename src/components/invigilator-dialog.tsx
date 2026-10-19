@@ -20,6 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Invigilator } from '@/lib/types';
+import { getFacultySeniority } from '@/lib/data';
 
 interface InvigilatorDialogProps {
     isOpen: boolean;
@@ -41,6 +42,7 @@ export function InvigilatorDialog({
         name: '',
         department: '',
         designation: 'Assistant Professor',
+        seniority: 'Junior',
         gender: 'Male',
         isAvailable: true,
         unavailableSlots: [],
@@ -49,13 +51,17 @@ export function InvigilatorDialog({
 
     useEffect(() => {
         if (invigilator) {
-            setFormData(invigilator);
+            setFormData({
+                ...invigilator,
+                seniority: invigilator.seniority || getFacultySeniority(invigilator)
+            });
         } else {
             setFormData({
                 id: `I${Math.floor(100 + Math.random() * 899)}`,
                 name: '',
                 department: departments[0] || '',
                 designation: 'Assistant Professor',
+                seniority: 'Junior',
                 gender: 'Male',
                 isAvailable: true,
                 unavailableSlots: [],
@@ -135,7 +141,29 @@ export function InvigilatorDialog({
                                         <SelectItem value="Professor">Professor</SelectItem>
                                         <SelectItem value="Associate Professor">Associate Professor</SelectItem>
                                         <SelectItem value="Assistant Professor">Assistant Professor</SelectItem>
+                                        <SelectItem value="Lecturer">Lecturer</SelectItem>
+                                        <SelectItem value="Nursing Tutor">Nursing Tutor</SelectItem>
+                                        <SelectItem value="Teaching Associate">Teaching Associate</SelectItem>
+                                        <SelectItem value="Teaching Assistant">Teaching Assistant</SelectItem>
                                         <SelectItem value="Tutor">Tutor</SelectItem>
+                                        <SelectItem value="Lab Assistant">Lab Assistant</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="seniority" className="text-right">Seniority</Label>
+                            <div className="col-span-3">
+                                <Select
+                                    value={formData.seniority || 'Junior'}
+                                    onValueChange={(val: 'Senior' | 'Junior') => setFormData({ ...formData, seniority: val })}
+                                >
+                                    <SelectTrigger id="seniority">
+                                        <SelectValue placeholder="Select Seniority" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Senior">Senior (Prof / Assoc Prof / Lead)</SelectItem>
+                                        <SelectItem value="Junior">Junior (Asst Prof / Lecturer / Tutor)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -63,6 +63,7 @@ export interface Invigilator {
   name: string;
   department: string;
   designation: 'Professor' | 'Associate Professor' | 'Assistant Professor' | 'Tutor' | 'Lab Assistant' | 'Nursing Tutor' | 'Lecturer' | 'Teaching Assistant' | 'Teaching Associate' | string;
+  seniority?: 'Senior' | 'Junior';
   gender: 'Male' | 'Female';
   isAvailable: boolean;
   maxDailySessions?: number;
@@ -164,6 +165,12 @@ export interface InvigilatorAssignment {
   classroom: Classroom | null; // Null if reserved/standby
   invigilator: Invigilator;
   isReserved?: boolean;
+  isExchanged?: boolean;
+  exchangedWith?: string;
+  originalInvigilatorName?: string;
+  originalInvigilatorId?: string;
+  exchangeReason?: string;
+  exchangeTimestamp?: string;
 }
 
 export interface RoomBatchDistribution {

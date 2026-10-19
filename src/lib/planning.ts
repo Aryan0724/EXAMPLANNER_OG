@@ -3,6 +3,7 @@
 import type { Student, Classroom, ExamSlot, SeatPlan, Invigilator, InvigilatorAssignment, Seat, BatchRoomAllocation, SessionAllotmentSummary, RoomBatchDistribution, FacultyStudentRule, RuleViolation, RuleValidationReport, RuleConflict } from './types';
 import { DEFAULT_FACULTY_STUDENT_RULES } from './types';
 import { isCourseMatch, canonicalizeCourse } from './course-utils';
+import { getFacultySeniority } from './data';
 
 /**
  * Calculates the required number of invigilators/faculty for a classroom based on student count
@@ -1045,23 +1046,44 @@ export function assignInvigilators(
 
             if (pos === 0) {
                 // POSITION 1: Room Senior / Lead Invigilator
-                // Try from Professors / Associate Professors first
+                // Prioritize faculty with Senior seniority
                 const seniorCandidates = availablePool.filter(inv =>
-                    SENIOR_DESIGNATIONS.has(inv.designation) && !assignedInSession.has(inv.id)
+                    (inv.seniority === 'Senior' || getFacultySeniority(inv) === 'Senior') &&
+                    !assignedInSession.has(inv.id)
                 );
 
                 if (seniorCandidates.length > 0) {
                     chosen = selectBestCandidate(seniorCandidates, 'SENIOR', sessionRoomAssignments);
                 }
 
-                // Fallback if senior pool exhausted: pick lowest-duty Assistant Professor
+                // Fallback if senior pool exhausted: pick lowest-duty candidate from remaining pool
                 if (!chosen) {
                     const fallbackCandidates = availablePool.filter(inv => !assignedInSession.has(inv.id));
                     chosen = selectBestCandidate(fallbackCandidates, 'SENIOR', sessionRoomAssignments);
                 }
+            } else if (pos === 1) {
+                // POSITION 2: Room Junior Invigilator (Pair 1 Junior with 1 Senior)
+                const hasLabAssistant = sessionRoomAssignments.some(inv => inv.designation === 'Lab Assistant');
+                const juniorCandidates = availablePool.filter(inv =>
+                    (inv.seniority === 'Junior' || getFacultySeniority(inv) === 'Junior') &&
+                    !assignedInSession.has(inv.id) &&
+                    !(hasLabAssistant && inv.designation === 'Lab Assistant')
+                );
+
+                if (juniorCandidates.length > 0) {
+                    chosen = selectBestCandidate(juniorCandidates, 'CO_INVIGILATOR', sessionRoomAssignments);
+                }
+
+                // Fallback if junior pool exhausted: pick any remaining candidate
+                if (!chosen) {
+                    const fallbackCandidates = availablePool.filter(inv =>
+                        !assignedInSession.has(inv.id) &&
+                        !(hasLabAssistant && inv.designation === 'Lab Assistant')
+                    );
+                    chosen = selectBestCandidate(fallbackCandidates, 'CO_INVIGILATOR', sessionRoomAssignments);
+                }
             } else {
-                // POSITION 2 & 3: Co-Invigilators
-                // Filter out a second Lab Assistant if one is already in this room
+                // POSITION 3+: Additional Co-Invigilators
                 const hasLabAssistant = sessionRoomAssignments.some(inv => inv.designation === 'Lab Assistant');
                 const coInvigilatorCandidates = availablePool.filter(inv =>
                     !assignedInSession.has(inv.id) &&

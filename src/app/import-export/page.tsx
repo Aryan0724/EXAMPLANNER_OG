@@ -28,9 +28,9 @@ import {
   generateDetailedInvigilatorDutyChart,
   generateSessionWiseInvigilationRoster,
   generateDayWiseSessionRosters,
-  downloadMasterSeatingMatrixCSV,
   downloadMasterSeatingMatrixExcel
 } from '@/lib/report-generator';
+import { getFacultySeniority } from '@/lib/data';
 import { parseExamPDF } from '@/lib/pdf-parser';
 import { generateStudentsFromBatches } from '@/lib/planning';
 import { canonicalizeCourse } from '@/lib/course-utils';
@@ -234,30 +234,6 @@ export default function ImportExportPage() {
     }
   };
 
-  const handleExportMasterMatrixCSV = () => {
-    if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'No Allotment Data',
-        description: 'Please generate a full allotment before exporting the matrix.',
-      });
-      return;
-    }
-    try {
-      downloadMasterSeatingMatrixCSV(fullAllotment, classrooms);
-      toast({
-        title: 'Matrix CSV Generated',
-        description: 'The official GEHU Bhimtal Master Seating Matrix (.csv) has been downloaded.',
-      });
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Export Failed',
-        description: error?.message || 'Could not generate matrix CSV.',
-      });
-    }
-  };
-
   const handleExportMasterMatrixExcel = async () => {
     if (!fullAllotment || Object.keys(fullAllotment).length === 0) {
       toast({
@@ -447,6 +423,14 @@ export default function ImportExportPage() {
 
         // Ensure defaults for new fields if not in CSV
         inv.designation = inv.designation || 'Assistant Professor';
+        const rawSeniority = String(inv.seniority || inv.Seniority || '').trim().toLowerCase();
+        if (rawSeniority === 'senior' || rawSeniority === 'sr' || rawSeniority === 'sr.') {
+          inv.seniority = 'Senior';
+        } else if (rawSeniority === 'junior' || rawSeniority === 'jr' || rawSeniority === 'jr.') {
+          inv.seniority = 'Junior';
+        } else {
+          inv.seniority = getFacultySeniority(inv);
+        }
         inv.gender = inv.gender || 'Male';
         inv.unavailableSlots = [];
         inv.assignedDuties = [];
@@ -606,7 +590,7 @@ export default function ImportExportPage() {
                       />
                       <ImportItem
                         title="Invigilator Data"
-                        format={['id', 'name', 'department', 'designation', 'gender', 'isAvailable']}
+                        format={['id', 'name', 'department', 'designation', 'seniority', 'gender', 'isAvailable']}
                         onUpload={handleInvigilatorUpload}
                       />
                     </Accordion>
@@ -622,10 +606,6 @@ export default function ImportExportPage() {
                     <CardDescription>Export detailed reports and logs from the generated allotment data in various formats.</CardDescription>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <Button onClick={handleExportMasterMatrixCSV} className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-medium shadow-sm">
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Master Matrix (.csv - GEHU Format)
-                    </Button>
                     <Button onClick={handleExportMasterMatrixExcel} className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-medium shadow-sm">
                       <Sparkles className="mr-2 h-4 w-4" />
                       Master Matrix (.xlsx - GEHU Format)

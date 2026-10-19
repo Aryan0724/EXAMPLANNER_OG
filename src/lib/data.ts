@@ -673,9 +673,24 @@ export const generateMockClassrooms = (): Classroom[] => {
   return generateOfficialClassrooms();
 };
 
+export function getFacultySeniority(inv: { name?: string; designation?: string; seniority?: string }): 'Senior' | 'Junior' {
+  if (inv.seniority) {
+    const s = String(inv.seniority).trim().toLowerCase();
+    if (s === 'senior' || s === 'sr' || s === 'sr.') return 'Senior';
+    if (s === 'junior' || s === 'jr' || s === 'jr.') return 'Junior';
+  }
+  const desig = (inv.designation || '').toLowerCase();
+  const name = inv.name || '';
+  if (desig.includes('professor') && !desig.includes('assistant')) return 'Senior';
+  if (desig.includes('associate professor')) return 'Senior';
+  if (name.startsWith('Dr.') && (desig.includes('assistant') || desig.includes('associate'))) return 'Senior';
+  return 'Junior';
+}
+
 export const generateMockInvigilators = (): Invigilator[] => {
   return REAL_FACULTY.map(faculty => ({
     ...faculty,
+    seniority: getFacultySeniority(faculty),
     isAvailable: true,
     unavailableSlots: [],
     assignedDuties: []

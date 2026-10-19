@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  Pencil
+  Pencil,
+  ArrowLeftRight
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -27,22 +28,27 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Invigilator } from '@/lib/types';
-import { DEPARTMENTS } from '@/lib/data';
+import { DEPARTMENTS, getFacultySeniority } from '@/lib/data';
 import { AvailabilityDialog } from '@/components/availability-dialog';
 import { toast } from '@/hooks/use-toast';
 import { DataContext } from '@/context/DataContext';
+import { AllotmentContext } from '@/context/AllotmentContext';
+import { FacultyDutyExchangeDialog } from '@/components/faculty-duty-exchange-dialog';
 
 import { InvigilatorDialog } from '@/components/invigilator-dialog';
 
 export default function InvigilatorsPage() {
   const { invigilators, setInvigilators, examSchedule, isHydrated } = useContext(DataContext);
+  const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
   const [desigFilter, setDesigFilter] = useState('all');
   const [genderFilter, setGenderFilter] = useState('all');
+  const [seniorityFilter, setSeniorityFilter] = useState('all');
 
   const [dialogState, setDialogState] = useState<{ isOpen: boolean; resource: Invigilator | null }>({ isOpen: false, resource: null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [showDutyExchangeDialog, setShowDutyExchangeDialog] = useState(false);
   const [editingInvigilator, setEditingInvigilator] = useState<Invigilator | null>(null);
 
   const router = useRouter();
@@ -71,12 +77,14 @@ export default function InvigilatorsPage() {
   };
 
   const stats = useMemo(() => {
-    if (!invigilators) return { total: 0, profs: 0, assoc: 0, assist: 0, active: 0, female: 0 };
+    if (!invigilators) return { total: 0, profs: 0, assoc: 0, assist: 0, seniors: 0, juniors: 0, active: 0, female: 0 };
     return {
       total: invigilators.length,
       profs: invigilators.filter(i => i.designation === 'Professor').length,
       assoc: invigilators.filter(i => i.designation === 'Associate Professor').length,
       assist: invigilators.filter(i => i.designation === 'Assistant Professor').length,
+      seniors: invigilators.filter(i => (i.seniority || getFacultySeniority(i)) === 'Senior').length,
+      juniors: invigilators.filter(i => (i.seniority || getFacultySeniority(i)) === 'Junior').length,
       active: invigilators.filter(i => i.isAvailable && i.unavailableSlots.length === 0).length,
       female: invigilators.filter(i => i.gender === 'Female').length
     };
@@ -101,12 +109,16 @@ export default function InvigilatorsPage() {
       list = list.filter(inv => inv.designation === desigFilter);
     }
 
+    if (seniorityFilter !== 'all') {
+      list = list.filter(inv => (inv.seniority || getFacultySeniority(inv)) === seniorityFilter);
+    }
+
     if (genderFilter !== 'all') {
       list = list.filter(inv => inv.gender === genderFilter);
     }
 
     return list;
-  }, [invigilators, searchQuery, deptFilter, desigFilter, genderFilter]);
+  }, [invigilators, searchQuery, deptFilter, desigFilter, seniorityFilter, genderFilter]);
 
   const openDialog = (invigilator: Invigilator) => {
     setDialogState({ isOpen: true, resource: invigilator });
@@ -196,6 +208,12 @@ export default function InvigilatorsPage() {
         invigilator={editingInvigilator}
         departments={DEPARTMENTS}
       />
+      <FacultyDutyExchangeDialog
+        isOpen={showDutyExchangeDialog}
+        onClose={() => setShowDutyExchangeDialog(false)}
+        fullAllotment={fullAllotment}
+        setFullAllotment={setFullAllotment}
+      />
       <div className="flex min-h-screen">
         <MainSidebar />
         <SidebarInset>
@@ -208,10 +226,21 @@ export default function InvigilatorsPage() {
                   <h1 className="text-3xl font-bold tracking-tight">Invigilator Management</h1>
                   <p className="text-muted-foreground">Manage faculty assignments, constraints, and total duty counts.</p>
                 </div>
-                <Button onClick={() => openAddDialog()}>
-                  <UserCheck className="mr-2 h-4 w-4" />
-                  Add Invigilator
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDutyExchangeDialog(true)}
+                    className="border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                    disabled={!fullAllotment}
+                  >
+                    <ArrowLeftRight className="mr-2 h-4 w-4 text-amber-600" />
+                    Exchange Duties
+                  </Button>
+                  <Button onClick={() => openAddDialog()}>
+                    <UserCheck className="mr-2 h-4 w-4" />
+                    Add Invigilator
+                  </Button>
+                </div>
               </div>
 
               {/* Stats Overview */}
@@ -231,15 +260,17 @@ export default function InvigilatorsPage() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <GraduationCap className="w-4 h-4 text-blue-500" />
+                      <GraduationCap className="w-4 h-4 text-purple-500" />
                       Seniority Mix
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex gap-2">
-                      <Badge variant="secondary" className="text-[10px]">{stats.profs} Prof.</Badge>
-                      <Badge variant="secondary" className="text-[10px]">{stats.assoc} Assoc.</Badge>
-                      <Badge variant="secondary" className="text-[10px]">{stats.assist} Assist.</Badge>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs font-semibold">{stats.seniors} Senior</Badge>
+                      <Badge className="bg-sky-100 text-sky-700 border-sky-200 text-xs font-semibold">{stats.juniors} Junior</Badge>
+                    </div>
+                    <div className="flex gap-1.5 text-muted-foreground text-[10px]">
+                      <span>{stats.profs} Prof</span> • <span>{stats.assoc} Assoc</span> • <span>{stats.assist} Assist</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -279,7 +310,7 @@ export default function InvigilatorsPage() {
                     <CardTitle className="text-base">Filters & Search</CardTitle>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <CardContent className="pt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="relative">
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -307,6 +338,20 @@ export default function InvigilatorsPage() {
                       <SelectItem value="Professor">Professor</SelectItem>
                       <SelectItem value="Associate Professor">Associate Professor</SelectItem>
                       <SelectItem value="Assistant Professor">Assistant Professor</SelectItem>
+                      <SelectItem value="Lecturer">Lecturer</SelectItem>
+                      <SelectItem value="Nursing Tutor">Nursing Tutor</SelectItem>
+                      <SelectItem value="Teaching Associate">Teaching Associate</SelectItem>
+                      <SelectItem value="Teaching Assistant">Teaching Assistant</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={seniorityFilter} onValueChange={setSeniorityFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seniority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Seniority</SelectItem>
+                      <SelectItem value="Senior">Senior Faculty</SelectItem>
+                      <SelectItem value="Junior">Junior Faculty</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={genderFilter} onValueChange={setGenderFilter}>
@@ -339,6 +384,7 @@ export default function InvigilatorsPage() {
                     <TableBody>
                       {filteredInvigilators.map((inv) => {
                         const dutyCount = inv.assignedDuties.reduce((acc, d) => acc + d.count, 0);
+                        const seniority = inv.seniority || getFacultySeniority(inv);
                         return (
                           <TableRow key={inv.id} className="hover:bg-muted/30 transition-colors">
                             <TableCell className="pl-6 font-mono text-xs">{inv.id}</TableCell>
@@ -348,7 +394,12 @@ export default function InvigilatorsPage() {
                                   {inv.name.split(' ').pop()?.charAt(0)}
                                 </div>
                                 <div className="flex flex-col">
-                                  <span className="font-semibold text-sm">{inv.name}</span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-semibold text-sm">{inv.name}</span>
+                                    <Badge className={`text-[9px] px-1.5 py-0 h-4 font-semibold ${seniority === 'Senior' ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300' : 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300'}`}>
+                                      {seniority}
+                                    </Badge>
+                                  </div>
                                   <span className="text-[10px] text-muted-foreground italic uppercase">{inv.designation}</span>
                                 </div>
                               </div>

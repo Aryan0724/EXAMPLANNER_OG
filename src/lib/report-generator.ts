@@ -465,7 +465,8 @@ export function generateInvigilatorDutyRoster(fullAllotment: FullAllotment, allI
 
             const headerVal = dutyMap.get(invigilator.id)!.get(header);
             const mark = assignment.exam.id.toLowerCase().includes('mid') ? '001' : '01';
-            const displayValue = isReserved ? `RESERVED (${mark})` : `${classroom?.roomNo || 'Unassigned'} (${mark})`;
+            const exchSuffix = assignment.isExchanged ? ` [EXCHANGED with ${assignment.exchangedWith || assignment.originalInvigilatorName || 'Faculty'}]` : '';
+            const displayValue = isReserved ? `RESERVED (${mark})${exchSuffix}` : `${classroom?.roomNo || 'Unassigned'} (${mark})${exchSuffix}`;
             
             // If it's already RESERVED but we found an active duty, prioritize active
             if (headerVal === 'RESERVED' && !isReserved) {
@@ -854,8 +855,8 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     };
     const usedAbbreviations = new Set<string>();
 
-    // Duty Map for easy lookup: invId -> date-shiftIdx -> 1 (active) or 0 (reserved)
-    const invDutyMap = new Map<string, Map<string, number>>();
+    // Duty Map for easy lookup: invId -> date-shiftIdx -> { val: number, isExchanged?: boolean, exchangedWith?: string }
+    const invDutyMap = new Map<string, Map<string, { val: number; isExchanged?: boolean; exchangedWith?: string; origName?: string }>>();
     sessionKeys.forEach(key => {
         const sData = fullAllotment[key];
         if (!sData) return;
@@ -866,9 +867,20 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         assignments.forEach(asg => {
             if (!asg?.invigilator?.id) return;
             if (!invDutyMap.has(asg.invigilator.id)) invDutyMap.set(asg.invigilator.id, new Map());
-            const current = invDutyMap.get(asg.invigilator.id)!.get(`${timing.date}-${shiftIdx}`);
-            if (current !== 1) {
-                invDutyMap.get(asg.invigilator.id)!.set(`${timing.date}-${shiftIdx}`, asg.isReserved ? 0 : 1);
+            const slotKey = `${timing.date}-${shiftIdx}`;
+            const current = invDutyMap.get(asg.invigilator.id)!.get(slotKey);
+            const val = asg.isReserved ? 0 : 1;
+            if (!current || current.val !== 1) {
+                invDutyMap.get(asg.invigilator.id)!.set(slotKey, {
+                    val,
+                    isExchanged: !!asg.isExchanged,
+                    exchangedWith: asg.exchangedWith,
+                    origName: asg.originalInvigilatorName
+                });
+            } else if (asg.isExchanged) {
+                current.isExchanged = true;
+                current.exchangedWith = asg.exchangedWith;
+                current.origName = asg.originalInvigilatorName;
             }
         });
     });
@@ -899,11 +911,22 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
         uniqueDates.forEach((date, dateIdx) => {
             const startCol = dateColStart + (dateIdx * numShifts);
             shiftTimings.forEach((_, shiftIdx) => {
-                const val = invDutyMap.get(inv.id)?.get(`${date}-${shiftIdx}`);
-                if (val !== undefined) {
-                    worksheet.getCell(rowNum, startCol + shiftIdx).value = val;
-                    worksheet.getCell(rowNum, startCol + shiftIdx).alignment = { horizontal: 'center' };
-                    if (val === 1) total++;
+                const entry = invDutyMap.get(inv.id)?.get(`${date}-${shiftIdx}`);
+                if (entry !== undefined) {
+                    const cell = worksheet.getCell(rowNum, startCol + shiftIdx);
+                    cell.value = entry.val;
+                    cell.alignment = { horizontal: 'center' };
+                    if (entry.val === 1) total++;
+
+                    if (entry.isExchanged) {
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFFDE047' } // Amber / Yellow highlight for duty exchange
+                        };
+                        cell.font = { bold: true, color: { argb: '78350F' } };
+                        cell.note = `Duty Exchanged with ${entry.exchangedWith || entry.origName || 'Faculty'}`;
+                    }
                 }
             });
         });
@@ -1083,7 +1106,10 @@ function buildShiftWorksheet(
 
         roomAsgs.forEach((asg) => {
             worksheet.getCell(currentRow, 1).value = srNo++;
-            worksheet.getCell(currentRow, 2).value = asg.invigilator?.name || 'Unassigned';
+            const nameVal = asg.isExchanged
+                ? `${asg.invigilator?.name || 'Unassigned'} (🔄 Exchanged with ${asg.exchangedWith || asg.originalInvigilatorName || 'Faculty'})`
+                : asg.invigilator?.name || 'Unassigned';
+            worksheet.getCell(currentRow, 2).value = nameVal;
             worksheet.getCell(currentRow, 3).value = `${room?.building || ''} ${room?.roomNo || ''}`.trim();
             
             [1,2,3,4,5,6,7].forEach(col => {
@@ -1091,6 +1117,13 @@ function buildShiftWorksheet(
                 cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
                 cell.font = { name: 'Times New Roman' };
                 cell.alignment = { vertical: 'middle', wrapText: true };
+                if (asg.isExchanged) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFDE047' } // Amber highlight for duty exchange
+                    };
+                }
             });
             currentRow++;
         });
@@ -1113,12 +1146,22 @@ function buildShiftWorksheet(
 
         reservedStaff.forEach(asg => {
             worksheet.getCell(currentRow, 1).value = '-';
-            worksheet.getCell(currentRow, 2).value = asg.invigilator?.name || 'Standby';
+            const nameVal = asg.isExchanged
+                ? `${asg.invigilator?.name || 'Standby'} (🔄 Exchanged with ${asg.exchangedWith || asg.originalInvigilatorName || 'Faculty'})`
+                : asg.invigilator?.name || 'Standby';
+            worksheet.getCell(currentRow, 2).value = nameVal;
             worksheet.getCell(currentRow, 3).value = 'RESERVED';
             [1,2,3,4,5,6,7].forEach(col => {
                 const cell = worksheet.getCell(currentRow, col);
                 cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
                 cell.font = { name: 'Times New Roman' };
+                if (asg.isExchanged) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFDE047' }
+                    };
+                }
             });
             currentRow++;
         });

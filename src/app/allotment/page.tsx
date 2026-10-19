@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck, ChevronDown, FileText, CalendarCheck2, Armchair, CalendarDays, SlidersHorizontal, ArrowRight, Copy } from 'lucide-react';
+import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck, ChevronDown, FileText, CalendarCheck2, Armchair, CalendarDays, SlidersHorizontal, ArrowRight, ArrowLeftRight } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator, FacultyStudentRule } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators, countSeatPlanViolations, isSeatPlanCompliantWithSittingRules } from '@/lib/planning';
-import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateDetailedInvigilatorDutyChart, downloadMasterSeatingMatrixCSV, downloadMasterSeatingMatrixExcel, generateMasterSeatingMatrixCSV } from '@/lib/report-generator';
+import { generateRoomSeatPlanPDF, generateRoomSeatPlanExcel, generateSessionWiseInvigilationRoster, generateMasterReport, generateDetailedInvigilatorDutyChart, downloadMasterSeatingMatrixExcel } from '@/lib/report-generator';
 import { ClassroomVisualizer } from '@/components/classroom-visualizer';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
@@ -31,6 +31,8 @@ import { AllotmentRulesDialog } from '@/components/allotment-rules-dialog';
 import { AllotmentChoiceDialog } from '@/components/allotment-choice-dialog';
 import { FacultyShiftAllotmentView } from '@/components/faculty-shift-allotment-view';
 import { BlockPriorityDialog } from '@/components/block-priority-dialog';
+import { FacultyDutyExchangeDialog } from '@/components/faculty-duty-exchange-dialog';
+import { getFacultySeniority } from '@/lib/data';
 type FullAllotment = Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }>;
 import { ExclusionReport } from '@/components/exclusion-report';
 
@@ -140,6 +142,8 @@ export default function AllotmentPage() {
   const [invigilatorAssignments, setInvigilatorAssignments] = useState<InvigilatorAssignment[] | null>(null);
 
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const [showDutyExchangeDialog, setShowDutyExchangeDialog] = useState(false);
+  const [selectedDutyExchangeId, setSelectedDutyExchangeId] = useState<string | undefined>(undefined);
 
   const autoRepairedSlotsRef = useRef<Set<string>>(new Set());
 
@@ -345,11 +349,13 @@ export default function AllotmentPage() {
 
   const selectedClassroom = selectedClassroomId ? classrooms.find(c => c.id === selectedClassroomId) : null;
 
-  const invigilatorsForClassroom = selectedClassroom && invigilatorAssignments
+  const roomAssignmentsForClassroom = selectedClassroom && invigilatorAssignments
     ? invigilatorAssignments
+        .map((a, originalIndex) => ({ ...a, originalIndex }))
         .filter(a => a && a.classroom?.id === selectedClassroom.id && a.invigilator)
-        .map(a => a.invigilator)
     : [];
+
+  const invigilatorsForClassroom = roomAssignmentsForClassroom.map(a => a.invigilator);
 
   const currentExams = seatPlan?.exam ? (Array.isArray(seatPlan.exam) ? seatPlan.exam : [seatPlan.exam]) : (examSlotsByTime[selectedSlotKey!] || []);
   const representativeExam = currentExams[0];
@@ -449,20 +455,6 @@ export default function AllotmentPage() {
     }
   };
 
-  const handleExportMasterMatrixCSV = () => {
-    if (!fullAllotment) return;
-    try {
-      downloadMasterSeatingMatrixCSV(fullAllotment, classrooms);
-      toast({
-        title: "Master Seating Matrix CSV Exported",
-        description: "Official GEHU Bhimtal format (.csv) downloaded successfully."
-      });
-    } catch (error: any) {
-      console.error("Master matrix CSV export failed", error);
-      toast({ variant: "destructive", title: "Export Failed", description: error?.message || "Could not generate CSV matrix." });
-    }
-  };
-
   const handleExportMasterMatrixExcel = async () => {
     if (!fullAllotment) return;
     try {
@@ -474,21 +466,6 @@ export default function AllotmentPage() {
     } catch (error: any) {
       console.error("Master matrix Excel export failed", error);
       toast({ variant: "destructive", title: "Export Failed", description: error?.message || "Could not generate Excel matrix." });
-    }
-  };
-
-  const handleCopyMasterMatrixCSV = () => {
-    if (!fullAllotment) return;
-    try {
-      const csv = generateMasterSeatingMatrixCSV(fullAllotment, classrooms);
-      navigator.clipboard.writeText(csv);
-      toast({
-        title: "Master Seating Matrix Copied!",
-        description: "Exact GEHU Bhimtal CSV format copied to clipboard. You can paste it directly."
-      });
-    } catch (error: any) {
-      console.error("Copy failed", error);
-      toast({ variant: "destructive", title: "Copy Failed", description: error?.message || "Could not copy matrix." });
     }
   };
 
@@ -1010,7 +987,21 @@ export default function AllotmentPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
 
-                          {/* 2. Unified Export Reports */}
+                          {/* 2. Faculty Duty Exchange */}
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedDutyExchangeId(undefined);
+                              setShowDutyExchangeDialog(true);
+                            }}
+                            className="h-10 text-xs font-semibold gap-1.5 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                            disabled={!fullAllotment}
+                          >
+                            <ArrowLeftRight className="h-4 w-4 text-amber-600" />
+                            <span>Exchange Duties</span>
+                          </Button>
+
+                          {/* 3. Unified Export Reports */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
@@ -1027,25 +1018,11 @@ export default function AllotmentPage() {
                               <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                 University Reports
                               </DropdownMenuLabel>
-                              <DropdownMenuItem onClick={handleExportMasterMatrixCSV}>
-                                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-xs">Master Seating Matrix (.csv)</span>
-                                  <span className="text-[10px] text-muted-foreground">Official GEHU Bhimtal format (exact ditto)</span>
-                                </div>
-                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={handleExportMasterMatrixExcel}>
                                 <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
                                 <div className="flex flex-col">
                                   <span className="font-medium text-xs">Master Seating Matrix (.xlsx)</span>
-                                  <span className="text-[10px] text-muted-foreground">Full room & course distribution table</span>
-                                </div>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={handleCopyMasterMatrixCSV}>
-                                <Copy className="mr-2 h-4 w-4 text-indigo-600" />
-                                <div className="flex flex-col">
-                                  <span className="font-medium text-xs">Copy Matrix to Clipboard</span>
-                                  <span className="text-[10px] text-muted-foreground">Copy ditto CSV text for 1-click paste</span>
+                                  <span className="text-[10px] text-muted-foreground">Official GEHU Bhimtal format</span>
                                 </div>
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={handleExportDutyChart}>
@@ -1255,44 +1232,70 @@ export default function AllotmentPage() {
                                </div>
                              )}
 
-                             <div className="text-center mb-4">
+                              <div className="text-center mb-4">
                               <div className="flex flex-wrap justify-center gap-3">
-                                {invigilatorsForClassroom.map((i, idx) => (
-                                  <div key={i.id} className="inline-flex items-center gap-2 p-2 px-4 rounded-xl bg-card border shadow-sm">
-                                    <div className={`p-1 rounded-full ${i.gender === 'Female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
-                                      <UserCheck className="w-4 h-4" />
-                                    </div>
-                                    <div className="flex flex-col items-start leading-tight">
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-sm font-bold">{i.name}</span>
-                                        {fullAllotment && selectedSlotKey && fullAllotment[selectedSlotKey] &&
-                                          !fullAllotment[selectedSlotKey].invigilatorAssignments.some(asg => asg.invigilator.id === i.id) && (
-                                            <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 h-4 px-1 text-[8px] border-amber-200">
-                                              <RotateCcw className="w-2 h-2 mr-0.5" />
-                                              Replaced
+                                {roomAssignmentsForClassroom.map((asg, idx) => {
+                                  const i = asg.invigilator;
+                                  const seniority = i.seniority || getFacultySeniority(i);
+                                  return (
+                                    <div key={i.id + idx} className={`inline-flex items-center gap-2 p-2 px-4 rounded-xl border shadow-sm ${asg.isExchanged ? 'bg-amber-50/80 border-amber-300 dark:bg-amber-950/30 dark:border-amber-800' : 'bg-card'}`}>
+                                      <div className={`p-1 rounded-full ${i.gender === 'Female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
+                                        <UserCheck className="w-4 h-4" />
+                                      </div>
+                                      <div className="flex flex-col items-start leading-tight">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-sm font-bold">{i.name}</span>
+                                          <Badge className={`text-[9px] px-1.5 py-0 h-4 ${seniority === 'Senior' ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300' : 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300'}`}>
+                                            {seniority}
+                                          </Badge>
+                                          {asg.isExchanged && (
+                                            <Badge className="bg-amber-200 text-amber-900 border-amber-300 text-[8px] h-4 px-1.5 font-bold">
+                                              🔄 Exchanged with {asg.exchangedWith || asg.originalInvigilatorName}
                                             </Badge>
                                           )}
+                                          {fullAllotment && selectedSlotKey && fullAllotment[selectedSlotKey] &&
+                                            !fullAllotment[selectedSlotKey].invigilatorAssignments.some(a => a.invigilator.id === i.id) && (
+                                              <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 h-4 px-1 text-[8px] border-amber-200">
+                                                <RotateCcw className="w-2 h-2 mr-0.5" />
+                                                Replaced
+                                              </Badge>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-1 mt-0.5">
+                                          <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 uppercase tracking-tighter">
+                                            {i.designation.split(' ')[0]}
+                                          </Badge>
+                                          <Badge variant="secondary" className="text-[9px] h-3.5 px-1 py-0 uppercase">
+                                            {i.gender}
+                                          </Badge>
+                                        </div>
                                       </div>
-                                      <div className="flex gap-1 mt-0.5">
-                                        <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 uppercase tracking-tighter">
-                                          {i.designation.split(' ')[0]}
-                                        </Badge>
-                                        <Badge variant="secondary" className="text-[9px] h-3.5 px-1 py-0 uppercase">
-                                          {i.gender}
-                                        </Badge>
+                                      <div className="flex items-center ml-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-amber-600 hover:bg-amber-100/50"
+                                          onClick={() => {
+                                            setSelectedDutyExchangeId(`${selectedSlotKey}___${asg.originalIndex}`);
+                                            setShowDutyExchangeDialog(true);
+                                          }}
+                                          title="Exchange this faculty duty"
+                                        >
+                                          <ArrowLeftRight className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                          onClick={() => handleEmergencySwap(i.id)}
+                                          title="Mark Absent & Replace"
+                                        >
+                                          <UserMinus className="h-4 w-4" />
+                                        </Button>
                                       </div>
                                     </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 ml-2 text-destructive hover:bg-destructive/10"
-                                      onClick={() => handleEmergencySwap(i.id)}
-                                      title="Mark Absent & Replace"
-                                    >
-                                      <UserMinus className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                                 <div className="flex flex-col items-center gap-2">
                                   {representativeExam && (
                                     <div className="flex flex-col items-center">
@@ -1470,6 +1473,16 @@ export default function AllotmentPage() {
         excludedRooms={excludedRooms}
         classrooms={classrooms}
         onSave={handleSavePriority}
+      />
+      <FacultyDutyExchangeDialog
+        isOpen={showDutyExchangeDialog}
+        onClose={() => {
+          setShowDutyExchangeDialog(false);
+          setSelectedDutyExchangeId(undefined);
+        }}
+        fullAllotment={fullAllotment}
+        setFullAllotment={setFullAllotment}
+        initialDutyId={selectedDutyExchangeId}
       />
     </>
   );
