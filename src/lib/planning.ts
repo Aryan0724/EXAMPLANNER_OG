@@ -485,23 +485,19 @@ export function generateSeatPlan(
         sortedCourseBatches.set(key, sorted);
     });
 
-    // 5. Course-wise Classroom Allocation with Interleaved Course Pairing (Rules 1, 2, 4, 6, 7, 8, 15, 18)
-    // University Anti-Cheating & Exam Rule:
-    // Students of the same course must NEVER sit together on the same bench or on adjacent sides across the aisle.
-    // For each classroom:
-    // - Side A (Left seat of benches down the columns) is allocated to Course A in ascending roll-number order.
-    // - Side B (Right seat of benches down the columns) is allocated to Course B (distinct course) in ascending roll-number order.
-    // If Course B runs out, another distinct course (e.g. Course C) can fill remaining Side B seats.
-    // If NO other distinct course is available in the session, Side B seats remain strictly VACANT.
-    interface RoomPlanTarget {
-        classroom: Classroom;
-        studentsA: (Student & { exam: ExamSlot })[];
-        studentsB: (Student & { exam: ExamSlot })[];
-        courseA: string | null;
-        courseB: string | null;
-        courses: string[];
-    }
-    const roomPlanTargets: RoomPlanTarget[] = [];
+    // 5. Course-wise Classroom Allocation with Interleaved Course Pairing & Smart Gap Filling (Rules 1, 2, 4, 6, 7, 8, 15, 18)
+    // University Anti-Cheating & Exam Administration Rules:
+    // - Students of the same course must NEVER sit together on the same bench or on adjacent sides across the aisle.
+    // - Consecutive roll numbers must sit down the column on the same side of benches in ascending order.
+    // - Classrooms are filled to maximum capacity before moving to the next classroom (Zero Seat Waste).
+    // - Primary large course (e.g. BTech) occupies Side A (Left).
+    // - Secondary large course (e.g. BCA, BBA) occupies Side B (Right).
+    // - Smart Gap-Filling Rule:
+    //   If space remains on a side, fill with compatible courses to prevent wasting classroom space.
+    //   Priority 1: Exact matches (course remaining count == remaining gap) or complete fits (course fits entirely).
+    //   Priority 2: Anti-Splinter Rule - If the room already has >= 2 distinct courses, do NOT splinter
+    //   a large 3rd course for just 1 or 2 leftover seats if other classrooms exist, preventing isolated student stragglers.
+    //   Priority 3: If gap >= 3 seats, take a substantial cohort from the largest candidate course.
     const availableQueue = [...availableClassrooms];
 
     // Track active pools for each course
@@ -517,28 +513,75 @@ export function generateSeatPlan(
         return sum;
     };
 
-    while (getTotalRemaining() > 0 && availableQueue.length > 0) {
-        const room = availableQueue.shift()!;
-
-        // Calculate how many Side A seats (left) and Side B seats (right for capacity >= 2) exist in this room
-        let sideACapacity = 0;
-        let sideBCapacity = 0;
-        room.benchCapacities.forEach(cap => {
-            if (cap >= 1) sideACapacity += 1;
-            if (cap >= 2) sideBCapacity += 1;
-        });
-
-        // 1. Pick Course A: The course with the highest remaining student count
-        const sortedCoursesDesc = Array.from(remainingCourseBatches.keys())
+    const getActiveCoursesSorted = () => {
+        return Array.from(remainingCourseBatches.keys())
             .filter(c => getRemainingCount(c) > 0)
             .sort((a, b) => getRemainingCount(b) - getRemainingCount(a));
+    };
 
-        if (sortedCoursesDesc.length === 0) break;
+    // Helper to check whether a candidate course/exam conflicts with an already seated student
+    const doesCandidateConflictWithOther = (
+        candidateCourse: string,
+        candidateExam: ExamSlot,
+        other: (Student & { exam: ExamSlot }) | null
+    ): boolean => {
+        if (!other) return false;
+        if (isCourseMatch(candidateCourse, other.course)) return true;
+        if (canonicalizeCourse(candidateCourse).toLowerCase() === canonicalizeCourse(other.course).toLowerCase()) return true;
+        if (other.exam?.course && isCourseMatch(candidateCourse, other.exam.course)) return true;
+        if (candidateExam.course && isCourseMatch(candidateExam.course, other.course)) return true;
+        if (candidateExam.subjectCode && other.exam?.subjectCode &&
+            candidateExam.subjectCode.trim().toLowerCase() === other.exam.subjectCode.trim().toLowerCase()) {
+            return true;
+        }
+        return false;
+    };
 
-        const courseA = sortedCoursesDesc[0];
+    while (getTotalRemaining() > 0 && availableQueue.length > 0) {
+        const room = availableQueue.shift()!;
+        const map = roomSeatMaps.get(room.id)!;
+
+        // Group benches by column traversal (down each aisle, column 0 then column 1...)
+        const orderedBenches: { benchIdx: number; benchNumber: number; capacity: number }[] = [];
+        for (let col = 0; col < room.columns; col++) {
+            for (let r = 0; r < room.rows; r++) {
+                const benchIdx = r * room.columns + col;
+                if (benchIdx < room.benchCapacities.length && room.benchCapacities[benchIdx] > 0) {
+                    orderedBenches.push({
+                        benchIdx,
+                        benchNumber: benchIdx + 1,
+                        capacity: room.benchCapacities[benchIdx]
+                    });
+                }
+            }
+        }
+
+        if (orderedBenches.length === 0) continue;
+
+        // Bench seating state tracking
+        const benchAssignments: {
+            bench: { benchIdx: number; benchNumber: number; capacity: number };
+            left: (Student & { exam: ExamSlot }) | null;
+            right: (Student & { exam: ExamSlot }) | null;
+            extra: (Student & { exam: ExamSlot }) | null;
+        }[] = orderedBenches.map(b => ({ bench: b, left: null, right: null, extra: null }));
+
+        const roomCourses = new Set<string>();
+
+        // 1. ANCHOR SIDE A (Left): Largest remaining course
+        const activeCoursesA = getActiveCoursesSorted();
+        if (activeCoursesA.length === 0) break;
+
+        const courseA = activeCoursesA[0];
+        const leftBenches = benchAssignments.filter(b => b.bench.capacity >= 1);
         const poolA = remainingCourseBatches.get(courseA)!;
-        const takeCountA = Math.min(poolA.length, sideACapacity);
+        const takeCountA = Math.min(poolA.length, leftBenches.length);
         const studentsA = poolA.splice(0, takeCountA);
+
+        for (let i = 0; i < takeCountA; i++) {
+            leftBenches[i].left = studentsA[i];
+        }
+        roomCourses.add(courseA);
 
         if (poolA.length > 0) {
             ruleConflicts.push({
@@ -547,62 +590,203 @@ export function generateSeatPlan(
                 classroomId: room.id,
                 roomNo: room.roomNo,
                 course: courseA,
-                description: `Course ${courseA} exceeded Room ${room.roomNo} Side A capacity (${sideACapacity}); remaining ${poolA.length} student(s) allotted to next eligible classroom.`,
+                description: `Course ${courseA} filled Room ${room.roomNo} Side A capacity (${leftBenches.length}); remaining ${poolA.length} student(s) will be allotted to next eligible classroom.`,
                 severity: 'warning'
             });
         }
 
-        // 2. Pick Course B (and subsequent distinct courses if needed) for Side B
-        const studentsB: (Student & { exam: ExamSlot })[] = [];
+        // 2. ANCHOR SIDE B (Right): Next largest course distinct from courseA
+        const rightBenches = benchAssignments.filter(b => b.bench.capacity >= 2);
         let primaryCourseB: string | null = null;
-        const assignedCoursesForRoom = [courseA];
 
-        let remainingSideBCap = sideBCapacity;
-        while (remainingSideBCap > 0) {
-            // Find distinct available courses other than Course A
-            const distinctOtherCourses = Array.from(remainingCourseBatches.keys())
-                .filter(c => c !== courseA && getRemainingCount(c) > 0)
-                .sort((a, b) => getRemainingCount(b) - getRemainingCount(a));
+        if (rightBenches.length > 0) {
+            const otherCourses = getActiveCoursesSorted().filter(c => c !== courseA);
+            if (otherCourses.length > 0) {
+                primaryCourseB = otherCourses[0];
+                const poolB = remainingCourseBatches.get(primaryCourseB)!;
+                const takeCountB = Math.min(poolB.length, rightBenches.length);
+                const studentsB = poolB.splice(0, takeCountB);
 
-            if (distinctOtherCourses.length === 0) {
-                // No other distinct course available in session.
-                // Leave remaining Side B seats VACANT to preserve anti-cheating rule (no same-course on same bench)
-                break;
-            }
+                for (let i = 0; i < takeCountB; i++) {
+                    rightBenches[i].right = studentsB[i];
+                }
+                roomCourses.add(primaryCourseB);
 
-            const pickedOtherCourse = distinctOtherCourses[0];
-            if (!primaryCourseB) primaryCourseB = pickedOtherCourse;
-            if (!assignedCoursesForRoom.includes(pickedOtherCourse)) {
-                assignedCoursesForRoom.push(pickedOtherCourse);
-            }
-
-            const poolOther = remainingCourseBatches.get(pickedOtherCourse)!;
-            const takeCountB = Math.min(poolOther.length, remainingSideBCap);
-            const takenB = poolOther.splice(0, takeCountB);
-            studentsB.push(...takenB);
-            remainingSideBCap -= takeCountB;
-
-            if (poolOther.length > 0) {
-                ruleConflicts.push({
-                    ruleNumber: 15,
-                    ruleName: 'Capacity management spillover',
-                    classroomId: room.id,
-                    roomNo: room.roomNo,
-                    course: pickedOtherCourse,
-                    description: `Course ${pickedOtherCourse} filled Room ${room.roomNo} Side B seats; remaining ${poolOther.length} student(s) will be allotted to next eligible classroom.`,
-                    severity: 'warning'
-                });
+                if (poolB.length > 0) {
+                    ruleConflicts.push({
+                        ruleNumber: 15,
+                        ruleName: 'Capacity management spillover',
+                        classroomId: room.id,
+                        roomNo: room.roomNo,
+                        course: primaryCourseB,
+                        description: `Course ${primaryCourseB} filled Room ${room.roomNo} Side B seats; remaining ${poolB.length} student(s) will be allotted to next eligible classroom.`,
+                        severity: 'warning'
+                    });
+                }
             }
         }
 
-        roomPlanTargets.push({
-            classroom: room,
-            studentsA,
-            studentsB,
-            courseA,
-            courseB: primaryCourseB,
-            courses: assignedCoursesForRoom
-        });
+        // 3. SMART GAP FILLING ON SIDE B (Right seats)
+        // If Side B has empty benches left, fill them intelligently without seat waste or 1-seat splinters
+        let currentRightIdx = rightBenches.findIndex(b => b.right === null);
+        if (currentRightIdx !== -1) {
+            while (currentRightIdx < rightBenches.length && getTotalRemaining() > 0) {
+                const remainingGap = rightBenches.length - currentRightIdx;
+
+                // Compatible candidates that don't conflict with the Left seat on the bench
+                const candidateCourses = getActiveCoursesSorted().filter(courseKey => {
+                    const benchTarget = rightBenches[currentRightIdx];
+                    if (!benchTarget.left) return true;
+                    const sampleStudent = remainingCourseBatches.get(courseKey)?.[0];
+                    const candidateExam = sampleStudent?.exam || exams[0];
+                    return !doesCandidateConflictWithOther(courseKey, candidateExam, benchTarget.left);
+                });
+
+                if (candidateCourses.length === 0) break;
+
+                let chosenCourse: string | null = null;
+                let seatsToTake = 0;
+
+                // Priority 1: Exact match (zero seat waste, whole course seated together)
+                const exactMatch = candidateCourses.find(c => getRemainingCount(c) === remainingGap);
+                if (exactMatch) {
+                    chosenCourse = exactMatch;
+                    seatsToTake = remainingGap;
+                } else {
+                    // Priority 2: Complete fit (entire course fits within remaining gap)
+                    const completeFits = candidateCourses
+                        .filter(c => getRemainingCount(c) < remainingGap)
+                        .sort((a, b) => getRemainingCount(b) - getRemainingCount(a));
+
+                    if (completeFits.length > 0) {
+                        chosenCourse = completeFits[0];
+                        seatsToTake = getRemainingCount(chosenCourse);
+                    } else {
+                        // Priority 3: Courses larger than remainingGap
+                        // Anti-Splinter: If room already has >= 2 courses and gap <= 2, do NOT splinter a large 3rd course
+                        if (roomCourses.size >= 2 && remainingGap <= 2) {
+                            if (availableQueue.length > 0) {
+                                break; // Keep 1-2 buffer seats; let the course stay together in the next room
+                            }
+                        }
+
+                        // Substantial cohort (gap >= 3) or room only has 1 course or final room
+                        const largest = candidateCourses[0];
+                        chosenCourse = largest;
+                        seatsToTake = Math.min(getRemainingCount(largest), remainingGap);
+                    }
+                }
+
+                if (!chosenCourse || seatsToTake <= 0) break;
+
+                const pool = remainingCourseBatches.get(chosenCourse)!;
+                const taken = pool.splice(0, seatsToTake);
+                for (let i = 0; i < taken.length; i++) {
+                    rightBenches[currentRightIdx + i].right = taken[i];
+                }
+                roomCourses.add(chosenCourse);
+                currentRightIdx += taken.length;
+            }
+        }
+
+        // 4. SMART GAP FILLING ON SIDE A (Left seats)
+        // If Side A has empty benches left (Course A had fewer students than Left capacity)
+        let currentLeftIdx = leftBenches.findIndex(b => b.left === null);
+        if (currentLeftIdx !== -1) {
+            while (currentLeftIdx < leftBenches.length && getTotalRemaining() > 0) {
+                const remainingGap = leftBenches.length - currentLeftIdx;
+
+                const candidateCourses = getActiveCoursesSorted().filter(courseKey => {
+                    const benchTarget = leftBenches[currentLeftIdx];
+                    if (!benchTarget.right) return true;
+                    const sampleStudent = remainingCourseBatches.get(courseKey)?.[0];
+                    const candidateExam = sampleStudent?.exam || exams[0];
+                    return !doesCandidateConflictWithOther(courseKey, candidateExam, benchTarget.right);
+                });
+
+                if (candidateCourses.length === 0) break;
+
+                let chosenCourse: string | null = null;
+                let seatsToTake = 0;
+
+                const exactMatch = candidateCourses.find(c => getRemainingCount(c) === remainingGap);
+                if (exactMatch) {
+                    chosenCourse = exactMatch;
+                    seatsToTake = remainingGap;
+                } else {
+                    const completeFits = candidateCourses
+                        .filter(c => getRemainingCount(c) < remainingGap)
+                        .sort((a, b) => getRemainingCount(b) - getRemainingCount(a));
+
+                    if (completeFits.length > 0) {
+                        chosenCourse = completeFits[0];
+                        seatsToTake = getRemainingCount(chosenCourse);
+                    } else {
+                        if (roomCourses.size >= 2 && remainingGap <= 2) {
+                            if (availableQueue.length > 0) {
+                                break;
+                            }
+                        }
+                        const largest = candidateCourses[0];
+                        chosenCourse = largest;
+                        seatsToTake = Math.min(getRemainingCount(largest), remainingGap);
+                    }
+                }
+
+                if (!chosenCourse || seatsToTake <= 0) break;
+
+                const pool = remainingCourseBatches.get(chosenCourse)!;
+                const taken = pool.splice(0, seatsToTake);
+                for (let i = 0; i < taken.length; i++) {
+                    leftBenches[currentLeftIdx + i].left = taken[i];
+                }
+                roomCourses.add(chosenCourse);
+                currentLeftIdx += taken.length;
+            }
+        }
+
+        // 5. COMMIT BENCH ASSIGNMENTS TO ROOM SEAT MAP
+        for (const item of benchAssignments) {
+            const { bench, left, right, extra } = item;
+            let benchFlatIdxBase = 0;
+            for (let b = 0; b < bench.benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
+
+            if (left) {
+                const flatIdx = benchFlatIdxBase + 0;
+                map[flatIdx] = {
+                    student: left,
+                    classroom: room,
+                    seatNumber: flatIdx + 1,
+                    benchNumber: bench.benchNumber,
+                    benchIndex: bench.benchIdx,
+                    seatPosition: 'Left'
+                };
+            }
+
+            if (right && bench.capacity >= 2) {
+                const flatIdx = benchFlatIdxBase + 1;
+                map[flatIdx] = {
+                    student: right,
+                    classroom: room,
+                    seatNumber: flatIdx + 1,
+                    benchNumber: bench.benchNumber,
+                    benchIndex: bench.benchIdx,
+                    seatPosition: 'Right'
+                };
+            }
+
+            if (extra && bench.capacity >= 3) {
+                const flatIdx = benchFlatIdxBase + 2;
+                map[flatIdx] = {
+                    student: extra,
+                    classroom: room,
+                    seatNumber: flatIdx + 1,
+                    benchNumber: bench.benchNumber,
+                    benchIndex: bench.benchIdx,
+                    seatPosition: 'Middle'
+                };
+            }
+        }
     }
 
     // Handle any students that could not be seated due to insufficient total capacity
@@ -624,73 +808,6 @@ export function generateSeatPlan(
             });
         }
     });
-
-    // 6. Systematic Bench and Seat Layout inside each Classroom (Rules 2, 3, 4, 5, 8, 16, 23)
-    // Rule 2 & 4: Students with consecutive roll numbers sit down the column on the same side of benches.
-    // Side A (Left): Course A students in ascending roll-number order (Bench 1 Left, Bench 2 Left, ...)
-    // Side B (Right): Course B students in ascending roll-number order (Bench 1 Right, Bench 2 Right, ...)
-    // Different courses sit on opposite sides of each bench (Side A = Course A, Side B = Course B).
-    for (const target of roomPlanTargets) {
-        const { classroom: room, studentsA, studentsB } = target;
-        const map = roomSeatMaps.get(room.id)!;
-
-        // Group benches by column (column 0 = Benches 1..rows, column 1 = next column, etc.)
-        const columnBenches: { benchIdx: number; benchNumber: number; capacity: number }[][] = [];
-        for (let col = 0; col < room.columns; col++) {
-            const colList: { benchIdx: number; benchNumber: number; capacity: number }[] = [];
-            for (let r = 0; r < room.rows; r++) {
-                const benchIdx = r * room.columns + col;
-                if (benchIdx < room.benchCapacities.length && room.benchCapacities[benchIdx] > 0) {
-                    colList.push({
-                        benchIdx,
-                        benchNumber: benchIdx + 1,
-                        capacity: room.benchCapacities[benchIdx]
-                    });
-                }
-            }
-            columnBenches.push(colList);
-        }
-
-        const queueA = [...studentsA];
-        const queueB = [...studentsB];
-
-        for (let col = 0; col < room.columns; col++) {
-            const benches = columnBenches[col];
-            for (let r = 0; r < benches.length; r++) {
-                const bench = benches[r];
-                let benchFlatIdxBase = 0;
-                for (let b = 0; b < bench.benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
-
-                // Side A (Seat 0, Left): Course A in ascending order
-                if (queueA.length > 0) {
-                    const s = queueA.shift()!;
-                    const flatIdx = benchFlatIdxBase + 0;
-                    map[flatIdx] = {
-                        student: s,
-                        classroom: room,
-                        seatNumber: flatIdx + 1,
-                        benchNumber: bench.benchNumber,
-                        benchIndex: bench.benchIdx,
-                        seatPosition: 'Left'
-                    };
-                }
-
-                // Side B (Seat 1, Right): Course B in ascending order (if bench capacity >= 2)
-                if (bench.capacity >= 2 && queueB.length > 0) {
-                    const s = queueB.shift()!;
-                    const flatIdx = benchFlatIdxBase + 1;
-                    map[flatIdx] = {
-                        student: s,
-                        classroom: room,
-                        seatNumber: flatIdx + 1,
-                        benchNumber: bench.benchNumber,
-                        benchIndex: bench.benchIdx,
-                        seatPosition: 'Right'
-                    };
-                }
-            }
-        }
-    }
 
     // 7. Assemble Final Assignments & Retain Allocation Records (Rule 23)
     availableClassrooms.forEach(room => {

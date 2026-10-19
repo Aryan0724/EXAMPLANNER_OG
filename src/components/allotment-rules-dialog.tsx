@@ -67,6 +67,12 @@ export const EXAM_ALLOTMENT_RULES = [
     category: 'Bench & Seating Arrangement',
   },
   {
+    num: 9,
+    title: 'Smart Anti-Splintering & Gap Optimization',
+    desc: 'When filling remaining seats in a room, exact-fit batches are prioritized to achieve zero seat waste. To prevent student isolation and administrative overhead, the engine will never splinter a large 3rd course into a room for just 1-2 leftover seats when subsequent classrooms exist.',
+    category: 'Classroom & Course Allocation',
+  },
+  {
     num: 10,
     title: 'No duplicate allotment',
     desc: 'A student must not be assigned more than one seat for the same examination session.',
