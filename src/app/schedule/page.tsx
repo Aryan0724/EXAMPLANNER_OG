@@ -29,8 +29,9 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
     parseExamScheduleFile,
     parsePastedExamSchedule,
@@ -63,7 +64,7 @@ export default function SchedulePage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [isClearScheduleAlertOpen, setIsClearScheduleAlertOpen] = useState(false);
-    const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [pasteText, setPasteText] = useState('');
 
     const [selectedExam, setSelectedExam] = useState<ExamSlot | null>(null);
@@ -218,6 +219,7 @@ export default function SchedulePage() {
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setIsImportModalOpen(false);
         await processUploadedFile(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -282,7 +284,7 @@ export default function SchedulePage() {
             }
 
             setExamSchedule(parsedExams);
-            setIsPasteDialogOpen(false);
+            setIsImportModalOpen(false);
             setPasteText('');
 
             toast({
@@ -390,46 +392,141 @@ export default function SchedulePage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Paste Schedule Dialog */}
-            <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
+            {/* Unified Import Exam Schedule Dialog */}
+            <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <ClipboardPaste className="h-5 w-5 text-primary" />
-                            Paste Exam Schedule
+                        <DialogTitle className="flex items-center gap-2 text-lg">
+                            <UploadCloud className="h-5 w-5 text-primary" />
+                            Import Exam Schedule
                         </DialogTitle>
                         <DialogDescription>
-                            Copy and paste rows directly from Excel, Google Sheets, or CSV text.
-                            Columns expected: Date, Time/Shift, Subject Code, Subject Name, Course, Department (optional), Semester (optional).
+                            Load your university date sheet to automatically generate room seating plans and faculty invigilation duties.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 py-2">
-                        <Textarea
-                            placeholder={"2026-05-14\t09:30\tTMA201\tEngineering Mathematics-II\tB.Tech CSE\tComputer Science and Engineering\tIII\n2026-05-14\t09:30\tBBA201\tOrganisational Behavior\tBBA\tSchool of Management\tIII"}
-                            rows={8}
-                            value={pasteText}
-                            onChange={(e) => setPasteText(e.target.value)}
-                            className="font-mono text-xs"
-                        />
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Tab, comma, or pipe separated rows supported</span>
+
+                    <Tabs defaultValue="upload" className="w-full mt-2">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="upload" className="gap-2">
+                                <FileSpreadsheet className="h-4 w-4" />
+                                <span>Upload Excel / CSV</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="paste" className="gap-2">
+                                <ClipboardPaste className="h-4 w-4" />
+                                <span>Paste From Clipboard</span>
+                            </TabsTrigger>
+                        </TabsList>
+
+                        {/* Tab 1: Upload Spreadsheet File */}
+                        <TabsContent value="upload" className="space-y-4 pt-3">
+                            <div
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={async (e) => {
+                                    await handleDrop(e);
+                                    setIsImportModalOpen(false);
+                                }}
+                                onClick={() => fileInputRef.current?.click()}
+                                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                                    isDragging
+                                        ? 'border-primary bg-primary/5'
+                                        : 'border-muted-foreground/25 hover:border-primary/60 hover:bg-accent/40 bg-card'
+                                }`}
+                            >
+                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3">
+                                    {isImporting ? <Loader2 className="h-6 w-6 animate-spin" /> : <UploadCloud className="h-6 w-6" />}
+                                </div>
+                                <p className="text-sm font-semibold mb-1">Click to browse or drag & drop file here</p>
+                                <p className="text-xs text-muted-foreground mb-4">Supports Microsoft Excel (.xlsx, .xls) and CSV (.csv)</p>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        fileInputRef.current?.click();
+                                    }}
+                                >
+                                    <FileSpreadsheet className="mr-1.5 h-4 w-4 text-emerald-600" />
+                                    Choose Spreadsheet File
+                                </Button>
+                            </div>
+
+                            <div className="p-3 rounded-lg bg-muted/40 border text-xs text-muted-foreground space-y-1">
+                                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                    Expected Column Headers
+                                </div>
+                                <p className="font-mono text-[11px]">
+                                    Date | Time or Shift | Subject Code | Subject Name | Course | Department | Semester
+                                </p>
+                            </div>
+                        </TabsContent>
+
+                        {/* Tab 2: Paste Rows Text */}
+                        <TabsContent value="paste" className="space-y-3 pt-3">
+                            <p className="text-xs text-muted-foreground">
+                                Copy rows from Excel, Google Sheets, or a text file and paste them directly below:
+                            </p>
+                            <Textarea
+                                placeholder={"Date\tTime\tSubject Code\tSubject Name\tCourse\tDepartment\tSemester\n2026-05-14\t09:30\tTMA201\tEngineering Mathematics-II\tB.Tech CSE\tComputer Science\tIII\n2026-05-14\t09:30\tBBA201\tOrganisational Behavior\tBBA\tManagement\tIII"}
+                                rows={7}
+                                value={pasteText}
+                                onChange={(e) => setPasteText(e.target.value)}
+                                className="font-mono text-xs"
+                            />
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>Tab-separated (TSV) or comma-separated (CSV) supported</span>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={handlePasteSubmit}
+                                    disabled={!pasteText.trim() || isImporting}
+                                    className="bg-primary text-white"
+                                >
+                                    {isImporting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ClipboardPaste className="mr-1.5 h-4 w-4" />}
+                                    Import Pasted Rows
+                                </Button>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
+
+                    {/* Dialog Footer with Auto-Allot toggle & Template download */}
+                    <div className="pt-4 border-t space-y-3">
+                        <div className="flex items-center gap-2 text-xs">
+                            <input
+                                type="checkbox"
+                                id="modalAutoAllotToggle"
+                                checked={autoAllotOnImport}
+                                onChange={(e) => setAutoAllotOnImport(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                            />
+                            <label htmlFor="modalAutoAllotToggle" className="cursor-pointer font-medium select-none text-muted-foreground hover:text-foreground">
+                                ⚡ Automatically generate seat plan & duty allotment immediately upon import
+                            </label>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs pt-1">
                             <Button
+                                type="button"
                                 variant="link"
                                 size="sm"
-                                className="h-auto p-0 text-xs"
+                                className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
                                 onClick={() => downloadSampleExamScheduleExcel()}
                             >
-                                <Download className="h-3 w-3 mr-1" />
-                                Download sample format
+                                <Download className="h-3.5 w-3.5 mr-1" />
+                                Download Sample Schedule Template (.xlsx)
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsImportModalOpen(false)}
+                            >
+                                Close
                             </Button>
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsPasteDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handlePasteSubmit} className="bg-primary">
-                            Import Schedule
-                        </Button>
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
@@ -571,80 +668,84 @@ export default function SchedulePage() {
                                                 </CardDescription>
                                             </div>
 
-                                            {/* Action Buttons Toolbar */}
-                                            <div className="flex flex-wrap items-center gap-2.5">
-                                                {/* Upload Excel/CSV Button */}
+                                            {/* Streamlined Action Buttons Toolbar */}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {/* Unified Import Schedule Button */}
                                                 <Button
                                                     variant="outline"
-                                                    onClick={() => fileInputRef.current?.click()}
+                                                    onClick={() => setIsImportModalOpen(true)}
                                                     disabled={isImporting || isGenerating}
-                                                    className="border-primary/30 hover:bg-primary/5"
+                                                    className="border-primary/30 hover:bg-primary/5 text-xs font-semibold h-10 gap-1.5"
                                                 >
                                                     {isImporting ? (
-                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
+                                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
                                                     ) : (
-                                                        <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                                                        <UploadCloud className="h-4 w-4 text-primary" />
                                                     )}
-                                                    {examSchedule.length === 0 ? 'Upload Excel / CSV' : 'Replace Schedule'}
-                                                </Button>
-
-                                                {/* Paste Schedule Button */}
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => setIsPasteDialogOpen(true)}
-                                                    disabled={isImporting || isGenerating}
-                                                >
-                                                    <ClipboardPaste className="mr-2 h-4 w-4 text-primary" />
-                                                    Paste Schedule
-                                                </Button>
-
-                                                {/* Faculty Ratio Rules */}
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => setShowFacultyDialog(true)}
-                                                    className="border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                                                >
-                                                    <UserCheck className="mr-2 h-4 w-4" />
-                                                    Ratio Rules
+                                                    <span>Import Schedule</span>
                                                 </Button>
 
                                                 {/* Add New Exam Manually */}
                                                 <Button
                                                     variant="outline"
                                                     onClick={() => handleOpenDialog()}
+                                                    className="text-xs font-semibold h-10 gap-1.5"
                                                 >
-                                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                                    Add Exam
+                                                    <PlusCircle className="h-4 w-4" />
+                                                    <span>Add Exam</span>
                                                 </Button>
 
-                                                {/* Clear Schedule Button (Visible when schedule is loaded) */}
-                                                {examSchedule.length > 0 && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => setIsClearScheduleAlertOpen(true)}
-                                                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                                        title="Clear Schedule"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                )}
+                                                {/* Settings / Overflow Dropdown */}
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-10 w-10 text-muted-foreground hover:text-foreground"
+                                                            title="More Schedule Options"
+                                                        >
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-56">
+                                                        <DropdownMenuItem onClick={() => setShowFacultyDialog(true)}>
+                                                            <UserCheck className="mr-2 h-4 w-4 text-blue-600" />
+                                                            <span>Faculty Ratio Rules</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => downloadSampleExamScheduleExcel()}>
+                                                            <Download className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                            <span>Download Sample Template</span>
+                                                        </DropdownMenuItem>
+                                                        {examSchedule.length > 0 && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    onClick={() => setIsClearScheduleAlertOpen(true)}
+                                                                    className="text-destructive focus:text-destructive"
+                                                                >
+                                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                                    <span>Clear Exam Schedule</span>
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
 
-                                                {/* 1-Click Allotment Generation Button */}
+                                                {/* Primary 1-Click Allotment Generation Button */}
                                                 <Button
                                                     onClick={() => executeGenerateAll()}
                                                     disabled={isGenerating || examSchedule.length === 0}
-                                                    className="bg-gradient-to-r from-primary via-indigo-600 to-purple-600 hover:from-primary/90 hover:to-purple-700 text-white font-semibold shadow-md"
+                                                    className="h-10 bg-gradient-to-r from-primary via-indigo-600 to-purple-600 hover:from-primary/90 hover:to-purple-700 text-white font-semibold shadow-xs"
                                                 >
                                                     {isGenerating ? (
                                                         <>
-                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                            Generating Allotment...
+                                                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                                            <span>Generating Allotment...</span>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Sparkles className="mr-2 h-4 w-4" />
-                                                            ⚡ Generate Full Allotment (1-Click)
+                                                            <Sparkles className="mr-1.5 h-4 w-4" />
+                                                            <span>⚡ Generate Allotment</span>
                                                         </>
                                                     )}
                                                 </Button>
@@ -660,57 +761,36 @@ export default function SchedulePage() {
                                                     onDragOver={handleDragOver}
                                                     onDragLeave={handleDragLeave}
                                                     onDrop={handleDrop}
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                    className={`border-2 border-dashed rounded-2xl p-10 md:p-14 text-center cursor-pointer transition-all duration-200 ${
-                                                        isDragging
-                                                            ? 'border-primary bg-primary/5 scale-[0.99]'
-                                                            : 'border-muted-foreground/25 hover:border-primary/60 hover:bg-accent/40 bg-card'
-                                                    }`}
+                                                    onClick={() => setIsImportModalOpen(true)}
+                                                    className="border-2 border-dashed rounded-2xl p-10 md:p-14 text-center cursor-pointer hover:border-primary/60 hover:bg-accent/40 bg-card transition-all duration-200"
                                                 >
-                                                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-4 shadow-sm">
-                                                        {isImporting ? (
-                                                            <Loader2 className="h-8 w-8 animate-spin" />
-                                                        ) : (
-                                                            <UploadCloud className="h-8 w-8" />
-                                                        )}
+                                                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-4 shadow-xs">
+                                                        <UploadCloud className="h-8 w-8" />
                                                     </div>
 
                                                     <h3 className="text-xl font-bold tracking-tight mb-2">
-                                                        Upload Exam Schedule (.xlsx, .xls, or .csv)
+                                                        No Exam Schedule Loaded
                                                     </h3>
                                                     <p className="text-sm text-muted-foreground max-w-lg mx-auto mb-6">
-                                                        Drag and drop your exam timetable spreadsheet here, or click to browse files.
-                                                        All 18 classrooms, 1,147 students, and faculty invigilators are already loaded and ready.
+                                                        Import your university date sheet (.xlsx, .xls, .csv, or paste text) to generate 100% conflict-free seating plans and faculty invigilation duties across all 18 official classrooms.
                                                     </p>
 
                                                     <div className="flex flex-wrap items-center justify-center gap-3">
                                                         <Button
                                                             size="lg"
-                                                            className="bg-primary hover:bg-primary/90 font-semibold shadow"
+                                                            className="bg-primary hover:bg-primary/90 font-semibold shadow-xs"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                fileInputRef.current?.click();
+                                                                setIsImportModalOpen(true);
                                                             }}
                                                         >
-                                                            <FileSpreadsheet className="mr-2 h-5 w-5" />
-                                                            Browse Excel / CSV File
+                                                            <UploadCloud className="mr-2 h-5 w-5" />
+                                                            Import Exam Schedule
                                                         </Button>
 
                                                         <Button
                                                             size="lg"
                                                             variant="outline"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setIsPasteDialogOpen(true);
-                                                            }}
-                                                        >
-                                                            <ClipboardPaste className="mr-2 h-5 w-5" />
-                                                            Paste Schedule Text
-                                                        </Button>
-
-                                                        <Button
-                                                            size="lg"
-                                                            variant="secondary"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 downloadSampleExamScheduleExcel();
@@ -720,23 +800,6 @@ export default function SchedulePage() {
                                                             Download Template (.xlsx)
                                                         </Button>
                                                     </div>
-
-                                                    {/* Auto-Allot Option */}
-                                                    <div
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="mt-8 pt-6 border-t max-w-md mx-auto flex items-center justify-center gap-2 text-sm text-muted-foreground"
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            id="autoAllotToggle"
-                                                            checked={autoAllotOnImport}
-                                                            onChange={(e) => setAutoAllotOnImport(e.target.checked)}
-                                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                                                        />
-                                                        <label htmlFor="autoAllotToggle" className="cursor-pointer font-medium select-none">
-                                                            ⚡ Automatically run 1-Click Allotment immediately upon file upload
-                                                        </label>
-                                                    </div>
                                                 </div>
 
                                                 {/* Demo / Sample Helper */}
@@ -744,7 +807,7 @@ export default function SchedulePage() {
                                                     <div className="flex items-center gap-2">
                                                         <AlertCircle className="h-4 w-4 text-blue-500 shrink-0" />
                                                         <span>
-                                                            Supported columns in your Excel: <strong>Date</strong>, <strong>Time / Shift</strong>, <strong>Subject Code</strong>, <strong>Subject Name</strong>, <strong>Course</strong> (e.g. B.Tech CSE, BBA, B.Sc Nursing), <strong>Semester</strong>.
+                                                            Supported columns in your Excel: <strong>Date</strong>, <strong>Time / Shift</strong>, <strong>Subject Code</strong>, <strong>Subject Name</strong>, <strong>Course</strong>, <strong>Semester</strong>.
                                                         </span>
                                                     </div>
                                                     <Button

@@ -5,8 +5,9 @@ import { useContext, useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, FileDown, UploadCloud, Database, Trash2, Sparkles, Users, Building, CalendarDays, UserCheck } from 'lucide-react';
+import { FileText, FileDown, UploadCloud, Database, Trash2, Sparkles, Users, Building, CalendarDays, UserCheck, Info, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -515,7 +516,22 @@ export default function ImportExportPage() {
                     </div>
                     <CardDescription>Upload your master data files in CSV format. The system will process the files to update the database. Click on an item to see the required format and upload.</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/70 dark:border-blue-900/40 text-xs text-blue-950 dark:text-blue-200 flex items-start gap-3 shadow-xs">
+                      <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-bold text-sm">Official GEHU Bhimtal Campus Data Is Pre-Loaded</p>
+                        <p className="leading-relaxed">
+                          All 1,147 students (across 46 degree cohorts), 18 official examination classrooms, and 71 faculty members are already loaded and active.
+                          To plan your exams, you only need to import your university date sheet on the{' '}
+                          <Link href="/schedule" className="inline-flex items-center gap-1 font-bold text-primary underline hover:text-primary/80">
+                            Exam Schedule Page <ArrowRight className="h-3 w-3 inline" />
+                          </Link>
+                          . Use the accordion below only if you want to override the database with custom raw CSV files.
+                        </p>
+                      </div>
+                    </div>
+
                     <Accordion type="single" collapsible className="w-full">
                       <ImportItem
                         title="Department & Course Data"

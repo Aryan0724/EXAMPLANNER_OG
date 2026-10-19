@@ -9,7 +9,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck, ChevronDown, FileText } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import type { SeatPlan, InvigilatorAssignment, ExamSlot, Classroom, Student, Invigilator, FacultyStudentRule } from '@/lib/types';
 import { generateSeatPlan, assignInvigilators, countSeatPlanViolations, isSeatPlanCompliantWithSittingRules } from '@/lib/planning';
@@ -691,80 +699,181 @@ export default function AllotmentPage() {
               <MainHeader />
               <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
                 <div className="space-y-8">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Seat Plan Generation & Allotment</CardTitle>
-                      <CardDescription>{fullAllotment ? 'A full allotment has been generated. Select a session to view.' : 'Select an exam session and generate the seat allotment and invigilator duties.'}</CardDescription>
+                  <Card className="shadow-xs">
+                    <CardHeader className="pb-3">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-xl">Seat Plan Generation & Allotment</CardTitle>
+                          <CardDescription>
+                            {fullAllotment
+                              ? `Allotment active across ${Object.keys(fullAllotment).length} sessions. Select a session below to inspect room grids.`
+                              : 'Select an exam session to generate conflict-free seating and invigilator duties.'}
+                          </CardDescription>
+                        </div>
+                        {slotOptions.length > 0 && (
+                          <Badge variant="outline" className="w-fit font-mono text-xs">
+                            {slotOptions.length} Sessions Available
+                          </Badge>
+                        )}
+                      </div>
                     </CardHeader>
-                    <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                      <div className="w-full sm:w-auto flex-grow">
-                        <Select onValueChange={handleSlotChange} value={selectedSlotKey}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select an exam session..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {slotOptions.map(slot => (
-                              <SelectItem key={slot.id} value={slot.id}>{slot.label}</SelectItem>
-                            ))}
-                            {slotOptions.length === 0 && <div className="p-4 text-center text-sm text-muted-foreground">No sessions available.</div>}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setShowExclusionReport(!showExclusionReport)}>
-                          {showExclusionReport ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                          {showExclusionReport ? 'Hide Exclusions' : 'View Exclusions'}
-                        </Button>
-                        <Button variant="secondary" size="sm" onClick={handleExportSessionRoster} disabled={!fullAllotment}>
-                          <FileDown className="mr-2 h-4 w-4" />
-                          Session Roster
-                        </Button>
-                        <Button variant="secondary" size="sm" onClick={handleExportDutyChart} disabled={!fullAllotment}>
-                          <FileSpreadsheet className="mr-2 h-4 w-4" />
-                          Faculty Duty Chart
-                        </Button>
-                        <Button variant="secondary" size="sm" onClick={handleExportMasterReport} disabled={!fullAllotment}>
-                          <FileSpreadsheet className="mr-2 h-4 w-4" />
-                          Master Report
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowRulesDialog(true)}
-                          className="h-9 text-xs font-semibold gap-1.5 border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                        >
-                          <ShieldCheck className="mr-1.5 h-4 w-4" />
-                          Seating Rules (24 Rules)
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowFacultyDialog(true)}
-                          className="h-9 text-xs font-semibold gap-1.5 border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                        >
-                          <UserCheck className="mr-1.5 h-4 w-4" />
-                          Faculty Ratio Rules
-                        </Button>
-                        <Button
-                          onClick={handleRegenerateAllSessions}
-                          disabled={isGenerating || Object.keys(examSlotsByTime).length === 0}
-                          variant="default"
-                          className="h-9 font-semibold gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
-                        >
-                          {isGenerating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1.5 h-4 w-4" />}
-                          Regenerate All (Strict Rules)
-                        </Button>
-                        <Button
-                          onClick={handleOpenGenerationDialog}
-                          disabled={isGenerating || !selectedSlotKey}
-                          className="h-9 font-semibold gap-1.5"
-                          variant="outline"
-                        >
-                          <Sparkles className="mr-1.5 h-4 w-4" />
-                          Custom Generate
-                        </Button>
+                    <CardContent className="pt-1">
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                        {/* Session Selector */}
+                        <div className="w-full lg:max-w-md flex-1">
+                          <Select onValueChange={handleSlotChange} value={selectedSlotKey}>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select an exam session..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {slotOptions.map(slot => (
+                                <SelectItem key={slot.id} value={slot.id}>{slot.label}</SelectItem>
+                              ))}
+                              {slotOptions.length === 0 && <div className="p-4 text-center text-sm text-muted-foreground">No sessions available.</div>}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Streamlined Action Bar */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* 1. Rules & Configuration */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="h-10 text-xs font-semibold gap-1.5 border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                              >
+                                <ShieldCheck className="h-4 w-4 text-purple-600" />
+                                <span>Rules & Config</span>
+                                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64">
+                              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                Allotment Governance
+                              </DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => setShowRulesDialog(true)}>
+                                <ShieldCheck className="mr-2 h-4 w-4 text-purple-600" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-xs">24 Seating Rules (Active)</span>
+                                  <span className="text-[10px] text-muted-foreground">Conflict-free layout & spacing</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setShowFacultyDialog(true)}>
+                                <UserCheck className="mr-2 h-4 w-4 text-blue-600" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-xs">Faculty Ratio Rules</span>
+                                  <span className="text-[10px] text-muted-foreground">Ratios, thresholds & reserves</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setShowExclusionReport(!showExclusionReport)}>
+                                {showExclusionReport ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                                <span>{showExclusionReport ? 'Hide Exclusions Panel' : 'View Exclusions Panel'}</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+
+                          {/* 2. Unified Export Reports */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="h-10 font-medium text-xs gap-1.5"
+                                disabled={!fullAllotment}
+                              >
+                                <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                                <span>Export Reports</span>
+                                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64">
+                              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                University Reports
+                              </DropdownMenuLabel>
+                              <DropdownMenuItem onClick={handleExportDutyChart}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-xs">Faculty Duty Chart</span>
+                                  <span className="text-[10px] text-muted-foreground">Official invigilation table (.xlsx)</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleExportMasterReport}>
+                                <FileText className="mr-2 h-4 w-4 text-blue-600" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-xs">Master Report</span>
+                                  <span className="text-[10px] text-muted-foreground">Consolidated university overview (.xlsx)</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleExportSessionRoster}>
+                                <FileDown className="mr-2 h-4 w-4 text-purple-600" />
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-xs">Session Roster</span>
+                                  <span className="text-[10px] text-muted-foreground">Shift-wise invigilation roster (.csv)</span>
+                                </div>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                Room Seating
+                              </DropdownMenuLabel>
+                              <DropdownMenuItem onClick={handleDownloadExcel} disabled={!selectedClassroom}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
+                                <span>Room Seating Grid (.xlsx)</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handlePrint} disabled={!selectedClassroom}>
+                                <Printer className="mr-2 h-4 w-4 text-slate-600" />
+                                <span>Print Room Seating (PDF)</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+
+                          {/* 3. Primary Generation Call-To-Action with Split Options */}
+                          <div className="inline-flex rounded-md shadow-xs">
+                            <Button
+                              onClick={handleRegenerateAllSessions}
+                              disabled={isGenerating || Object.keys(examSlotsByTime).length === 0}
+                              className="h-10 font-semibold gap-1.5 rounded-r-none bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+                            >
+                              {isGenerating ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
+                              <span>⚡ Generate Allotment</span>
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  disabled={isGenerating || Object.keys(examSlotsByTime).length === 0}
+                                  className="h-10 px-2 rounded-l-none border-l border-white/20 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                  title="Allotment Options"
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-64">
+                                <DropdownMenuItem onClick={handleRegenerateAllSessions}>
+                                  <Sparkles className="mr-2 h-4 w-4 text-purple-600" />
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-xs">Generate All Sessions (Strict)</span>
+                                    <span className="text-[10px] text-muted-foreground">Applies 24 rules across all dates</span>
+                                  </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleRegenerateCurrentSession} disabled={!selectedSlotKey}>
+                                  <RotateCcw className="mr-2 h-4 w-4 text-indigo-600" />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-xs">Generate Current Session Only</span>
+                                    <span className="text-[10px] text-muted-foreground">Re-run algorithm for active slot</span>
+                                  </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setShowFacultyDialog(true)}>
+                                  <UserCheck className="mr-2 h-4 w-4 text-blue-600" />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-xs">Configure Ratio Rules...</span>
+                                    <span className="text-[10px] text-muted-foreground">Set custom faculty-to-student ratios</span>
+                                  </div>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -802,9 +911,9 @@ export default function AllotmentPage() {
                               Viewing plan for session: {representativeExam?.date} @ {representativeExam?.time}
                             </CardDescription>
                           </div>
-                          <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                          <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0">
                             <Select onValueChange={setSelectedClassroomId} value={selectedClassroomId || ''}>
-                              <SelectTrigger className="w-full sm:w-[280px]">
+                              <SelectTrigger className="w-full sm:w-[260px] h-9">
                                 <SelectValue placeholder="Select a classroom to view" />
                               </SelectTrigger>
                               <SelectContent>
@@ -813,21 +922,35 @@ export default function AllotmentPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Button onClick={handleRegenerateCurrentSession} variant="outline" disabled={isGenerating || !selectedSlotKey} className="hidden sm:flex border-purple-300 text-purple-700 hover:bg-purple-50">
-                              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                              Regenerate Slot
+                            <Button
+                              onClick={handlePrint}
+                              variant="outline"
+                              size="sm"
+                              disabled={!selectedClassroom}
+                              className="h-9 gap-1.5"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              <span>Print Plan</span>
                             </Button>
-                            <Button onClick={handleDownloadPDF} variant="outline" disabled={!selectedClassroom} className="hidden sm:flex">
-                              <FileDown className="mr-2 h-4 w-4" />
-                              PDF
+                            <Button
+                              onClick={handleDownloadExcel}
+                              variant="outline"
+                              size="sm"
+                              disabled={!selectedClassroom}
+                              className="h-9 gap-1.5"
+                            >
+                              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>Excel Grid</span>
                             </Button>
-                            <Button onClick={handleDownloadExcel} variant="outline" disabled={!selectedClassroom} className="hidden sm:flex">
-                              <FileDown className="mr-2 h-4 w-4" />
-                              Excel
-                            </Button>
-                            <Button onClick={handlePrint} variant="outline" disabled={!selectedClassroom}>
-                              <Printer className="mr-2 h-4 w-4" />
-                              Print
+                            <Button
+                              onClick={handleRegenerateCurrentSession}
+                              variant="ghost"
+                              size="icon"
+                              disabled={isGenerating || !selectedSlotKey}
+                              title="Regenerate this session"
+                              className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                            >
+                              <RotateCcw className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
