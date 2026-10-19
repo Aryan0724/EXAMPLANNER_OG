@@ -7,9 +7,10 @@ import { MainSidebar } from '@/components/main-sidebar';
 import { MainHeader } from '@/components/main-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck, ChevronDown, FileText } from 'lucide-react';
+import { Sparkles, Loader2, Printer, Building, UserCheck, Eye, EyeOff, Info, UserMinus, RotateCcw, FileDown, FileSpreadsheet, CheckCircle, AlertTriangle, ShieldCheck, ChevronDown, FileText, CalendarCheck2, Armchair, CalendarDays, SlidersHorizontal, ArrowRight } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,9 @@ import { AllotmentContext } from '@/context/AllotmentContext';
 import { DataContext } from '@/context/DataContext';
 import { FacultyAllocationDialog } from '@/components/faculty-allocation-dialog';
 import { AllotmentRulesDialog } from '@/components/allotment-rules-dialog';
+import { AllotmentChoiceDialog } from '@/components/allotment-choice-dialog';
+import { FacultyShiftAllotmentView } from '@/components/faculty-shift-allotment-view';
+import { BlockPriorityDialog } from '@/components/block-priority-dialog';
 type FullAllotment = Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }>;
 import { ExclusionReport } from '@/components/exclusion-report';
 
@@ -77,9 +81,54 @@ const getSlotOptions = (allotment: Record<string, any> | null, examSchedule: Exa
 export default function AllotmentPage() {
   const { toast } = useToast();
   const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
-  const { students, classrooms, invigilators, setInvigilators, examSchedule, isHydrated, reservedCount, setReservedCount, facultyStudentRules, setFacultyStudentRules, blockPriority } = useContext(DataContext);
+  const {
+    students,
+    classrooms,
+    setClassrooms,
+    invigilators,
+    setInvigilators,
+    examSchedule,
+    isHydrated,
+    reservedCount,
+    setReservedCount,
+    facultyStudentRules,
+    setFacultyStudentRules,
+    blockPriority,
+    setBlockPriority,
+    excludedBlocks,
+    setExcludedBlocks,
+    excludedRooms,
+    setExcludedRooms,
+  } = useContext(DataContext);
 
   const examSlotsByTime = useMemo(() => getExamSlotsByTime(examSchedule), [examSchedule]);
+
+  const [allotmentMode, setAllotmentMode] = useState<'full' | 'shift-duty'>('full');
+  const [isChoiceModalOpen, setIsChoiceModalOpen] = useState(false);
+  const [isPriorityDialogOpen, setIsPriorityDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get('mode');
+      if (m === 'shift-duty' || m === 'full') {
+        setAllotmentMode(m);
+      }
+    }
+  }, []);
+
+  const availableBlocks = useMemo(
+    () => Array.from(new Set(classrooms.map(c => c.building))).sort(),
+    [classrooms]
+  );
+
+  const handleSavePriority = (newPriority: string[], newExcludedBlocks: string[], newExcludedRooms: string[]) => {
+    setBlockPriority(newPriority);
+    setExcludedBlocks(newExcludedBlocks);
+    setExcludedRooms(newExcludedRooms);
+    setIsPriorityDialogOpen(false);
+    toast({ title: 'Room Priorities Saved', description: 'Classroom selection priority updated for seating allotment.' });
+  };
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [showFacultyDialog, setShowFacultyDialog] = useState(false);
@@ -697,8 +746,152 @@ export default function AllotmentPage() {
           <SidebarInset>
             <div className="flex flex-col h-full no-print">
               <MainHeader />
-              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-                <div className="space-y-8">
+              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
+                {/* Allotment Mode Selector Header */}
+                <div className="bg-card border rounded-2xl p-4 md:p-5 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
+                          Examination Allotment Hub
+                        </h1>
+                        <Badge variant="outline" className="text-xs font-semibold uppercase tracking-wider text-primary border-primary/30">
+                          {allotmentMode === 'shift-duty' ? 'Kind 1 Active' : 'Kind 2 Active'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Choose between Faculty Shift Duty Allotment (Kind 1) and Full Examination & Seating Allotment (Kind 2).
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsChoiceModalOpen(true)}
+                        className="h-9 text-xs font-semibold gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                      >
+                        <Sparkles className="size-3.5" />
+                        <span>Choose Allotment Type</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Segmented Mode Switcher */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-1.5 rounded-xl bg-muted/50 border">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAllotmentMode('shift-duty');
+                        if (typeof window !== 'undefined') {
+                          window.history.replaceState(null, '', '/allotment?mode=shift-duty');
+                        }
+                      }}
+                      className={`flex items-center justify-center sm:justify-start gap-2.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all ${
+                        allotmentMode === 'shift-duty'
+                          ? 'bg-background text-emerald-700 dark:text-emerald-300 shadow-xs border border-emerald-500/30'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-md ${allotmentMode === 'shift-duty' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
+                        <CalendarCheck2 className="size-4" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-bold flex items-center gap-1.5">
+                          <span>Kind 1: Faculty Shift Duty Allotment</span>
+                          {allotmentMode === 'shift-duty' && <Badge className="h-4 px-1 text-[9px] bg-emerald-600">Active</Badge>}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground font-normal">Rooms & teachers per shift → Official Duty Chart (.xlsx)</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAllotmentMode('full');
+                        if (typeof window !== 'undefined') {
+                          window.history.replaceState(null, '', '/allotment?mode=full');
+                        }
+                      }}
+                      className={`flex items-center justify-center sm:justify-start gap-2.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all ${
+                        allotmentMode === 'full'
+                          ? 'bg-background text-indigo-700 dark:text-indigo-300 shadow-xs border border-indigo-500/30'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-md ${allotmentMode === 'full' ? 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700' : 'bg-muted text-muted-foreground'}`}>
+                        <Armchair className="size-4" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-bold flex items-center gap-1.5">
+                          <span>Kind 2: Full Seating & Room Allotment</span>
+                          {allotmentMode === 'full' && <Badge className="h-4 px-1 text-[9px] bg-indigo-600">Active</Badge>}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground font-normal">Exam Schedule + 24 Rules → Desk Grids & Invigilation</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {allotmentMode === 'shift-duty' ? (
+                  <FacultyShiftAllotmentView embedded={true} />
+                ) : (
+                  <div className="space-y-6">
+                    {/* Pre-Allotment Settings Bar for Kind 2 */}
+                    <div className="p-3.5 rounded-xl border bg-card/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-muted-foreground font-medium">Pre-Allotment Configuration:</span>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsPriorityDialogOpen(true)}
+                          className="h-7 text-[11px] gap-1 px-2 font-mono"
+                        >
+                          <Building className="size-3 text-primary" />
+                          <span>Priority: {blockPriority[0] || 'Capacity-First'}</span>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowFacultyDialog(true)}
+                          className="h-7 text-[11px] gap-1 px-2 font-mono"
+                        >
+                          <UserCheck className="size-3 text-blue-600" />
+                          <span>1:{facultyStudentRules[0]?.maxStudents || 24} Staff Ratio</span>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowFacultyDialog(true)}
+                          className="h-7 text-[11px] gap-1 px-2 font-mono"
+                        >
+                          <ShieldCheck className="size-3 text-amber-600" />
+                          <span>{reservedCount} Standby Reserves</span>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowRulesDialog(true)}
+                          className="h-7 text-[11px] gap-1 px-2 font-mono text-purple-700 dark:text-purple-300"
+                        >
+                          <ShieldCheck className="size-3 text-purple-600" />
+                          <span>24 Seating Rules</span>
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Link href="/schedule">
+                          <Button variant="ghost" size="sm" className="h-7 text-[11px] text-muted-foreground hover:text-foreground gap-1">
+                            <CalendarDays className="size-3" />
+                            <span>{examSchedule.length} Exams in Schedule</span>
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
                   <Card className="shadow-xs">
                     <CardHeader className="pb-3">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
@@ -1126,8 +1319,9 @@ export default function AllotmentPage() {
                         </div>
                       </CardContent>
                     </Card>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </main>
             </div>
           </SidebarInset>
@@ -1191,6 +1385,27 @@ export default function AllotmentPage() {
       <AllotmentRulesDialog
         open={showRulesDialog}
         onOpenChange={setShowRulesDialog}
+      />
+      <AllotmentChoiceDialog
+        open={isChoiceModalOpen}
+        onOpenChange={setIsChoiceModalOpen}
+        currentMode={allotmentMode}
+        onSelectMode={(mode) => {
+          setAllotmentMode(mode);
+          if (typeof window !== 'undefined') {
+            window.history.replaceState(null, '', `/allotment?mode=${mode}`);
+          }
+        }}
+      />
+      <BlockPriorityDialog
+        isOpen={isPriorityDialogOpen}
+        onClose={() => setIsPriorityDialogOpen(false)}
+        availableBlocks={availableBlocks}
+        currentPriority={blockPriority}
+        excludedBlocks={excludedBlocks}
+        excludedRooms={excludedRooms}
+        classrooms={classrooms}
+        onSave={handleSavePriority}
       />
     </>
   );

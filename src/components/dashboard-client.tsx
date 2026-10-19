@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useState } from 'react';
+import { useContext, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -12,18 +12,21 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, Building, UserCheck, CalendarDays, Sparkles, Loader2, Database, Trash2, FileDown, ArrowRight, FileUp } from 'lucide-react';
+import { Users, Building, UserCheck, CalendarDays, Sparkles, Loader2, Database, Trash2, FileDown, ArrowRight, FileUp, ShieldCheck, Clock, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { DataContext } from '@/context/DataContext';
 import { AllotmentContext } from '@/context/AllotmentContext';
 import { generateMockClassrooms, generateMockExamSchedule, generateMockInvigilators, generateMockStudents } from '@/lib/data';
-import { createClassroom, type ExamSlot, type Student, type Invigilator, type SeatPlan, type InvigilatorAssignment } from '@/lib/types';
+import { createClassroom, type ExamSlot, type Student, type Invigilator, type SeatPlan, type InvigilatorAssignment, type FacultyStudentRule } from '@/lib/types';
 import { generateMasterReport, generateInvigilatorDutyRoster, generateSessionWiseInvigilationRoster } from '@/lib/report-generator';
 import { generateSeatPlan, assignInvigilators } from '@/lib/planning';
 
-import { BlockPriorityDialog } from '@/components/block-priority-dialog'; // Assuming this component exists and is exported
+import { BlockPriorityDialog } from '@/components/block-priority-dialog';
 import { DataImportDialog } from '@/components/data-import-dialog';
 import { CustomMockDataDialog } from '@/components/custom-mock-data-dialog';
+import { AllotmentRulesDialog } from '@/components/allotment-rules-dialog';
+import { FacultyAllocationDialog } from '@/components/faculty-allocation-dialog';
+import { FacultyTimeRequestsDialog } from '@/components/faculty-time-requests-dialog';
 
 export function DashboardClient() {
     const { toast } = useToast();
@@ -38,7 +41,7 @@ export function DashboardClient() {
         excludedBlocks, setExcludedBlocks,
         excludedRooms, setExcludedRooms,
         reservedCount, setReservedCount,
-        facultyStudentRules
+        facultyStudentRules, setFacultyStudentRules
     } = useContext(DataContext);
 
     const { fullAllotment, setFullAllotment } = useContext(AllotmentContext);
@@ -47,6 +50,13 @@ export function DashboardClient() {
     const [isPriorityDialogOpen, setIsPriorityDialogOpen] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isCustomMockDialogOpen, setIsCustomMockDialogOpen] = useState(false);
+    const [showRulesDialog, setShowRulesDialog] = useState(false);
+    const [showFacultyDialog, setShowFacultyDialog] = useState(false);
+    const [showTimeRequestsDialog, setShowTimeRequestsDialog] = useState(false);
+
+    const activeFacultyTimeRequestsCount = useMemo(() => {
+        return invigilators.reduce((sum, inv) => sum + (inv.unavailableSlots?.length || 0), 0);
+    }, [invigilators]);
 
     const stats = [
         { title: 'Total Students', value: students.length, icon: Users, href: '/students' },
@@ -319,112 +329,219 @@ export function DashboardClient() {
                 ))}
             </div>
 
-            {/* Primary Operations Hub */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Pillar 1: Faculty Shift Allotment */}
-                <Card className="border-primary/25 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
-                                Day & Shift Duty Engine
-                            </div>
-                            <span className="text-xs text-muted-foreground font-mono">Official Format</span>
-                        </div>
-                        <CardTitle className="text-xl font-bold mt-2">Faculty Shift Allotment</CardTitle>
-                        <CardDescription className="text-xs leading-relaxed">
-                            Specify faculty counts needed per day and shift. The engine assigns duties fairly across the faculty pool (prioritizing junior staff and preventing consecutive shifts) and outputs the official university Duty Chart.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-2">
-                        <div className="p-3.5 rounded-xl bg-secondary/50 border text-xs space-y-2">
-                            <div className="flex justify-between items-center text-muted-foreground">
-                                <span>Active Invigilator Pool:</span>
-                                <span className="font-bold text-foreground">{invigilators.length} Members</span>
-                            </div>
-                            <div className="flex justify-between items-center text-muted-foreground">
-                                <span>Official Template:</span>
-                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">GEHU Bhimtal Duty Chart (.xlsx)</span>
-                            </div>
-                        </div>
+            {/* Primary Allotment Hub: Two Distinct Modes */}
+            <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h2 className="text-xl font-bold tracking-tight text-foreground">Examination Allotment Engines</h2>
+                        <p className="text-xs text-muted-foreground">Select between the two dedicated allotment modes supported by the platform:</p>
+                    </div>
+                </div>
 
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <Button
-                                onClick={() => router.push('/manual-allotment')}
-                                className="flex-1 h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-xs gap-2"
-                            >
-                                <UserCheck className="size-4" />
-                                Open Faculty Allotment
-                            </Button>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Kind 1: Faculty Shift Duty Allotment */}
+                    <Card className="border-primary/25 shadow-xs hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                                    Kind 1: Shift Duty Allotment
+                                </div>
+                                <span className="text-xs text-muted-foreground font-mono">Faculty Roster</span>
+                            </div>
+                            <CardTitle className="text-xl font-bold mt-2">Faculty Shift Duty Allotment</CardTitle>
+                            <CardDescription className="text-xs leading-relaxed">
+                                Give classroom count and required faculty count per shift and day. The engine automatically assigns teachers fairly, prioritizing junior staff, avoiding consecutive shifts, honoring staff time requests, and outputs the official GEHU Bhimtal Duty Chart (.xlsx).
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-2">
+                            <div className="p-3.5 rounded-xl bg-secondary/50 border text-xs space-y-2">
+                                <div className="flex justify-between items-center text-muted-foreground">
+                                    <span>Input Parameters:</span>
+                                    <span className="font-semibold text-foreground">Rooms Count + Faculty Needed per Shift</span>
+                                </div>
+                                <div className="flex justify-between items-center text-muted-foreground">
+                                    <span>Active Faculty Pool:</span>
+                                    <span className="font-bold text-foreground">{invigilators.length} Members</span>
+                                </div>
+                                <div className="flex justify-between items-center text-muted-foreground">
+                                    <span>Output Format:</span>
+                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">Official GEHU Bhimtal Duty Chart (.xlsx)</span>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-2.5">
+                                <Button
+                                    onClick={() => router.push('/allotment?mode=shift-duty')}
+                                    className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs gap-2"
+                                >
+                                    <UserCheck className="size-4" />
+                                    <span>Open Faculty Shift Allotment</span>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => router.push('/manual-allotment')}
+                                    className="h-11 font-medium gap-2 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                                >
+                                    <span>Advanced Roster</span>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Kind 2: Full Examination & Student Seating Allotment */}
+                    <Card className="border-indigo-500/25 shadow-xs hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
+                                    Kind 2: Comprehensive 1-Click
+                                </div>
+                                <span className="text-xs text-muted-foreground font-mono">Bench Seating + Duties</span>
+                            </div>
+                            <CardTitle className="text-xl font-bold mt-2">Full Seating & Room Allotment</CardTitle>
+                            <CardDescription className="text-xs leading-relaxed">
+                                Upload your exam schedule date sheet. Set classroom block priority, reserve seats, and 1:24 faculty-student ratio. In 1 click, the engine executes full student bench seating (24 conflict-free rules) and assigns room invigilators.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-2">
+                            <div className="p-3.5 rounded-xl bg-secondary/50 border text-xs space-y-2">
+                                <div className="flex justify-between items-center text-muted-foreground">
+                                    <span>Input Parameters:</span>
+                                    <span className="font-semibold text-foreground">Date Sheet + Priorities + Ratios & Limits</span>
+                                </div>
+                                <div className="flex justify-between items-center text-muted-foreground">
+                                    <span>Exam Schedule:</span>
+                                    <span className="font-bold text-foreground">{examSchedule.length} Slots Loaded</span>
+                                </div>
+                                <div className="flex justify-between items-center text-muted-foreground">
+                                    <span>Output Format:</span>
+                                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">Seating Grid, Master Report & Rosters</span>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-2.5">
+                                <Button
+                                    onClick={() => router.push('/allotment?mode=full')}
+                                    className="flex-1 h-11 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold shadow-xs gap-2"
+                                >
+                                    <Sparkles className="size-4" />
+                                    <span>Open Full Seating Allotment</span>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => router.push('/schedule')}
+                                    className="h-11 font-medium gap-2 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
+                                >
+                                    <span>Exam Schedule</span>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            {/* Allotment Rules & Staff Time Requests Hub */}
+            <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h2 className="text-xl font-bold tracking-tight text-foreground">Allotment Governance & Staff Time Requests</h2>
+                        <p className="text-xs text-muted-foreground">
+                            Enforce strict seating rules, configure faculty-student ratios, or manage faculty leave requests and time exemptions.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Card 1: 24 Seating Rules */}
+                    <Card className="border hover:border-purple-300 dark:hover:border-purple-800 transition-colors shadow-xs flex flex-col justify-between">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300">
+                                    <ShieldCheck className="size-5" />
+                                </div>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                    <CheckCircle2 className="size-3.5" /> 24 Rules Active
+                                </span>
+                            </div>
+                            <CardTitle className="text-base font-bold mt-2">24 Seating Rules</CardTitle>
+                            <CardDescription className="text-xs">
+                                Strict course interleaving, roll-number sequences, no adjacent/diagonal same-course neighbors, and room capacity enforcement.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-2">
                             <Button
                                 variant="outline"
-                                onClick={() => router.push('/manual-allotment')}
-                                className="h-11 font-medium gap-2 border-primary/20 hover:bg-primary/5"
+                                size="sm"
+                                onClick={() => setShowRulesDialog(true)}
+                                className="w-full text-xs font-semibold gap-1.5 border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/20"
                             >
-                                Configure Shifts
+                                <ShieldCheck className="size-3.5" />
+                                <span>Inspect 24 Rules</span>
                             </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
 
-                {/* Pillar 2: Student Seating & Room Allotment */}
-                <Card className="border shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25">
-                                Automated Seating
+                    {/* Card 2: Faculty Ratio Rules */}
+                    <Card className="border hover:border-blue-300 dark:hover:border-blue-800 transition-colors shadow-xs flex flex-col justify-between">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300">
+                                    <UserCheck className="size-5" />
+                                </div>
+                                <span className="text-[11px] font-semibold text-muted-foreground font-mono">
+                                    1:{facultyStudentRules[0]?.maxStudents || 24} Ratio
+                                </span>
                             </div>
-                            <span className="text-xs text-muted-foreground font-mono">Bench Grid</span>
-                        </div>
-                        <CardTitle className="text-xl font-bold mt-2">Student Seating & Room Plan</CardTitle>
-                        <CardDescription className="text-xs leading-relaxed">
-                            Generate automated seating arrangements for students across examination rooms, applying subject interleaving, capacity optimization, and room block priority rules.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-2">
-                        <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/50 border text-xs">
-                            <div className="space-y-0.5">
-                                <span className="font-semibold text-foreground">Standby Staff / Session</span>
-                                <p className="text-[11px] text-muted-foreground">Emergency reserve invigilators</p>
-                            </div>
-                            <div className="flex items-center gap-2 bg-background border px-2 py-1 rounded-lg">
-                                <button
-                                    onClick={() => setReservedCount(prev => Math.max(0, prev - 1))}
-                                    className="text-xs font-bold px-1 hover:text-primary"
-                                    aria-label="Decrease reserved staff"
-                                >
-                                    -
-                                </button>
-                                <span className="font-mono font-bold px-1.5 text-sm">{reservedCount}</span>
-                                <button
-                                    onClick={() => setReservedCount(prev => Math.min(20, prev + 1))}
-                                    className="text-xs font-bold px-1 hover:text-primary"
-                                    aria-label="Increase reserved staff"
-                                >
-                                    +
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <Button
-                                onClick={handleGenerateAll}
-                                disabled={isGenerating || examSchedule.length === 0}
-                                className="flex-1 h-11 font-semibold gap-2 shadow-xs"
-                            >
-                                {isGenerating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                                {isGenerating ? 'Generating...' : 'Run Seating Engine'}
-                            </Button>
+                            <CardTitle className="text-base font-bold mt-2">Faculty Ratio & Reserves</CardTitle>
+                            <CardDescription className="text-xs">
+                                Configure teacher-to-student ratios, standby emergency reserves ({reservedCount} staff/session), and designation duty limits.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-2">
                             <Button
                                 variant="outline"
-                                onClick={() => router.push('/allotment')}
-                                className="h-11 font-medium gap-2"
+                                size="sm"
+                                onClick={() => setShowFacultyDialog(true)}
+                                className="w-full text-xs font-semibold gap-1.5 border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20"
                             >
-                                View Seating Grid
+                                <UserCheck className="size-3.5" />
+                                <span>Configure Ratio Rules</span>
                             </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+
+                    {/* Card 3: Faculty Time Requests */}
+                    <Card className="border hover:border-amber-300 dark:hover:border-amber-800 transition-colors shadow-xs flex flex-col justify-between">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300">
+                                    <Clock className="size-5" />
+                                </div>
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+                                    activeFacultyTimeRequestsCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+                                }`}>
+                                    {activeFacultyTimeRequestsCount} Staff Requests
+                                </span>
+                            </div>
+                            <CardTitle className="text-base font-bold mt-2">Staff Time Requests</CardTitle>
+                            <CardDescription className="text-xs">
+                                Record faculty who asked for certain times or shifts off (medical leave, morning-only, external viva). Allotment honors them automatically.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowTimeRequestsDialog(true)}
+                                className="w-full text-xs font-semibold gap-1.5 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                            >
+                                <Clock className="size-3.5" />
+                                <span>Manage Time Requests</span>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
 
             {/* Reports & Official Exports Section */}
@@ -620,6 +737,28 @@ export function DashboardClient() {
                     handlePopulateMockData(count);
                 }}
                 onFloodAndGenerate={handleFloodAndGenerateAll}
+            />
+
+            {/* Governance & Rules Dialogs */}
+            <AllotmentRulesDialog open={showRulesDialog} onOpenChange={setShowRulesDialog} />
+
+            <FacultyAllocationDialog
+                isOpen={showFacultyDialog}
+                onClose={() => setShowFacultyDialog(false)}
+                onConfirm={(newRules, newReserves) => {
+                    setFacultyStudentRules(newRules);
+                    setReservedCount(newReserves);
+                    setShowFacultyDialog(false);
+                    toast({ title: 'Faculty Rules Updated', description: 'Updated ratios and reserve staff allocations.' });
+                }}
+                initialRules={facultyStudentRules}
+                initialReserveCount={reservedCount}
+                confirmLabel="Save Rules"
+            />
+
+            <FacultyTimeRequestsDialog
+                open={showTimeRequestsDialog}
+                onOpenChange={setShowTimeRequestsDialog}
             />
         </div>
     );

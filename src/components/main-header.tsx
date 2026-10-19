@@ -18,7 +18,7 @@ const routeTitles: Record<string, string> = {
   '': 'Dashboard',
   'dashboard': 'Dashboard',
   'manual-allotment': 'Faculty Shift Allotment',
-  'allotment': 'Seating & Room Plan',
+  'allotment': 'Examination Allotment Hub',
   'schedule': 'Exam Schedule',
   'invigilators': 'Faculty & Invigilators',
   'classrooms': 'Classrooms & Venues',
@@ -60,13 +60,13 @@ export function MainHeader() {
           <span>May 2026 Session</span>
         </div>
 
-        {segment !== 'manual-allotment' && (
+        {segment !== 'allotment' && (
           <Link
-            href="/manual-allotment"
+            href="/allotment"
             className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all shadow-xs"
           >
-            <CalendarCheck2 className="size-3.5" />
-            Faculty Shift Allotment
+            <Sparkles className="size-3.5" />
+            Allotment Hub
           </Link>
         )}
       </div>

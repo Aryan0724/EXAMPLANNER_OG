@@ -55,18 +55,24 @@ const navGroups: NavGroup[] = [
     label: 'Duty & Allotment',
     items: [
       {
-        id: 'manual-allotment',
-        href: '/manual-allotment',
-        icon: CalendarCheck2,
-        label: 'Faculty Shift Allotment',
-        badge: 'Core',
-        badgeColor: 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
-      },
-      {
         id: 'allotment',
         href: '/allotment',
+        icon: Sparkles,
+        label: 'Allotment Hub',
+        badge: 'Dual Mode',
+        badgeColor: 'bg-primary/20 text-primary border-primary/30',
+      },
+      {
+        id: 'manual-allotment',
+        href: '/allotment?mode=shift-duty',
+        icon: CalendarCheck2,
+        label: 'Kind 1: Shift Allotment',
+      },
+      {
+        id: 'full-seating',
+        href: '/allotment?mode=full',
         icon: Armchair,
-        label: 'Seating & Room Plan',
+        label: 'Kind 2: Full Seating Plan',
       },
       {
         id: 'schedule',
