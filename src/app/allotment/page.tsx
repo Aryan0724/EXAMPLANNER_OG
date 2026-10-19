@@ -415,9 +415,9 @@ export default function AllotmentPage() {
         title: "Session Roster Generated",
         description: "High-fidelity duty chart downloaded successfully."
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Export failed", error);
-      toast({ variant: "destructive", title: "Export Failed", description: "Could not generate session roster." });
+      toast({ variant: "destructive", title: "Export Failed", description: error?.message || "Could not generate session roster." });
     }
   };
 
@@ -429,9 +429,9 @@ export default function AllotmentPage() {
         title: "Master Report Generated",
         description: "Official seating plan master report downloaded successfully."
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Master report export failed", error);
-      toast({ variant: "destructive", title: "Export Failed", description: "Could not generate master report." });
+      toast({ variant: "destructive", title: "Export Failed", description: error?.message || "Could not generate master report." });
     }
   };
 
@@ -1002,7 +1002,7 @@ export default function AllotmentPage() {
                                 <FileDown className="mr-2 h-4 w-4 text-purple-600" />
                                 <div className="flex flex-col">
                                   <span className="font-medium text-xs">Session Roster</span>
-                                  <span className="text-[10px] text-muted-foreground">Shift-wise invigilation roster (.csv)</span>
+                                  <span className="text-[10px] text-muted-foreground">Shift-wise invigilation roster (.xlsx)</span>
                                 </div>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />

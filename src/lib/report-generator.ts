@@ -12,6 +12,95 @@ const getDayOfWeek = (date: string) => {
     return days[new Date(date).getDay()];
 };
 
+/**
+ * Safely parses session timing from key and exam object.
+ * Correctly distinguishes 12-hour AM/PM and extracts shift number (1-4) and Roman label.
+ */
+export function parseSessionTiming(key: string, representativeExam?: ExamSlot | null): {
+    date: string;
+    time: string;
+    shiftNum: number;
+    shiftRoman: string;
+    timingDisplay: string;
+} {
+    const firstSpaceIdx = key.indexOf(' ');
+    const date = (firstSpaceIdx !== -1 ? key.substring(0, firstSpaceIdx) : key).trim();
+    const rawTime = (representativeExam?.time || (firstSpaceIdx !== -1 ? key.substring(firstSpaceIdx + 1) : '')).trim();
+
+    // Look specifically at the START time part before '-' or 'to'
+    const startPart = rawTime.split(/[-–—]|to/i)[0].trim().toLowerCase();
+    const isPM = startPart.includes('pm') && !startPart.includes('12:00') && !startPart.includes('12.00');
+
+    const match = startPart.match(/(\d{1,2})[:.](\d{2})/);
+    let hour = 9;
+    if (match) {
+        hour = parseInt(match[1], 10);
+        if (isPM && hour < 12) {
+            hour += 12;
+        } else if (!isPM && hour === 12 && startPart.includes('am')) {
+            hour = 0;
+        }
+    } else {
+        const numMatch = startPart.match(/\d{1,2}/);
+        if (numMatch) {
+            hour = parseInt(numMatch[0], 10);
+            if (isPM && hour < 12) hour += 12;
+        }
+    }
+
+    let shiftNum = 1;
+    let shiftRoman = 'Shift I';
+
+    if (hour < 11) {
+        shiftNum = 1;
+        shiftRoman = 'Shift I';
+    } else if (hour < 13) {
+        shiftNum = 2;
+        shiftRoman = 'Shift II';
+    } else if (hour < 15) {
+        shiftNum = 3;
+        shiftRoman = 'Shift III';
+    } else {
+        shiftNum = 4;
+        shiftRoman = 'Shift IV';
+    }
+
+    const timingDisplay = formatTimingDisplay(
+        (representativeExam as any)?.timeRange,
+        rawTime,
+        representativeExam?.duration || 180
+    );
+
+    return {
+        date,
+        time: rawTime,
+        shiftNum,
+        shiftRoman,
+        timingDisplay,
+    };
+}
+
+/**
+ * Returns a guaranteed valid and unique Excel worksheet name (<= 31 characters, no illegal characters).
+ */
+export function getUniqueWorksheetName(workbook: ExcelJS.Workbook, baseName: string): string {
+    let sanitized = baseName.replace(/[\\/?*\[\]:]/g, '-').trim();
+    if (sanitized.length > 31) {
+        sanitized = sanitized.substring(0, 31).trim();
+    }
+    if (!sanitized) sanitized = 'Sheet';
+
+    let candidate = sanitized;
+    let counter = 2;
+    while (workbook.getWorksheet(candidate)) {
+        const suffix = ` (${counter})`;
+        const maxBaseLen = 31 - suffix.length;
+        candidate = `${sanitized.substring(0, maxBaseLen).trim()}${suffix}`;
+        counter++;
+    }
+    return candidate;
+}
+
 type FullAllotment = Record<string, { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }>;
 
 /**
@@ -34,16 +123,17 @@ export function generateMasterReport(fullAllotment: FullAllotment, allStudents: 
     ];
 
     // Sort Sessions
-    const sortedSessions = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const sortedSessions = Object.keys(fullAllotment || {}).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
     sortedSessions.forEach(sessionKey => {
-        const { seatPlan, invigilatorAssignments } = fullAllotment[sessionKey];
+        const sessionEntry = fullAllotment[sessionKey];
+        if (!sessionEntry || !sessionEntry.seatPlan) return;
+        const { seatPlan, invigilatorAssignments } = sessionEntry;
         const representativeExam = Array.isArray(seatPlan.exam) ? seatPlan.exam[0] : seatPlan.exam;
+        const timing = parseSessionTiming(sessionKey, representativeExam);
 
-        // 1. SESSION HEADER ROW (Bold, spans columns ideally, but for now just first cell)
-        // Format: "DATE: YYYY-MM-DD (Day) | TIME: HH:MM - HH:MM | SHIFT: X"
-        const shiftName = parseInt(representativeExam.time.split(':')[0]) < 12 ? 'Morning' : 'Evening';
-        const sessionHeader = `SESSION: ${representativeExam.date} (${getDayOfWeek(representativeExam.date)}) | ${shiftName.toUpperCase()} | ${representativeExam.time}`;
+        const sessionDate = representativeExam?.date || timing.date;
+        const sessionHeader = `SESSION: ${sessionDate} (${getDayOfWeek(sessionDate)}) | ${timing.shiftRoman.toUpperCase()} | ${timing.timingDisplay || timing.time}`;
 
         masterSheetRows.push(['']); // Spacing
         masterSheetRows.push([sessionHeader]); // Section Title
@@ -474,9 +564,6 @@ export async function generateRoomSeatPlanExcel(
     assignments: any[] // Passing raw assignments for grid building
 ) {
     try {
-        // Use CDN injection to ensure library is available in all environments
-        const XLSX = await ensureXLSX();
-        
         const wb = XLSX.utils.book_new();
         const rows: any[][] = [];
 
@@ -581,39 +668,40 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     const worksheet = workbook.addWorksheet('Invigilator Duty Chart');
 
     // 1. COLLECT DATA & DIMENSIONS
-    const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    const uniqueDates = Array.from(new Set(sessionKeys.map(key => key.split(' ')[0]))).sort();
+    const sessionKeys = Object.keys(fullAllotment || {}).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const uniqueDates = Array.from(new Set(sessionKeys.map(key => {
+        const firstSpace = key.indexOf(' ');
+        return (firstSpace !== -1 ? key.substring(0, firstSpace) : key).trim();
+    }))).sort();
     
     // Check if sessions are 2-shift model (e.g. End Term 09:30 & 13:30) or 4-shift model
     const hasIntermediateShifts = sessionKeys.some(k => {
-        const time = k.split(' ')[1] || '';
-        const h = parseInt(time.split(':')[0]);
-        return (h >= 11 && h <= 12) || h >= 15;
+        const sData = fullAllotment[k];
+        const repExam = Array.isArray(sData?.seatPlan?.exam) ? sData.seatPlan.exam[0] : sData?.seatPlan?.exam;
+        const timing = parseSessionTiming(k, repExam);
+        return timing.shiftNum >= 3;
     });
 
-    // Helper to get shift index from time
-    const getShiftIndex = (time: string) => {
-        const hour = parseInt(time.split(':')[0]);
+    // Helper to get shift index from session key
+    const getShiftIndex = (k: string) => {
+        const sData = fullAllotment[k];
+        const repExam = Array.isArray(sData?.seatPlan?.exam) ? sData.seatPlan.exam[0] : sData?.seatPlan?.exam;
+        const timing = parseSessionTiming(k, repExam);
         if (hasIntermediateShifts) {
-            if (hour <= 10) return 0;
-            if (hour <= 12) return 1;
-            if (hour <= 14) return 2;
-            return 3;
-        } else {
-            return hour <= 11 ? 0 : 1;
+            return Math.max(0, Math.min(3, timing.shiftNum - 1));
         }
+        return timing.shiftNum <= 1 ? 0 : 1;
     };
 
     // Dynamically derive shift timing labels from real exam inputs
     const shiftTimingMap = new Map<number, string>();
     sessionKeys.forEach(key => {
-        const time = key.split(' ')[1] || '';
         const sData = fullAllotment[key];
         const repExam = Array.isArray(sData?.seatPlan?.exam) ? sData.seatPlan.exam[0] : sData?.seatPlan?.exam;
-        const sIdx = getShiftIndex(time);
-        if (!shiftTimingMap.has(sIdx) && repExam) {
-            const range = (repExam as any).timeRange || formatTimingRange(repExam.time || time, repExam.duration || 180);
-            shiftTimingMap.set(sIdx, range.replace(/^Timing\s*/i, ''));
+        const timing = parseSessionTiming(key, repExam);
+        const sIdx = getShiftIndex(key);
+        if (!shiftTimingMap.has(sIdx)) {
+            shiftTimingMap.set(sIdx, timing.timingDisplay.replace(/^Timing\s*/i, ''));
         }
     });
 
@@ -715,10 +803,13 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     // 5. CALCULATE TOTALS PER SHIFT (No of Duty Required)
     const shiftTotals = new Map<string, number>(); // key: "date-shiftIdx"
     sessionKeys.forEach(key => {
-        const [date, time] = key.split(' ');
-        const shiftIdx = getShiftIndex(time);
-        const count = fullAllotment[key].invigilatorAssignments.length;
-        const mapKey = `${date}-${shiftIdx}`;
+        const sData = fullAllotment[key];
+        if (!sData) return;
+        const repExam = Array.isArray(sData.seatPlan?.exam) ? sData.seatPlan.exam[0] : sData.seatPlan?.exam;
+        const timing = parseSessionTiming(key, repExam);
+        const shiftIdx = getShiftIndex(key);
+        const count = sData.invigilatorAssignments?.length || 0;
+        const mapKey = `${timing.date}-${shiftIdx}`;
         shiftTotals.set(mapKey, (shiftTotals.get(mapKey) || 0) + count);
     });
 
@@ -766,13 +857,18 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
     // Duty Map for easy lookup: invId -> date-shiftIdx -> 1 (active) or 0 (reserved)
     const invDutyMap = new Map<string, Map<string, number>>();
     sessionKeys.forEach(key => {
-        const [date, time] = key.split(' ');
-        const shiftIdx = getShiftIndex(time);
-        fullAllotment[key].invigilatorAssignments.forEach(asg => {
+        const sData = fullAllotment[key];
+        if (!sData) return;
+        const repExam = Array.isArray(sData.seatPlan?.exam) ? sData.seatPlan.exam[0] : sData.seatPlan?.exam;
+        const timing = parseSessionTiming(key, repExam);
+        const shiftIdx = getShiftIndex(key);
+        const assignments = sData.invigilatorAssignments || [];
+        assignments.forEach(asg => {
+            if (!asg?.invigilator?.id) return;
             if (!invDutyMap.has(asg.invigilator.id)) invDutyMap.set(asg.invigilator.id, new Map());
-            const current = invDutyMap.get(asg.invigilator.id)!.get(`${date}-${shiftIdx}`);
+            const current = invDutyMap.get(asg.invigilator.id)!.get(`${timing.date}-${shiftIdx}`);
             if (current !== 1) {
-                invDutyMap.get(asg.invigilator.id)!.set(`${date}-${shiftIdx}`, asg.isReserved ? 0 : 1);
+                invDutyMap.get(asg.invigilator.id)!.set(`${timing.date}-${shiftIdx}`, asg.isReserved ? 0 : 1);
             }
         });
     });
@@ -919,28 +1015,22 @@ export async function generateDetailedInvigilatorDutyChart(fullAllotment: FullAl
 /**
  * Helper to build a single shift worksheet in the user's specific photo format.
  */
-function buildShiftWorksheet(worksheet: ExcelJS.Worksheet, sessionData: { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] }, date: string, time: string, allClassrooms: Classroom[]) {
-    const { seatPlan, invigilatorAssignments } = sessionData;
-    const representativeExam = Array.isArray(seatPlan.exam) ? seatPlan.exam[0] : seatPlan.exam;
-    
-    const hour = parseInt(time.split(':')[0]);
-    let shiftNum = 1;
-    if (hour <= 10) shiftNum = 1;
-    else if (hour <= 12) shiftNum = 2;
-    else if (hour <= 14) shiftNum = 3;
-    else shiftNum = 4;
-
-    // Calculate timing range string dynamically from representative exam
-    const timingDisplay = formatTimingDisplay(
-        (representativeExam as any)?.timeRange,
-        time,
-        representativeExam?.duration || 180
-    );
+function buildShiftWorksheet(
+    worksheet: ExcelJS.Worksheet,
+    sessionData: { seatPlan: SeatPlan, invigilatorAssignments: InvigilatorAssignment[] },
+    date: string,
+    time: string,
+    allClassrooms: Classroom[]
+) {
+    const seatPlan = sessionData?.seatPlan;
+    const invigilatorAssignments = sessionData?.invigilatorAssignments || [];
+    const representativeExam = Array.isArray(seatPlan?.exam) ? seatPlan.exam[0] : seatPlan?.exam;
+    const timing = parseSessionTiming(`${date} ${time}`, representativeExam);
 
     // 1. HEADER (Photo Style)
-    worksheet.getCell('B2').value = `Date: ${date}`;
-    worksheet.getCell('C2').value = `Shift ${shiftNum}`;
-    worksheet.getCell('E2').value = timingDisplay;
+    worksheet.getCell('B2').value = `Date: ${timing.date}`;
+    worksheet.getCell('C2').value = timing.shiftRoman;
+    worksheet.getCell('E2').value = timing.timingDisplay;
     [worksheet.getCell('B2'), worksheet.getCell('C2'), worksheet.getCell('E2')].forEach(c => {
         c.font = { bold: true, size: 11, name: 'Times New Roman' };
     });
@@ -991,9 +1081,9 @@ function buildShiftWorksheet(worksheet: ExcelJS.Worksheet, sessionData: { seatPl
         const room = allClassrooms.find(c => c.id === roomId);
         const startRow = currentRow;
 
-        roomAsgs.forEach((asg, idx) => {
+        roomAsgs.forEach((asg) => {
             worksheet.getCell(currentRow, 1).value = srNo++;
-            worksheet.getCell(currentRow, 2).value = asg.invigilator.name;
+            worksheet.getCell(currentRow, 2).value = asg.invigilator?.name || 'Unassigned';
             worksheet.getCell(currentRow, 3).value = `${room?.building || ''} ${room?.roomNo || ''}`.trim();
             
             [1,2,3,4,5,6,7].forEach(col => {
@@ -1023,7 +1113,7 @@ function buildShiftWorksheet(worksheet: ExcelJS.Worksheet, sessionData: { seatPl
 
         reservedStaff.forEach(asg => {
             worksheet.getCell(currentRow, 1).value = '-';
-            worksheet.getCell(currentRow, 2).value = asg.invigilator.name;
+            worksheet.getCell(currentRow, 2).value = asg.invigilator?.name || 'Standby';
             worksheet.getCell(currentRow, 3).value = 'RESERVED';
             [1,2,3,4,5,6,7].forEach(col => {
                 const cell = worksheet.getCell(currentRow, col);
@@ -1051,21 +1141,25 @@ function buildShiftWorksheet(worksheet: ExcelJS.Worksheet, sessionData: { seatPl
 export async function generateSessionWiseInvigilationRoster(fullAllotment: FullAllotment, allClassrooms: Classroom[]) {
     const workbook = new ExcelJS.Workbook();
     
-    const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    if (sessionKeys.length === 0) return;
+    const sessionKeys = Object.keys(fullAllotment || {}).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    if (sessionKeys.length === 0) {
+        throw new Error('No allotment sessions available to export.');
+    }
 
     sessionKeys.forEach(key => {
-        const [date, time] = key.split(' ');
-        const hour = parseInt(time.split(':')[0]);
-        let shiftNum = 1;
-        if (hour <= 10) shiftNum = 1;
-        else if (hour <= 12) shiftNum = 2;
-        else if (hour <= 14) shiftNum = 3;
-        else shiftNum = 4;
+        const sessionData = fullAllotment[key];
+        if (!sessionData) return;
+        const representativeExam = Array.isArray(sessionData.seatPlan?.exam)
+            ? sessionData.seatPlan.exam[0]
+            : sessionData.seatPlan?.exam;
+        const timing = parseSessionTiming(key, representativeExam);
 
-        const sheetName = `Shift ${shiftNum} (${date.replace(/\//g, '-')})`.substring(0, 31);
+        const dateFormatted = new Date(timing.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        const desiredName = `${timing.shiftRoman} (${dateFormatted})`;
+        const sheetName = getUniqueWorksheetName(workbook, desiredName);
+
         const worksheet = workbook.addWorksheet(sheetName);
-        buildShiftWorksheet(worksheet, fullAllotment[key], date, time, allClassrooms);
+        buildShiftWorksheet(worksheet, sessionData, timing.date, timing.time, allClassrooms);
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -1078,12 +1172,13 @@ export async function generateSessionWiseInvigilationRoster(fullAllotment: FullA
  */
 export async function generateDayWiseSessionRosters(fullAllotment: FullAllotment, allClassrooms: Classroom[]) {
     const zip = new JSZip();
-    const sessionKeys = Object.keys(fullAllotment).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const sessionKeys = Object.keys(fullAllotment || {}).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     if (sessionKeys.length === 0) return;
 
     const sessionsByDate = new Map<string, string[]>();
     sessionKeys.forEach(key => {
-        const date = key.split(' ')[0];
+        const firstSpaceIdx = key.indexOf(' ');
+        const date = firstSpaceIdx !== -1 ? key.substring(0, firstSpaceIdx) : key;
         if (!sessionsByDate.has(date)) sessionsByDate.set(date, []);
         sessionsByDate.get(date)!.push(key);
     });
@@ -1094,21 +1189,21 @@ export async function generateDayWiseSessionRosters(fullAllotment: FullAllotment
         const workbook = new ExcelJS.Workbook();
         
         dateKeys.forEach(key => {
-            const [_, time] = key.split(' ');
-            const hour = parseInt(time.split(':')[0]);
-            let shiftNum = 1;
-            if (hour <= 10) shiftNum = 1;
-            else if (hour <= 12) shiftNum = 2;
-            else if (hour <= 14) shiftNum = 3;
-            else shiftNum = 4;
+            const sessionData = fullAllotment[key];
+            if (!sessionData) return;
+            const representativeExam = Array.isArray(sessionData.seatPlan?.exam)
+                ? sessionData.seatPlan.exam[0]
+                : sessionData.seatPlan?.exam;
+            const timing = parseSessionTiming(key, representativeExam);
 
-            const sheetName = `Shift ${shiftNum}`;
+            const desiredName = timing.shiftRoman;
+            const sheetName = getUniqueWorksheetName(workbook, desiredName);
             const worksheet = workbook.addWorksheet(sheetName);
-            buildShiftWorksheet(worksheet, fullAllotment[key], date, time, allClassrooms);
+            buildShiftWorksheet(worksheet, sessionData, timing.date, timing.time, allClassrooms);
         });
 
         const buffer = await workbook.xlsx.writeBuffer();
-        const safeDate = date.replace(/\//g, '-');
+        const safeDate = date.replace(/[\\/?*\[\]:]/g, '-');
         rootFolder?.file(`DutyChart_${safeDate}.xlsx`, buffer);
     }
 
