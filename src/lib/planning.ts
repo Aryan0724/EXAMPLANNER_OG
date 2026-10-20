@@ -543,7 +543,7 @@ export function generateSeatPlan(
         const map = roomSeatMaps.get(room.id)!;
 
         // Group benches by column traversal (down each aisle, column 0 then column 1...)
-        const orderedBenches: { benchIdx: number; benchNumber: number; capacity: number }[] = [];
+        const orderedBenches: { benchIdx: number; benchNumber: number; capacity: number; col: number; row: number }[] = [];
         for (let col = 0; col < room.columns; col++) {
             for (let r = 0; r < room.rows; r++) {
                 const benchIdx = r * room.columns + col;
@@ -551,7 +551,9 @@ export function generateSeatPlan(
                     orderedBenches.push({
                         benchIdx,
                         benchNumber: benchIdx + 1,
-                        capacity: room.benchCapacities[benchIdx]
+                        capacity: room.benchCapacities[benchIdx],
+                        col,
+                        row: r
                     });
                 }
             }
@@ -559,13 +561,142 @@ export function generateSeatPlan(
 
         if (orderedBenches.length === 0) continue;
 
-        // Bench seating state tracking
-        const benchAssignments: {
-            bench: { benchIdx: number; benchNumber: number; capacity: number };
-            left: (Student & { exam: ExamSlot }) | null;
-            right: (Student & { exam: ExamSlot }) | null;
-            extra: (Student & { exam: ExamSlot }) | null;
-        }[] = orderedBenches.map(b => ({ bench: b, left: null, right: null, extra: null }));
+        // Structured Seat Targets: Maps all physical seats into Side A, Side B, and Extra slots.
+        // Handles both multi-seater benches (Left/Right) and single-seater desks (alternating columns/rows).
+        interface SeatTarget {
+            benchIdx: number;
+            benchNumber: number;
+            capacity: number;
+            col: number;
+            row: number;
+            flatOffset: number;
+            seatPosition: 'Left' | 'Right' | 'Middle';
+            assignedStudent: (Student & { exam: ExamSlot }) | null;
+        }
+
+        const sideASeats: SeatTarget[] = [];
+        const sideBSeats: SeatTarget[] = [];
+        const extraSeats: SeatTarget[] = [];
+
+        // Maps to look up neighboring seats on the same bench or adjacent columns
+        const benchMap = new Map<number, { left?: SeatTarget; right?: SeatTarget }>();
+        const colRowSeatMap = new Map<string, SeatTarget>();
+
+        for (const b of orderedBenches) {
+            if (!benchMap.has(b.benchIdx)) {
+                benchMap.set(b.benchIdx, {});
+            }
+            const bEntry = benchMap.get(b.benchIdx)!;
+
+            if (b.capacity >= 2) {
+                // Multi-seater bench (e.g. 2-seater):
+                // Left slot is Side A
+                const targetA: SeatTarget = {
+                    benchIdx: b.benchIdx,
+                    benchNumber: b.benchNumber,
+                    capacity: b.capacity,
+                    col: b.col,
+                    row: b.row,
+                    flatOffset: 0,
+                    seatPosition: 'Left',
+                    assignedStudent: null
+                };
+                sideASeats.push(targetA);
+                bEntry.left = targetA;
+                colRowSeatMap.set(`${b.col}_${b.row}_L`, targetA);
+
+                // Right slot is Side B
+                const targetB: SeatTarget = {
+                    benchIdx: b.benchIdx,
+                    benchNumber: b.benchNumber,
+                    capacity: b.capacity,
+                    col: b.col,
+                    row: b.row,
+                    flatOffset: 1,
+                    seatPosition: 'Right',
+                    assignedStudent: null
+                };
+                sideBSeats.push(targetB);
+                bEntry.right = targetB;
+                colRowSeatMap.set(`${b.col}_${b.row}_R`, targetB);
+
+                // Middle/Extra slot if capacity >= 3
+                if (b.capacity >= 3) {
+                    const targetExtra: SeatTarget = {
+                        benchIdx: b.benchIdx,
+                        benchNumber: b.benchNumber,
+                        capacity: b.capacity,
+                        col: b.col,
+                        row: b.row,
+                        flatOffset: 2,
+                        seatPosition: 'Middle',
+                        assignedStudent: null
+                    };
+                    extraSeats.push(targetExtra);
+                }
+            } else if (b.capacity === 1) {
+                // Single-seater desk / bench (e.g. D203, D204):
+                // Even columns (0, 2, 4, 6...) are Side A (Left)
+                // Odd columns (1, 3, 5...) are Side B (Right)
+                // If 1 column, alternating rows are used
+                const isSideA = room.columns > 1 ? (b.col % 2 === 0) : (b.row % 2 === 0);
+                if (isSideA) {
+                    const targetA: SeatTarget = {
+                        benchIdx: b.benchIdx,
+                        benchNumber: b.benchNumber,
+                        capacity: 1,
+                        col: b.col,
+                        row: b.row,
+                        flatOffset: 0,
+                        seatPosition: 'Left',
+                        assignedStudent: null
+                    };
+                    sideASeats.push(targetA);
+                    bEntry.left = targetA;
+                    colRowSeatMap.set(`${b.col}_${b.row}`, targetA);
+                } else {
+                    const targetB: SeatTarget = {
+                        benchIdx: b.benchIdx,
+                        benchNumber: b.benchNumber,
+                        capacity: 1,
+                        col: b.col,
+                        row: b.row,
+                        flatOffset: 0,
+                        seatPosition: 'Right',
+                        assignedStudent: null
+                    };
+                    sideBSeats.push(targetB);
+                    bEntry.right = targetB;
+                    colRowSeatMap.set(`${b.col}_${b.row}`, targetB);
+                }
+            }
+        }
+
+        // Helper to find neighboring seated students (on same bench or adjacent columns)
+        const getNeighboringStudents = (target: SeatTarget): (Student & { exam: ExamSlot })[] => {
+            const neighbors: (Student & { exam: ExamSlot })[] = [];
+            if (target.capacity >= 2) {
+                const bEntry = benchMap.get(target.benchIdx);
+                const other = target.seatPosition === 'Left' ? bEntry?.right : bEntry?.left;
+                if (other?.assignedStudent) neighbors.push(other.assignedStudent);
+            } else {
+                // For single-seater desks, check left adjacent column and right adjacent column at the same row
+                if (target.col > 0) {
+                    const leftColSeat = colRowSeatMap.get(`${target.col - 1}_${target.row}`);
+                    if (leftColSeat?.assignedStudent) neighbors.push(leftColSeat.assignedStudent);
+                }
+                if (target.col < room.columns - 1) {
+                    const rightColSeat = colRowSeatMap.get(`${target.col + 1}_${target.row}`);
+                    if (rightColSeat?.assignedStudent) neighbors.push(rightColSeat.assignedStudent);
+                }
+            }
+            return neighbors;
+        };
+
+        const conflictsWithNeighbors = (courseKey: string, candidateExam: ExamSlot, target: SeatTarget): boolean => {
+            const neighbors = getNeighboringStudents(target);
+            return neighbors.some(neighbor => doesCandidateConflictWithOther(courseKey, candidateExam, neighbor));
+        };
 
         const roomCourses = new Set<string>();
 
@@ -574,13 +705,12 @@ export function generateSeatPlan(
         if (activeCoursesA.length === 0) break;
 
         const courseA = activeCoursesA[0];
-        const leftBenches = benchAssignments.filter(b => b.bench.capacity >= 1);
         const poolA = remainingCourseBatches.get(courseA)!;
-        const takeCountA = Math.min(poolA.length, leftBenches.length);
+        const takeCountA = Math.min(poolA.length, sideASeats.length);
         const studentsA = poolA.splice(0, takeCountA);
 
         for (let i = 0; i < takeCountA; i++) {
-            leftBenches[i].left = studentsA[i];
+            sideASeats[i].assignedStudent = studentsA[i];
         }
         roomCourses.add(courseA);
 
@@ -591,25 +721,24 @@ export function generateSeatPlan(
                 classroomId: room.id,
                 roomNo: room.roomNo,
                 course: courseA,
-                description: `Course ${courseA} filled Room ${room.roomNo} Side A capacity (${leftBenches.length}); remaining ${poolA.length} student(s) will be allotted to next eligible classroom.`,
+                description: `Course ${courseA} filled Room ${room.roomNo} Side A capacity (${sideASeats.length}); remaining ${poolA.length} student(s) will be allotted to next eligible classroom.`,
                 severity: 'warning'
             });
         }
 
         // 2. ANCHOR SIDE B (Right): Next largest course distinct from courseA
-        const rightBenches = benchAssignments.filter(b => b.bench.capacity >= 2);
         let primaryCourseB: string | null = null;
 
-        if (rightBenches.length > 0) {
+        if (sideBSeats.length > 0) {
             const otherCourses = getActiveCoursesSorted().filter(c => c !== courseA);
             if (otherCourses.length > 0) {
                 primaryCourseB = otherCourses[0];
                 const poolB = remainingCourseBatches.get(primaryCourseB)!;
-                const takeCountB = Math.min(poolB.length, rightBenches.length);
+                const takeCountB = Math.min(poolB.length, sideBSeats.length);
                 const studentsB = poolB.splice(0, takeCountB);
 
                 for (let i = 0; i < takeCountB; i++) {
-                    rightBenches[i].right = studentsB[i];
+                    sideBSeats[i].assignedStudent = studentsB[i];
                 }
                 roomCourses.add(primaryCourseB);
 
@@ -628,19 +757,18 @@ export function generateSeatPlan(
         }
 
         // 3. SMART GAP FILLING ON SIDE B (Right seats)
-        // If Side B has empty benches left, fill them intelligently without seat waste or 1-seat splinters
-        let currentRightIdx = rightBenches.findIndex(b => b.right === null);
+        // If Side B has empty seats left, fill them intelligently without seat waste or 1-seat splinters
+        let currentRightIdx = sideBSeats.findIndex(s => s.assignedStudent === null);
         if (currentRightIdx !== -1) {
-            while (currentRightIdx < rightBenches.length && getTotalRemaining() > 0) {
-                const remainingGap = rightBenches.length - currentRightIdx;
+            while (currentRightIdx < sideBSeats.length && getTotalRemaining() > 0) {
+                const remainingGap = sideBSeats.length - currentRightIdx;
+                const seatTarget = sideBSeats[currentRightIdx];
 
-                // Compatible candidates that don't conflict with the Left seat on the bench
+                // Compatible candidates that don't conflict with neighboring seated students
                 const candidateCourses = getActiveCoursesSorted().filter(courseKey => {
-                    const benchTarget = rightBenches[currentRightIdx];
-                    if (!benchTarget.left) return true;
                     const sampleStudent = remainingCourseBatches.get(courseKey)?.[0];
                     const candidateExam = sampleStudent?.exam || exams[0];
-                    return !doesCandidateConflictWithOther(courseKey, candidateExam, benchTarget.left);
+                    return !conflictsWithNeighbors(courseKey, candidateExam, seatTarget);
                 });
 
                 if (candidateCourses.length === 0) break;
@@ -683,7 +811,7 @@ export function generateSeatPlan(
                 const pool = remainingCourseBatches.get(chosenCourse)!;
                 const taken = pool.splice(0, seatsToTake);
                 for (let i = 0; i < taken.length; i++) {
-                    rightBenches[currentRightIdx + i].right = taken[i];
+                    sideBSeats[currentRightIdx + i].assignedStudent = taken[i];
                 }
                 roomCourses.add(chosenCourse);
                 currentRightIdx += taken.length;
@@ -691,18 +819,17 @@ export function generateSeatPlan(
         }
 
         // 4. SMART GAP FILLING ON SIDE A (Left seats)
-        // If Side A has empty benches left (Course A had fewer students than Left capacity)
-        let currentLeftIdx = leftBenches.findIndex(b => b.left === null);
+        // If Side A has empty seats left (Course A had fewer students than Side A capacity)
+        let currentLeftIdx = sideASeats.findIndex(s => s.assignedStudent === null);
         if (currentLeftIdx !== -1) {
-            while (currentLeftIdx < leftBenches.length && getTotalRemaining() > 0) {
-                const remainingGap = leftBenches.length - currentLeftIdx;
+            while (currentLeftIdx < sideASeats.length && getTotalRemaining() > 0) {
+                const remainingGap = sideASeats.length - currentLeftIdx;
+                const seatTarget = sideASeats[currentLeftIdx];
 
                 const candidateCourses = getActiveCoursesSorted().filter(courseKey => {
-                    const benchTarget = leftBenches[currentLeftIdx];
-                    if (!benchTarget.right) return true;
                     const sampleStudent = remainingCourseBatches.get(courseKey)?.[0];
                     const candidateExam = sampleStudent?.exam || exams[0];
-                    return !doesCandidateConflictWithOther(courseKey, candidateExam, benchTarget.right);
+                    return !conflictsWithNeighbors(courseKey, candidateExam, seatTarget);
                 });
 
                 if (candidateCourses.length === 0) break;
@@ -739,54 +866,29 @@ export function generateSeatPlan(
                 const pool = remainingCourseBatches.get(chosenCourse)!;
                 const taken = pool.splice(0, seatsToTake);
                 for (let i = 0; i < taken.length; i++) {
-                    leftBenches[currentLeftIdx + i].left = taken[i];
+                    sideASeats[currentLeftIdx + i].assignedStudent = taken[i];
                 }
                 roomCourses.add(chosenCourse);
                 currentLeftIdx += taken.length;
             }
         }
 
-        // 5. COMMIT BENCH ASSIGNMENTS TO ROOM SEAT MAP
-        for (const item of benchAssignments) {
-            const { bench, left, right, extra } = item;
+        // 5. COMMIT ALL ASSIGNMENTS TO ROOM SEAT MAP
+        const allTargets = [...sideASeats, ...sideBSeats, ...extraSeats];
+        for (const target of allTargets) {
+            if (!target.assignedStudent) continue;
             let benchFlatIdxBase = 0;
-            for (let b = 0; b < bench.benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
+            for (let b = 0; b < target.benchIdx; b++) benchFlatIdxBase += room.benchCapacities[b];
+            const flatIdx = benchFlatIdxBase + target.flatOffset;
 
-            if (left) {
-                const flatIdx = benchFlatIdxBase + 0;
-                map[flatIdx] = {
-                    student: left,
-                    classroom: room,
-                    seatNumber: flatIdx + 1,
-                    benchNumber: bench.benchNumber,
-                    benchIndex: bench.benchIdx,
-                    seatPosition: 'Left'
-                };
-            }
-
-            if (right && bench.capacity >= 2) {
-                const flatIdx = benchFlatIdxBase + 1;
-                map[flatIdx] = {
-                    student: right,
-                    classroom: room,
-                    seatNumber: flatIdx + 1,
-                    benchNumber: bench.benchNumber,
-                    benchIndex: bench.benchIdx,
-                    seatPosition: 'Right'
-                };
-            }
-
-            if (extra && bench.capacity >= 3) {
-                const flatIdx = benchFlatIdxBase + 2;
-                map[flatIdx] = {
-                    student: extra,
-                    classroom: room,
-                    seatNumber: flatIdx + 1,
-                    benchNumber: bench.benchNumber,
-                    benchIndex: bench.benchIdx,
-                    seatPosition: 'Middle'
-                };
-            }
+            map[flatIdx] = {
+                student: target.assignedStudent,
+                classroom: room,
+                seatNumber: flatIdx + 1,
+                benchNumber: target.benchNumber,
+                benchIndex: target.benchIdx,
+                seatPosition: target.seatPosition
+            };
         }
     }
 
