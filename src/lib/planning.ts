@@ -203,6 +203,7 @@ export function validateSeatPlanRules(
     const violations: RuleViolation[] = [];
     const validClassrooms = Array.isArray(classrooms) ? classrooms.filter(c => c && c.id) : [];
     const roomMap = new Map(validClassrooms.map(c => [c.id, c]));
+    const targetRoomIds = new Set(validClassrooms.map(c => c.id));
 
     const assignedSeats = (plan.assignments || []).filter(a => a && a.classroom?.id);
 
@@ -216,9 +217,13 @@ export function validateSeatPlanRules(
     });
     studentSeatMap.forEach((seats, studentId) => {
         if (seats.length > 1) {
+            const seatInRoom = targetRoomIds.size > 0 ? seats.find(s => s.classroom && targetRoomIds.has(s.classroom.id)) : seats[0];
+            if (targetRoomIds.size > 0 && !seatInRoom) return;
             violations.push({
                 ruleNumber: 10,
                 ruleName: 'No duplicate allotment',
+                classroomId: seatInRoom?.classroom?.id || seats[0]?.classroom?.id,
+                roomNo: seatInRoom?.classroom?.roomNo || seats[0]?.classroom?.roomNo,
                 studentRollNo: seats[0].student?.rollNo,
                 description: `Student ${seats[0].student?.name} (${seats[0].student?.rollNo}) is assigned to ${seats.length} seats in the same session.`,
                 severity: 'error'
@@ -231,6 +236,7 @@ export function validateSeatPlanRules(
     assignedSeats.forEach(seat => {
         if (seat.student) {
             const rId = seat.classroom.id;
+            if (targetRoomIds.size > 0 && !targetRoomIds.has(rId)) return;
             if (!roomSeatOccupancy.has(rId)) roomSeatOccupancy.set(rId, new Map());
             const seatMap = roomSeatOccupancy.get(rId)!;
             if (!seatMap.has(seat.seatNumber)) seatMap.set(seat.seatNumber, []);
@@ -263,6 +269,7 @@ export function validateSeatPlanRules(
     });
 
     assignmentsByRoom.forEach((seats, rId) => {
+        if (targetRoomIds.size > 0 && !targetRoomIds.has(rId)) return;
         const room = roomMap.get(rId) || seats[0]?.classroom;
         if (!room || !Array.isArray(room.benchCapacities)) return;
 
@@ -360,9 +367,15 @@ export function getSeatPlanViolations(
     classrooms: Classroom[] = []
 ): BenchViolationDetail[] {
     if (!plan || !plan.assignments || !Array.isArray(plan.assignments) || plan.assignments.length === 0) return [];
+    const targetRoomIds = new Set((classrooms || []).filter(c => c && c.id).map(c => c.id));
     const report = validateSeatPlanRules(plan, classrooms);
     return report.violations
-        .filter(v => v.severity === 'error' && (v.ruleNumber === 2 || v.ruleNumber === 5 || v.ruleNumber === 10 || v.ruleNumber === 11))
+        .filter(v => {
+            if (v.severity !== 'error') return false;
+            if (v.ruleNumber !== 2 && v.ruleNumber !== 5 && v.ruleNumber !== 10 && v.ruleNumber !== 11) return false;
+            if (targetRoomIds.size > 0 && v.classroomId && !targetRoomIds.has(v.classroomId)) return false;
+            return true;
+        })
         .map(v => ({
             classroomId: v.classroomId || '',
             roomNo: v.roomNo || 'Room',

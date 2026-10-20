@@ -337,15 +337,20 @@ export default function AllotmentPage() {
     }
   }, [selectedSlotKey, updateStateForSlot]);
 
-  const classroomsInPlan = seatPlan
-    ? [
-        ...new Map(
-          seatPlan.assignments
-            .filter(a => a && a.student && a.classroom?.id)
-            .map(item => [item.classroom.id, item.classroom])
-        ).values()
-      ]
-    : [];
+  const classroomsInPlan = useMemo(() => {
+    if (!seatPlan) return [];
+    const map = new Map<string, any>();
+    (seatPlan.assignments || []).forEach(a => {
+      if (a && a.classroom?.id) {
+        map.set(a.classroom.id, a.classroom);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const bld = (a.building || '').localeCompare(b.building || '');
+      if (bld !== 0) return bld;
+      return (a.roomNo || '').localeCompare(b.roomNo || '', undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [seatPlan]);
 
   const selectedClassroom = selectedClassroomId ? classrooms.find(c => c.id === selectedClassroomId) : null;
 
@@ -938,7 +943,13 @@ export default function AllotmentPage() {
                             <SelectTrigger className="h-10">
                               <SelectValue placeholder="Select an exam session..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent
+                              position="popper"
+                              side="bottom"
+                              sideOffset={4}
+                              align="start"
+                              className="max-h-[260px] w-[var(--radix-select-trigger-width)] min-w-[280px] overflow-y-auto"
+                            >
                               {slotOptions.map(slot => (
                                 <SelectItem key={slot.id} value={slot.id}>{slot.label}</SelectItem>
                               ))}
@@ -1147,10 +1158,16 @@ export default function AllotmentPage() {
                           </div>
                           <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0">
                             <Select onValueChange={setSelectedClassroomId} value={selectedClassroomId || ''}>
-                              <SelectTrigger className="w-full sm:w-[260px] h-9">
+                              <SelectTrigger className="w-full sm:w-[280px] h-9">
                                 <SelectValue placeholder="Select a classroom to view" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent
+                                position="popper"
+                                side="bottom"
+                                sideOffset={4}
+                                align="start"
+                                className="max-h-[260px] w-[var(--radix-select-trigger-width)] min-w-[280px] overflow-y-auto"
+                              >
                                 {classroomsInPlan.map(c => (
                                   <SelectItem key={c.id} value={c.id}>{c.roomNo} ({c.building})</SelectItem>
                                 ))}
